@@ -9,6 +9,7 @@
     <string name="gallery_menu_favorites_only">즐겨찾기만 보기</string>
     <string name="gallery_menu_show_all">전체 보기</string>
     <string name="gallery_menu_trash">휴지통</string>
+    <string name="gallery_menu_drive">Google Drive</string>
     <string name="gallery_rename_label">새 이름</string>
     <string name="gallery_rename_hint">확장자를 생략하면 .%1$s 가 유지됩니다</string>
     <string name="gallery_move_new_album">새 앨범 이름</string>
@@ -70,7 +71,7 @@
     <string name="settings_sign_in_cancelled">로그인이 취소되었습니다</string>
     <string name="settings_storage_usage">Drive 저장공간 %1$s / %2$s 사용</string>
     <string name="settings_storage_usage_unlimited">Drive 저장공간 %1$s 사용</string>
-    <string name="settings_scope_note">이 앱은 자신이 업로드한 파일에만 접근합니다 (drive.file 권한).</string>
+    <string name="settings_scope_note">Drive 파일을 탐색하고 폴더를 만들기 위해 Google Drive 전체 접근 권한을 요청합니다.</string>
     <string name="settings_upload_section">업로드</string>
     <string name="settings_gallery_section">갤러리</string>
     <string name="settings_manage_media">확인 없이 편집</string>
@@ -78,18 +79,21 @@
     <string name="settings_manage_media_granted">허용됨 — 삭제·휴지통·이동을 바로 실행합니다</string>
     <string name="settings_upload_folder">업로드 폴더</string>
     <string name="settings_upload_queue">업로드 목록</string>
+    <string name="settings_browse_drive">Google Drive 파일 보기</string>
     <string name="settings_upload_wifi_only">Wi-Fi에서만 업로드</string>
     <string name="settings_upload_wifi_only_description">모바일 데이터에서는 대기하고 Wi-Fi에 연결되면 이어서 올립니다</string>
     <string name="settings_upload_charging_only">충전 중에만 업로드</string>
     <string name="settings_upload_charging_only_description">배터리 소모를 줄이려면 켜세요</string>
     <string name="settings_upload_folder_default">Easy Gallery (기본)</string>
 
-    <!-- 폴더 선택 -->
-    <string name="folder_picker_title">업로드 폴더 선택</string>
-    <string name="folder_picker_select_here">이 폴더에 업로드</string>
+    <!-- Google Drive 탐색 -->
+    <string name="drive_title">Google Drive</string>
+    <string name="drive_root_name">내 드라이브</string>
+    <string name="drive_folder_empty">비어 있는 폴더입니다. 오른쪽 위에서 새 폴더를 만들 수 있습니다.</string>
+    <string name="drive_use_as_upload_folder">이 폴더를 업로드 폴더로 지정</string>
+    <string name="drive_folder_created">%1$s 폴더를 만들었습니다</string>
     <string name="folder_picker_new_folder">새 폴더</string>
     <string name="folder_picker_folder_name">폴더 이름</string>
-    <string name="folder_picker_empty">하위 폴더가 없습니다. 오른쪽 위에서 새 폴더를 만들 수 있습니다.</string>
 
     <!-- 업로드 목록 -->
     <string name="upload_queue_title">업로드 목록</string>
@@ -132,5 +136,6 @@
     <string name="action_move">앨범으로 이동</string>
     <string name="action_restore">복원</string>
     <string name="action_save">저장</string>
+    <string name="action_refresh">새로 고침</string>
     <string name="action_remove">삭제</string>
 </resources>

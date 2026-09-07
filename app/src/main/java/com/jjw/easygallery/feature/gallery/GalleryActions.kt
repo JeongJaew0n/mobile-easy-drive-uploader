@@ -91,35 +91,45 @@ internal fun GalleryOverflowMenu(
     supportsTrashAndFavorites: Boolean,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenDrive: () -> Unit,
 ) {
-    if (!supportsTrashAndFavorites) return
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
         DropdownMenuItem(
-            text = {
-                Text(
-                    stringResource(
-                        if (favoritesOnly) R.string.gallery_menu_show_all else R.string.gallery_menu_favorites_only,
-                    ),
-                )
-            },
-            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+            text = { Text(stringResource(R.string.gallery_menu_drive)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_insert_drive_file), contentDescription = null) },
             onClick = {
                 expanded = false
-                onFavoritesOnlyChange(!favoritesOnly)
+                onOpenDrive()
             },
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.gallery_menu_trash)) },
-            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-            onClick = {
-                expanded = false
-                onOpenTrash()
-            },
-        )
+        if (supportsTrashAndFavorites) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (favoritesOnly) R.string.gallery_menu_show_all else R.string.gallery_menu_favorites_only,
+                        ),
+                    )
+                },
+                leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onFavoritesOnlyChange(!favoritesOnly)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.gallery_menu_trash)) },
+                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onOpenTrash()
+                },
+            )
+        }
     }
 }
 

@@ -84,7 +84,7 @@ class GoogleAuthRepository @Inject constructor(
 
     private suspend fun authorize(account: Account?): AuthorizationResult {
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(DRIVE_FILE_SCOPE)))
+            .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
             .apply { if (account != null) setAccount(account) }
             .build()
         return client.authorize(request).await()
@@ -100,8 +100,12 @@ class GoogleAuthRepository @Inject constructor(
     }
 
     companion object {
-        /** 앱이 만든 파일만 접근 — Google 검증 없이 사용 가능한 non-sensitive scope */
-        const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+        /**
+         * Drive 전체 접근. 사용자의 기존 파일·폴더를 탐색하고 어디든 폴더를 만들 수 있어야 해서 필요하다.
+         * restricted scope 라 스토어 공개 시 Google 검증이 필요하고, 테스트 모드에서는 테스트 사용자만 로그인 가능.
+         * 앱이 만든 파일만 다루는 것으로 축소하려면 "https://www.googleapis.com/auth/drive.file" 로 바꾼다.
+         */
+        const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
         private const val GOOGLE_ACCOUNT_TYPE = "com.google"
 
         // 실제 만료는 1시간. 여유를 두고 갱신하고, 그래도 401 이 오면 Authenticator 가 재시도.

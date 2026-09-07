@@ -1,7 +1,11 @@
 package com.jjw.easygallery.core.data.drive
 
 import com.jjw.easygallery.core.domain.model.DriveAccount
+import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
+import com.jjw.easygallery.core.domain.model.DrivePage
+import java.time.Instant
+import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,9 +24,12 @@ class DriveRestRepository @Inject constructor(
         )
     }
 
-    override suspend fun listFolders(parentId: String): List<DriveFolder> {
-        val query = "mimeType = '${DriveApi.FOLDER_MIME_TYPE}' and '${escape(parentId)}' in parents and trashed = false"
-        return listAll(query).map { it.toFolder() }
+    override suspend fun listChildren(parentId: String, pageToken: String?): DrivePage {
+        val page = api.listFiles(
+            query = "'${escape(parentId)}' in parents and trashed = false",
+            pageToken = pageToken,
+        )
+        return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
 
     override suspend fun createFolder(name: String, parentId: String): DriveFolder =
@@ -56,6 +63,21 @@ class DriveRestRepository @Inject constructor(
     }
 
     private fun DriveFileDto.toFolder() = DriveFolder(id = id, name = name)
+
+    private fun DriveFileDto.toEntry() = DriveEntry(
+        id = id,
+        name = name,
+        mimeType = mimeType ?: "",
+        sizeBytes = size?.toLongOrNull(),
+        modifiedTimeMillis = modifiedTime?.let { parseRfc3339(it) },
+        webViewLink = webViewLink,
+    )
+
+    private fun parseRfc3339(value: String): Long? = try {
+        Instant.parse(value).toEpochMilli()
+    } catch (e: DateTimeParseException) {
+        null
+    }
 
     // Drive 쿼리 문자열 안의 작은따옴표/백슬래시 이스케이프
     private fun escape(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")

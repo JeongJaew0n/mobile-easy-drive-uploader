@@ -6,7 +6,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import com.jjw.easygallery.feature.folderpicker.FolderPickerRoute
+import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
@@ -30,13 +30,15 @@ fun AppNavigation() {
                     onSettingsClick = { backStack.add(SettingsKey) },
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onTrashClick = { backStack.add(TrashKey) },
+                    onDriveClick = { backStack.add(DriveBrowserKey()) },
                 )
             }
             entry<SettingsKey> {
                 SettingsRoute(
                     onBackClick = { backStack.removeLastOrNull() },
-                    onUploadFolderClick = { backStack.add(FolderPickerKey()) },
+                    onUploadFolderClick = { backStack.add(DriveBrowserKey()) },
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
+                    onDriveClick = { backStack.add(DriveBrowserKey()) },
                 )
             }
             entry<UploadQueueKey> {
@@ -45,12 +47,12 @@ fun AppNavigation() {
             entry<TrashKey> {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
             }
-            entry<FolderPickerKey> { key ->
-                FolderPickerRoute(
+            entry<DriveBrowserKey> { key ->
+                DriveBrowserRoute(
                     key = key,
-                    onOpenFolder = { folder -> backStack.add(FolderPickerKey(folder.id, folder.name)) },
-                    // 폴더를 고르면 폴더 피커 스택 전체를 걷어내고 설정으로 복귀
-                    onFolderSelected = { backStack.removeAll { it is FolderPickerKey } },
+                    onOpenFolder = { folder -> backStack.add(DriveBrowserKey(folder.id, folder.name)) },
+                    // 업로드 폴더를 지정하면 Drive 탐색 스택 전체를 걷어내고 이전 화면으로 복귀
+                    onUploadFolderSelected = { backStack.removeAll { it is DriveBrowserKey } },
                     onBackClick = { backStack.removeLastOrNull() },
                 )
             }

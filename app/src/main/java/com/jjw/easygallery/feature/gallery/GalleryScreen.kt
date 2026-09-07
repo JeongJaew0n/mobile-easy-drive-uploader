@@ -69,6 +69,7 @@ fun GalleryRoute(
     onSettingsClick: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onTrashClick: () -> Unit,
+    onDriveClick: () -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -155,6 +156,7 @@ fun GalleryRoute(
         onUploadQueueClick = onUploadQueueClick,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onTrashClick = onTrashClick,
+        onDriveClick = onDriveClick,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,
             onDelete = viewModel::deleteSelected,
@@ -190,6 +192,7 @@ internal fun GalleryScreen(
     onSelectionChange: (Set<Long>) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onTrashClick: () -> Unit = {},
+    onDriveClick: () -> Unit = {},
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -219,6 +222,7 @@ internal fun GalleryScreen(
                     onSettingsClick = onSettingsClick,
                     onFavoritesOnlyChange = onFavoritesOnlyChange,
                     onTrashClick = onTrashClick,
+                    onDriveClick = onDriveClick,
                 )
             }
         },
@@ -368,6 +372,7 @@ private fun GalleryTopBar(
     onSettingsClick: () -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onTrashClick: () -> Unit,
+    onDriveClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -391,6 +396,7 @@ private fun GalleryTopBar(
                 supportsTrashAndFavorites = supportsTrashAndFavorites,
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
                 onOpenTrash = onTrashClick,
+                onOpenDrive = onDriveClick,
             )
         },
     )

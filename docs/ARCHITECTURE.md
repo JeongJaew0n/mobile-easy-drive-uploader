@@ -25,7 +25,7 @@ app/src/main/java/com/jjw/easygallery/
     ├── gallery/               # GalleryRoute/Screen/Grid, GalleryActions(하단 바·다이얼로그·메뉴), GalleryViewModel, MediaPermission
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
-    ├── folderpicker/          # Drive 폴더 탐색·생성·선택 (FolderPickerKey 를 중첩 push)
+    ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)
     └── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
 ```
 
@@ -76,7 +76,7 @@ GalleryViewModel.uploadSelected ─▶ EnqueueUploadsUseCase ─▶ Room upload_
 - **토큰**: `AuthorizationClient.authorize()` 는 동의가 있으면 UI 없이 새 토큰을 준다. 45분 캐시 + 401 시 `TokenAuthenticator` 가 1회 재발급·재시도.
 - **예외**: `AuthException`(IOException) 계열 — `NotSignedIn`/`AuthorizationRequired`/`SignInCancelled`. 갤러리는 이를 받으면 "로그인 필요" 스낵바 → 설정으로 유도.
 - **업로드는 큐에 넣기만**: UI 는 Room 에 행을 추가하고 워커를 예약한 뒤 즉시 반환. 진행 상황은 `UploadQueueRepository.observeSummary()` 로 관찰.
-- **폴더 선택**: `drive.file` scope 는 앱이 만든 파일만 보이므로 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true` 로 식별) 아래를 탐색·생성한다.
+- **Drive 탐색**: `files.list` 를 `'<parent>' in parents and trashed = false`, `orderBy=folder,name_natural` 로 100개씩 페이징(리스트 끝 5개 전에 다음 페이지). 파일 탭은 `webViewLink` 를 ACTION_VIEW 로 열어 Drive 앱/브라우저에 위임. 기본 업로드 폴더는 여전히 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true`) 이며, 사용자가 Drive 탐색에서 임의 폴더를 업로드 폴더로 지정할 수 있다.
 
 ## 갤러리 편집 (MediaStore CRUD)
 

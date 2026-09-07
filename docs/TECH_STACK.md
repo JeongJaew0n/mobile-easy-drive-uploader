@@ -62,7 +62,7 @@ iOS는 수요가 확인되면 "업로드 전용 축소판"으로 별도 판단.
 | 기능 | 구현 | 비고 |
 |---|---|---|
 | 로그인 + Drive 권한 | `play-services-auth` **AuthorizationClient** 하나로 계정 선택·scope 동의 처리 | 서버가 없어 ID 토큰이 필요 없으므로 Credential Manager 는 쓰지 않음. 계정 정보(이메일·저장공간)는 Drive `about` API 로 조회. Android OAuth 클라이언트(패키지명+SHA-1)만 등록하면 되고 앱에 클라이언트 ID 를 심지 않음 |
-| OAuth scope | `https://www.googleapis.com/auth/drive.file` | 앱이 만든 파일만 접근(non-sensitive → Google 검증 불필요). 대신 사용자가 Drive 에서 직접 만든 기존 폴더는 보이지 않으므로 앱 루트 폴더("Easy Gallery") 아래에서 폴더를 만들어 고르게 함. 전체 Drive 접근이 필요해지면 `drive` scope + Google 검증 |
+| OAuth scope | `https://www.googleapis.com/auth/drive` (전체) | 2026-09-08 `drive.file` 에서 변경 — 사용자의 기존 Drive 파일·폴더를 탐색하고 어디든 폴더를 만드는 기능이 필요. restricted scope 라 스토어 공개 시 Google 검증 필요(테스트 모드는 테스트 사용자만). 축소하려면 `GoogleAuthRepository.DRIVE_SCOPE` 한 곳만 바꾼다 |
 | Drive API 호출 | **Retrofit + OkHttp**로 Drive REST v3 직접 호출, **kotlinx.serialization** | 공식 Java 클라이언트(`google-api-services-drive`)는 Guava 등 의존성이 무겁고 Android 최적화가 약해 배제 |
 | 업로드 | **Resumable upload** (`uploadType=resumable`) | 세션 URL 발급 → 청크 PUT → 중단 시 `Content-Range: bytes */total`로 오프셋 조회 후 재개 |
 

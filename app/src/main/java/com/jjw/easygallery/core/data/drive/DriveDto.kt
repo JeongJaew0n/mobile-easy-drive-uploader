@@ -11,6 +11,7 @@ data class DriveFileDto(
     val modifiedTime: String? = null,
     /** Drive 는 int64 를 문자열로 내려준다 */
     val size: String? = null,
+    val webViewLink: String? = null,
 )
 
 @Serializable

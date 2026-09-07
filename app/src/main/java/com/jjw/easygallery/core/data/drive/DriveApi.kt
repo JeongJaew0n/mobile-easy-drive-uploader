@@ -20,9 +20,10 @@ interface DriveApi {
         @Query("q") query: String,
         @Query("pageToken") pageToken: String? = null,
         @Query("pageSize") pageSize: Int = DEFAULT_PAGE_SIZE,
-        @Query("orderBy") orderBy: String = "name",
+        @Query("orderBy") orderBy: String = "folder,name_natural",
         @Query("spaces") spaces: String = "drive",
-        @Query("fields") fields: String = "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size)",
+        @Query("fields") fields: String =
+            "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink)",
     ): DriveFileListDto
 
     @POST("drive/v3/files")

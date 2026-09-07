@@ -61,18 +61,41 @@ class DriveRestRepositoryTest {
     }
 
     @Test
-    fun `listFolders follows nextPageToken and filters by parent`() = runTest {
-        server.enqueue(json("""{"files":[{"id":"1","name":"A"}],"nextPageToken":"tok"}"""))
-        server.enqueue(json("""{"files":[{"id":"2","name":"B"}]}"""))
+    fun `listChildren returns one page with folders first and escapes parent id`() = runTest {
+        server.enqueue(
+            json(
+                """{"files":[
+                    {"id":"f1","name":"앨범","mimeType":"application/vnd.google-apps.folder","modifiedTime":"2026-09-07T12:00:00.000Z"},
+                    {"id":"i1","name":"a.jpg","mimeType":"image/jpeg","size":"1234","webViewLink":"https://drive/a"}
+                  ],"nextPageToken":"tok"}""",
+            ),
+        )
 
-        val folders = repository.listFolders("parent'1")
+        val page = repository.listChildren("parent'1")
 
-        assertEquals(listOf("A", "B"), folders.map { it.name })
-        val first = server.takeRequest()
-        val q = first.url.queryParameter("q")!!
-        assertTrue(q.contains("mimeType = '${DriveApi.FOLDER_MIME_TYPE}'"))
+        assertEquals(listOf("앨범", "a.jpg"), page.entries.map { it.name })
+        assertTrue(page.entries[0].isFolder)
+        val expectedModified = java.time.Instant.parse("2026-09-07T12:00:00.000Z").toEpochMilli()
+        assertEquals(expectedModified, page.entries[0].modifiedTimeMillis)
+        assertEquals(1_234L, page.entries[1].sizeBytes)
+        assertEquals("https://drive/a", page.entries[1].webViewLink)
+        assertEquals("tok", page.nextPageToken)
+        val request = server.takeRequest()
+        val q = request.url.queryParameter("q")!!
         assertTrue("작은따옴표 이스케이프: $q", q.contains("'parent\\'1' in parents"))
-        assertEquals(null, first.url.queryParameter("pageToken"))
+        assertTrue(q.contains("trashed = false"))
+        assertEquals("folder,name_natural", request.url.queryParameter("orderBy"))
+        assertEquals(null, request.url.queryParameter("pageToken"))
+    }
+
+    @Test
+    fun `listChildren passes pageToken for next page`() = runTest {
+        server.enqueue(json("""{"files":[]}"""))
+
+        val page = repository.listChildren("root", pageToken = "tok")
+
+        assertTrue(page.entries.isEmpty())
+        assertEquals(null, page.nextPageToken)
         assertEquals("tok", server.takeRequest().url.queryParameter("pageToken"))
     }
 
