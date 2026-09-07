@@ -45,8 +45,8 @@ iOS는 수요가 확인되면 "업로드 전용 축소판"으로 별도 판단.
 | 기능 | 구현 |
 |---|---|
 | 조회 (사진·영상, 앨범/버킷별, 날짜 정렬) | `ContentResolver` + `MediaStore.Images/Video/Files` 쿼리, `ContentObserver`로 변경 감지 |
-| 대량 목록 | **Paging 3** (`PagingSource`로 MediaStore 페이징) |
-| 썸네일·이미지 로딩 | **Coil 3** (`video` 확장으로 영상 썸네일) |
+| 대량 목록 | 메모리 리스트 + `LazyVerticalGrid` (Paging 3 는 수십만 장 규모가 실측되면 도입 — 근거는 ARCHITECTURE.md) |
+| 썸네일·이미지 로딩 | **Coil 3** + 커스텀 Fetcher(`ContentResolver.loadThumbnail` 시스템 썸네일 캐시), 폴백은 `coil-video` |
 | 삭제 / 휴지통 / 복원 | `MediaStore.createDeleteRequest` / `createTrashRequest` (API 30+) |
 | 즐겨찾기 | `MediaStore.createFavoriteRequest` (API 30+) |
 | 파일명 변경, 폴더(앨범) 이동 | `createWriteRequest` + `DISPLAY_NAME` / `RELATIVE_PATH` 업데이트 |
@@ -126,8 +126,8 @@ Gradle은 프로젝트의 Gradle Wrapper(`./gradlew`)로 실행하므로 별도 
 
 ## 개발 순서
 
-1. 프로젝트 스캐폴딩 (Compose, Hilt, Version Catalog, detekt, CI)
-2. 갤러리 조회 MVP — 권한 흐름, 앨범/타임라인 그리드, Paging + Coil
+1. 프로젝트 스캐폴딩 (Compose, Hilt, Version Catalog, detekt, CI) ✅ (2026-09-07)
+2. 갤러리 조회 MVP — 권한 흐름, 타임라인 그리드, Coil 썸네일 ✅ (2026-09-07)
 3. Google 로그인 + Drive 폴더 선택 + 단건 업로드
 4. WorkManager 기반 백그라운드 업로드·재개·알림
 5. 갤러리 CRUD 확장 — 삭제/휴지통/즐겨찾기/이름 변경/이동

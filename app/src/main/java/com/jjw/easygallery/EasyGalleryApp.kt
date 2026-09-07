@@ -1,14 +1,21 @@
 package com.jjw.easygallery
 
 import android.app.Application
+import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.request.crossfade
+import coil3.video.VideoFrameDecoder
+import com.jjw.easygallery.core.ui.image.MediaStoreThumbnailFetcher
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import javax.inject.Inject
 
 @HiltAndroidApp
-class EasyGalleryApp : Application(), Configuration.Provider {
+class EasyGalleryApp : Application(), Configuration.Provider, SingletonImageLoader.Factory {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
@@ -24,6 +31,16 @@ class EasyGalleryApp : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
-            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.ERROR)
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.ERROR)
+            .build()
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .components {
+                // MediaStore URI 는 시스템 썸네일 우선, 그 외 영상은 프레임 디코더
+                add(MediaStoreThumbnailFetcher.Factory())
+                add(VideoFrameDecoder.Factory())
+            }
+            .crossfade(true)
             .build()
 }

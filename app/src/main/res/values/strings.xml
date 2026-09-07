@@ -7,6 +7,13 @@
         <item quantity="other">%1$d개의 항목</item>
     </plurals>
 
+    <string name="gallery_permission_title">사진과 영상에 접근할 수 없습니다</string>
+    <string name="gallery_permission_description">갤러리를 표시하고 Google Drive로 옮기려면 사진·영상 읽기 권한이 필요합니다.</string>
+    <string name="gallery_permission_grant">권한 허용</string>
+    <string name="gallery_permission_open_settings">설정에서 허용</string>
+    <string name="gallery_partial_access_message">일부 사진·영상만 접근이 허용되어 있습니다.</string>
+    <string name="gallery_partial_access_manage">더 선택</string>
+
     <string name="settings_title">설정</string>
     <string name="settings_placeholder">설정 화면은 준비 중입니다</string>
 

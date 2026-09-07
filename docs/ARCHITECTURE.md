@@ -11,11 +11,28 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── data/media/            # MediaRepository (interface) / MediaStoreRepository / MediaModule
 │   ├── domain/model/          # MediaItem 등 순수 Kotlin 모델
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
-│   └── ui/theme/              # Material 3 테마
+│   └── ui/
+│       ├── image/             # Coil Fetcher (MediaStore 썸네일)
+│       └── theme/             # Material 3 테마
 └── feature/
-    ├── gallery/               # GalleryRoute / GalleryScreen / GalleryViewModel
+    ├── gallery/               # GalleryRoute/Screen/Grid, GalleryViewModel, MediaPermission, GallerySection
     └── settings/              # SettingsRoute / SettingsScreen
 ```
+
+## 갤러리 데이터 흐름
+
+```
+ContentObserver(MediaStore.Files) ─debounce 300ms─┐
+flowOf(Unit) (최초 1회) ───────────────────────────┴─▶ mapLatest { queryAll() } ─▶ List<MediaItem>
+                                                                                      │
+GalleryViewModel: permissionStatus.flatMapLatest ─▶ groupByDate() ─▶ GalleryUiState.Content(sections)
+```
+
+- **MediaStoreRepository**: `MediaStore.Files` 컬렉션을 `MEDIA_TYPE IN (IMAGE, VIDEO)` 로 한 번에 조회. `DATE_TAKEN` 이 0인 행은 `DATE_ADDED*1000` 으로 대체 후 메모리 정렬. 쿼리는 `ensureActive()` 로 취소 가능.
+- **전체 로드 (Paging 미사용)**: 수천~수만 장은 항목당 수백 바이트라 메모리 리스트로 충분하고(6천 장 ≈ 수 MB), 날짜 헤더·다중 선택·"이 날 전체 선택" 같은 기능이 훨씬 단순해진다. 수십만 장 규모 이슈가 실측되면 Paging 3 도입을 재검토한다.
+- **권한**: `MediaPermission` 이 SDK 별 권한 집합과 상태(Full/Partial/Denied)를 계산. `GalleryRoute` 가 `LifecycleResumeEffect` 마다 상태를 ViewModel 에 알려 설정 앱에서 돌아온 경우도 반영. ViewModel 은 상태를 모르는 동안(`null`) 쿼리하지 않는다.
+- **썸네일**: `MediaStoreThumbnailFetcher` 가 `content://media/...` URI 를 가로채 `ContentResolver.loadThumbnail` (시스템 썸네일 캐시) 사용. 실패 시 원본 스트림으로 폴백해 Coil 기본 디코더/`VideoFrameDecoder` 가 처리.
+- **그리드**: `LazyVerticalGrid(Adaptive 100dp)`, 날짜 헤더는 `GridItemSpan(maxLineSpan)`. key 는 URI 문자열.
 
 ## 레이어 흐름 (UDF)
 

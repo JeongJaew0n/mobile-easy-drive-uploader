@@ -12,8 +12,13 @@ data class MediaItem(
     val type: MediaType,
     val mimeType: String,
     val sizeBytes: Long,
+    /** 촬영 시각(ms). DATE_TAKEN 이 없으면 DATE_ADDED 로 대체된 값. */
     val dateTakenMillis: Long,
     val bucketId: Long,
     val bucketName: String,
+    val width: Int = 0,
+    val height: Int = 0,
     val durationMillis: Long? = null,
-)
+) {
+    val isVideo: Boolean get() = type == MediaType.VIDEO
+}

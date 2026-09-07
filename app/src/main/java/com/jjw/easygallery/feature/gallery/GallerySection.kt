@@ -1,0 +1,31 @@
+package com.jjw.easygallery.feature.gallery
+
+import com.jjw.easygallery.core.domain.model.MediaItem
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+/** 같은 날짜에 촬영된 항목 묶음. 최신 날짜가 먼저 온다. */
+data class GallerySection(
+    val date: LocalDate,
+    val items: List<MediaItem>,
+)
+
+/** [items] 는 최신순으로 정렬되어 있다고 가정한다. 섹션 내 순서는 입력 순서를 유지한다. */
+fun groupByDate(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): List<GallerySection> {
+    if (items.isEmpty()) return emptyList()
+    val sections = ArrayList<GallerySection>()
+    var currentDate: LocalDate? = null
+    var bucket = ArrayList<MediaItem>()
+    for (item in items) {
+        val date = Instant.ofEpochMilli(item.dateTakenMillis).atZone(zone).toLocalDate()
+        if (date != currentDate) {
+            if (currentDate != null) sections += GallerySection(currentDate, bucket)
+            currentDate = date
+            bucket = ArrayList()
+        }
+        bucket += item
+    }
+    currentDate?.let { sections += GallerySection(it, bucket) }
+    return sections
+}
