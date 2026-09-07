@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Easy Gallery</string>
+
+    <string name="gallery_title">갤러리</string>
+    <string name="gallery_empty">표시할 사진이나 영상이 없습니다</string>
+    <plurals name="gallery_media_count">
+        <item quantity="other">%1$d개의 항목</item>
+    </plurals>
+
+    <string name="settings_title">설정</string>
+    <string name="settings_placeholder">설정 화면은 준비 중입니다</string>
+
+    <string name="action_settings">설정</string>
+    <string name="action_back">뒤로</string>
+</resources>
