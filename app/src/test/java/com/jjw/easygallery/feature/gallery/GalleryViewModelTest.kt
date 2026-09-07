@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
+import com.jjw.easygallery.core.domain.usecase.UploadMediaUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -24,6 +25,7 @@ import org.junit.Test
 class GalleryViewModelTest {
 
     private val repository: MediaRepository = mockk()
+    private val uploadMedia: UploadMediaUseCase = mockk()
 
     // StandardTestDispatcher: 구독 전까지 upstream 이 실행되지 않아 상태 전이 순서를 관찰할 수 있다.
     private val testDispatcher = StandardTestDispatcher()
@@ -40,7 +42,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `stays Loading and does not query until permission status is known`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -51,7 +53,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `denied permission shows PermissionRequired without querying`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -65,7 +67,7 @@ class GalleryViewModelTest {
     fun `full permission loads content grouped by date`() = runTest(testDispatcher) {
         val item = sampleItem(id = 1)
         every { repository.observeMedia() } returns flowOf(listOf(item))
-        val viewModel = GalleryViewModel(repository)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -80,7 +82,7 @@ class GalleryViewModelTest {
     @Test
     fun `partial permission flags content as partial access`() = runTest(testDispatcher) {
         every { repository.observeMedia() } returns flowOf(emptyList())
-        val viewModel = GalleryViewModel(repository)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
 
         viewModel.uiState.test {
             awaitItem() // Loading
@@ -92,17 +94,47 @@ class GalleryViewModelTest {
     }
 
     @Test
+    fun `toggleSelection adds and removes ids and clearSelection resets`() = runTest(testDispatcher) {
+        val items = listOf(sampleItem(1), sampleItem(2))
+        every { repository.observeMedia() } returns flowOf(items)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertTrue((awaitItem() as GalleryUiState.Content).selectedIds.isEmpty())
+
+            viewModel.toggleSelection(1)
+            assertEquals(setOf(1L), (awaitItem() as GalleryUiState.Content).selectedIds)
+
+            viewModel.toggleSelection(2)
+            val both = awaitItem() as GalleryUiState.Content
+            assertEquals(setOf(1L, 2L), both.selectedIds)
+            assertTrue(both.isSelectionMode)
+
+            viewModel.toggleSelection(1)
+            assertEquals(setOf(2L), (awaitItem() as GalleryUiState.Content).selectedIds)
+
+            viewModel.clearSelection()
+            assertEquals(false, (awaitItem() as GalleryUiState.Content).isSelectionMode)
+        }
+    }
+
+    @Test
     fun `repository failure maps to Error state`() = runTest(testDispatcher) {
         val boom = IllegalStateException("boom")
         every { repository.observeMedia() } returns flow { throw boom }
-        val viewModel = GalleryViewModel(repository)
+        val viewModel = GalleryViewModel(repository, uploadMedia)
 
         viewModel.uiState.test {
             awaitItem() // Loading
             viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
             val error = awaitItem()
             assertTrue(error is GalleryUiState.Error)
-            assertEquals(boom, (error as GalleryUiState.Error).throwable)
+            // combine 은 스택트레이스 복구를 위해 예외 사본을 만들 수 있으므로 동일성 대신 타입·메시지 비교
+            val throwable = (error as GalleryUiState.Error).throwable
+            assertTrue(throwable is IllegalStateException)
+            assertEquals(boom.message, throwable.message)
         }
     }
 

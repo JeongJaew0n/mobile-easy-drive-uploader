@@ -121,11 +121,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
 
-    // Auth
-    implementation(libs.androidx.credentials)
-    implementation(libs.androidx.credentials.play.services.auth)
-    implementation(libs.googleid)
+    // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Network
     implementation(libs.retrofit)

@@ -27,5 +27,8 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - Kotlin 은 AGP 내장(built-in Kotlin). `org.jetbrains.kotlin.android` 플러그인을 추가하지 않는다. kapt 금지, KSP 사용.
 - 백그라운드 작업은 WorkManager + `@HiltWorker`. Application 이 `HiltWorkerFactory` 를 제공하므로 매니페스트의 기본 초기화 제거를 유지한다.
 - Drive API 는 Retrofit 으로 REST v3 직접 호출. 공식 Java 클라이언트(`google-api-services-drive`) 추가 금지.
-- 문자열은 `res/values/strings.xml` (한국어 기본). 하드코딩 금지.
+- 문자열은 `res/values/strings.xml` (한국어 기본). 하드코딩 금지. Composable 밖(LaunchedEffect 등)에서 문자열이 필요하면 `LocalResources.current` 를 캡처해 쓴다 — `LocalContext.current.getString` 은 lint 에러.
+- Google 인증은 `AuthorizationClient` 만 사용(Credential Manager/GoogleSignIn 금지). Drive 는 `drive.file` scope 유지.
+- Robolectric 테스트는 `robolectric.properties` 의 sdk=35 유지 (36+ 는 Java 21 필요, 테스트 JVM 은 17).
+- 벡터 아이콘은 `res/drawable/ic_*.xml` 에 직접 추가 (`material-icons-extended` 미사용, `?attr/colorControlNormal` 같은 AppCompat 속성 금지).
 - 줄 길이 120, 트레일링 콤마 사용 (detekt formatting 이 검사).

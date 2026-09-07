@@ -6,6 +6,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.jjw.easygallery.feature.folderpicker.FolderPickerRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 
@@ -26,7 +27,19 @@ fun AppNavigation() {
                 GalleryRoute(onSettingsClick = { backStack.add(SettingsKey) })
             }
             entry<SettingsKey> {
-                SettingsRoute(onBackClick = { backStack.removeLastOrNull() })
+                SettingsRoute(
+                    onBackClick = { backStack.removeLastOrNull() },
+                    onUploadFolderClick = { backStack.add(FolderPickerKey()) },
+                )
+            }
+            entry<FolderPickerKey> { key ->
+                FolderPickerRoute(
+                    key = key,
+                    onOpenFolder = { folder -> backStack.add(FolderPickerKey(folder.id, folder.name)) },
+                    // 폴더를 고르면 폴더 피커 스택 전체를 걷어내고 설정으로 복귀
+                    onFolderSelected = { backStack.removeAll { it is FolderPickerKey } },
+                    onBackClick = { backStack.removeLastOrNull() },
+                )
             }
         },
     )

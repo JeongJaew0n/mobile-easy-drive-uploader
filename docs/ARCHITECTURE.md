@@ -8,15 +8,21 @@ app/src/main/java/com/jjw/easygallery/
 ├── MainActivity.kt            # @AndroidEntryPoint, 단일 Activity
 ├── core/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
+│   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
+│   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
 │   ├── data/media/            # MediaRepository (interface) / MediaStoreRepository / MediaModule
-│   ├── domain/model/          # MediaItem 등 순수 Kotlin 모델
+│   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
+│   ├── data/upload/           # DriveUploader (resumable), ContentUriRequestBody
+│   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount
+│   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, UploadMediaUseCase
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
 │   └── ui/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
 │       └── theme/             # Material 3 테마
 └── feature/
-    ├── gallery/               # GalleryRoute/Screen/Grid, GalleryViewModel, MediaPermission, GallerySection
-    └── settings/              # SettingsRoute / SettingsScreen
+    ├── gallery/               # GalleryRoute/Screen/Grid(선택·업로드 진행), GalleryViewModel, MediaPermission, GallerySection
+    ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더 진입
+    └── folderpicker/          # Drive 폴더 탐색·생성·선택 (FolderPickerKey 를 중첩 push)
 ```
 
 ## 갤러리 데이터 흐름
@@ -53,6 +59,23 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 - `NavDisplay` 에 `rememberSaveableStateHolderNavEntryDecorator()` + `rememberViewModelStoreNavEntryDecorator()` 를 걸어 엔트리별 ViewModel 스코프를 보장.
 - 이동은 `backStack.add(Key)`, 뒤로는 `backStack.removeLastOrNull()`.
 
+## 인증 / Drive / 업로드 흐름
+
+```
+SettingsViewModel ─▶ SignInUseCase ─▶ AuthRepository.beginSignIn()
+                                         │ hasResolution → NeedsConsent(PendingIntent) → UI 가 StartIntentSenderForResult
+                                         │ 완료 → 토큰 캐시(45분) → DriveRepository.getAccount() → prefs.setAccount
+GalleryViewModel.uploadSelected ─▶ UploadMediaUseCase ─▶ GetUploadFolderUseCase(prefs → 없으면 ensureAppRootFolder)
+                                                        └▶ DriveUploader: POST uploadType=resumable → Location
+                                                                          PUT 세션 URI (ContentUriRequestBody 스트리밍, 진행률)
+```
+
+- **순환 의존 차단**: OkHttp `AuthInterceptor` 는 `TokenProvider` 만 알고, `GoogleAuthRepository` 가 이를 구현. Drive 계층은 Auth 를 모른다.
+- **토큰**: `AuthorizationClient.authorize()` 는 동의가 있으면 UI 없이 새 토큰을 준다. 45분 캐시 + 401 시 `TokenAuthenticator` 가 1회 재발급·재시도.
+- **예외**: `AuthException`(IOException) 계열 — `NotSignedIn`/`AuthorizationRequired`/`SignInCancelled`. 갤러리는 이를 받으면 "로그인 필요" 스낵바 → 설정으로 유도.
+- **업로드 (현 단계)**: ViewModel 스코프에서 순차 실행(포그라운드). 세션 URI 저장·재개·백그라운드는 다음 단계(WorkManager) 에서.
+- **폴더 선택**: `drive.file` scope 는 앱이 만든 파일만 보이므로 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true` 로 식별) 아래를 탐색·생성한다.
+
 ## 백그라운드 (예정)
 
 - `feature/upload` 에 `@HiltWorker class UploadWorker : CoroutineWorker`.
@@ -63,5 +86,5 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 
 | 종류 | 위치 | 도구 |
 |---|---|---|
-| 단위 | `app/src/test` | JUnit4, MockK, Turbine, coroutines-test, Robolectric |
+| 단위 | `app/src/test` | JUnit4, MockK, Turbine, coroutines-test, MockWebServer3(Drive REST), Robolectric(sdk=35 — 36+ 이미지는 Java 21 필요) |
 | 계측 | `app/src/androidTest` | Compose UI Test, Hilt testing (`HiltTestRunner`) |

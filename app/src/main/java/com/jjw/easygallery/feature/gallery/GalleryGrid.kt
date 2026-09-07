@@ -1,6 +1,9 @@
 package com.jjw.easygallery.feature.gallery
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -12,8 +15,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -38,8 +44,11 @@ import java.util.concurrent.TimeUnit
 @Composable
 internal fun GalleryGrid(
     sections: List<GallerySection>,
+    selectedIds: Set<Long>,
+    onToggleSelection: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectionMode = selectedIds.isNotEmpty()
     val configuration = LocalConfiguration.current
     val locale = remember(configuration) {
         ConfigurationCompat.getLocales(configuration)[0] ?: Locale.getDefault()
@@ -67,7 +76,12 @@ internal fun GalleryGrid(
                 key = { it.uri.toString() },
                 contentType = { "media" },
             ) { item ->
-                MediaThumbnail(item = item)
+                MediaThumbnail(
+                    item = item,
+                    selected = item.id in selectedIds,
+                    selectionMode = selectionMode,
+                    onToggleSelection = { onToggleSelection(item.id) },
+                )
             }
         }
     }
@@ -86,22 +100,41 @@ private fun DateHeader(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MediaThumbnail(
     item: MediaItem,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onToggleSelection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            // 길게 누르면 선택 모드 진입, 선택 모드에서는 탭으로 토글 (탭 열기는 상세 화면 추가 시)
+            .combinedClickable(
+                onClick = { if (selectionMode) onToggleSelection() },
+                onLongClick = onToggleSelection,
+            ),
     ) {
         AsyncImage(
             model = item.uri,
             contentDescription = item.displayName,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (selected) Modifier.padding(SELECTED_INSET_DP.dp) else Modifier),
         )
+        if (selectionMode) {
+            SelectionIndicator(
+                selected = selected,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp),
+            )
+        }
         if (item.isVideo) {
             VideoBadge(
                 durationMillis = item.durationMillis ?: 0L,
@@ -110,6 +143,31 @@ private fun MediaThumbnail(
                     .padding(4.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun SelectionIndicator(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = modifier
+                .size(22.dp)
+                .background(Color.White, CircleShape),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = BADGE_ALPHA * 0.5f))
+                .border(2.dp, Color.White, CircleShape),
+        )
     }
 }
 
@@ -153,5 +211,6 @@ internal fun formatDuration(millis: Long): String {
 private const val MIN_CELL_SIZE_DP = 100
 private const val CELL_SPACING_DP = 2
 private const val BADGE_ALPHA = 0.6f
+private const val SELECTED_INSET_DP = 10
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L

@@ -28,6 +28,15 @@ naming:
   TopLevelPropertyNaming:
     constantPattern: '[A-Za-z][_A-Za-z0-9]*'
 
+exceptions:
+  SwallowedException:
+    ignoredExceptionTypes:
+      - InterruptedException
+      - MalformedURLException
+      - NumberFormatException
+      - ParseException
+      - SignInCancelledException
+
 style:
   MagicNumber:
     ignoreAnnotated: ['Composable', 'Preview']
