@@ -9,10 +9,13 @@
     </plurals>
     <string name="gallery_selected_count">%1$d개 선택</string>
     <string name="gallery_uploading">업로드 중 (%1$d/%2$d) · %3$s</string>
-    <plurals name="gallery_upload_done">
-        <item quantity="other">%1$d개 항목을 Drive에 업로드했습니다</item>
+    <plurals name="gallery_upload_enqueued">
+        <item quantity="other">%1$d개 항목을 업로드 대기열에 추가했습니다</item>
     </plurals>
-    <string name="gallery_upload_done_with_failures">%1$d개 성공, %2$d개 실패</string>
+    <string name="gallery_upload_enqueued_skipped">%1$d개 추가, %2$d개는 이미 대기 중</string>
+    <plurals name="gallery_upload_failed_banner">
+        <item quantity="other">%1$d개 항목 업로드에 실패했습니다</item>
+    </plurals>
     <string name="gallery_sign_in_required">Drive에 업로드하려면 Google 계정 로그인이 필요합니다</string>
 
     <string name="gallery_permission_title">사진과 영상에 접근할 수 없습니다</string>
@@ -33,7 +36,13 @@
     <string name="settings_storage_usage">Drive 저장공간 %1$s / %2$s 사용</string>
     <string name="settings_storage_usage_unlimited">Drive 저장공간 %1$s 사용</string>
     <string name="settings_scope_note">이 앱은 자신이 업로드한 파일에만 접근합니다 (drive.file 권한).</string>
+    <string name="settings_upload_section">업로드</string>
     <string name="settings_upload_folder">업로드 폴더</string>
+    <string name="settings_upload_queue">업로드 목록</string>
+    <string name="settings_upload_wifi_only">Wi-Fi에서만 업로드</string>
+    <string name="settings_upload_wifi_only_description">모바일 데이터에서는 대기하고 Wi-Fi에 연결되면 이어서 올립니다</string>
+    <string name="settings_upload_charging_only">충전 중에만 업로드</string>
+    <string name="settings_upload_charging_only_description">배터리 소모를 줄이려면 켜세요</string>
     <string name="settings_upload_folder_default">Easy Gallery (기본)</string>
 
     <!-- 폴더 선택 -->
@@ -43,6 +52,29 @@
     <string name="folder_picker_folder_name">폴더 이름</string>
     <string name="folder_picker_empty">하위 폴더가 없습니다. 오른쪽 위에서 새 폴더를 만들 수 있습니다.</string>
 
+    <!-- 업로드 목록 -->
+    <string name="upload_queue_title">업로드 목록</string>
+    <string name="upload_queue_empty">업로드 내역이 없습니다</string>
+    <string name="upload_queue_retry_failed">실패 재시도</string>
+    <string name="upload_queue_clear_completed">완료 정리</string>
+    <string name="upload_queue_cancel_all">전체 취소</string>
+    <string name="upload_state_pending">대기 중</string>
+    <string name="upload_state_running">%1$s / %2$s</string>
+    <string name="upload_state_completed">완료 · %1$s</string>
+    <string name="upload_state_failed">실패</string>
+
+    <!-- 알림 -->
+    <string name="notification_channel_upload">Drive 업로드</string>
+    <string name="notification_channel_upload_description">Google Drive 업로드 진행 상황</string>
+    <string name="notification_upload_title">Drive에 업로드 중 (%1$d/%2$d)</string>
+    <string name="notification_upload_summary_title">Drive 업로드 완료</string>
+    <plurals name="notification_upload_done">
+        <item quantity="other">%1$d개 항목을 업로드했습니다</item>
+    </plurals>
+    <string name="notification_upload_done_with_failures">%1$d개 성공, %2$d개 실패</string>
+    <string name="notification_sign_in_required_title">업로드가 중단되었습니다</string>
+    <string name="notification_sign_in_required_text">Google 계정을 다시 연결해야 업로드를 계속할 수 있습니다</string>
+
     <!-- 공통 액션 -->
     <string name="action_settings">설정</string>
     <string name="action_back">뒤로</string>
@@ -51,4 +83,6 @@
     <string name="action_retry">다시 시도</string>
     <string name="action_clear_selection">선택 해제</string>
     <string name="action_upload_to_drive">Drive에 업로드</string>
+    <string name="action_view">보기</string>
+    <string name="action_remove">삭제</string>
 </resources>

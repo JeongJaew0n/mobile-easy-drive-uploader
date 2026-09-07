@@ -129,6 +129,6 @@ Gradle은 프로젝트의 Gradle Wrapper(`./gradlew`)로 실행하므로 별도 
 1. 프로젝트 스캐폴딩 (Compose, Hilt, Version Catalog, detekt, CI) ✅ (2026-09-07)
 2. 갤러리 조회 MVP — 권한 흐름, 타임라인 그리드, Coil 썸네일 ✅ (2026-09-07)
 3. Google 로그인 + Drive 폴더 선택 + 다중 선택 업로드(포그라운드) ✅ (2026-09-07, GCP OAuth 클라이언트 등록 후 기기 검증 예정)
-4. WorkManager 기반 백그라운드 업로드·재개·알림
+4. WorkManager 기반 백그라운드 업로드·재개·알림 ✅ (2026-09-07)
 5. 갤러리 CRUD 확장 — 삭제/휴지통/즐겨찾기/이름 변경/이동
 6. 고급 기능 — 중복 탐지, 영상 압축, 자동 백업 규칙

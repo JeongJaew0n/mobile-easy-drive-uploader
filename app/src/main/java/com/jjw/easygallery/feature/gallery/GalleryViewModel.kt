@@ -4,12 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.media.MediaRepository
-import com.jjw.easygallery.core.data.upload.UploadEvent
+import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.MediaItem
-import com.jjw.easygallery.core.domain.usecase.UploadMediaUseCase
+import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,21 +30,22 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-@Suppress("TooGenericExceptionCaught") // 업로드 실패는 종류를 가리지 않고 집계해 사용자에게 알린다
+@Suppress("TooGenericExceptionCaught") // UI 경계: 큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
 class GalleryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
-    private val uploadMedia: UploadMediaUseCase,
+    uploadQueue: UploadQueueRepository,
+    private val enqueueUploads: EnqueueUploadsUseCase,
+    private val manageQueue: ManageUploadQueueUseCase,
 ) : ViewModel() {
 
     // null = 아직 권한 상태를 확인하지 않음
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val uploadStatus = MutableStateFlow<UploadStatus?>(null)
+    private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
     val eventFlow: Flow<GalleryEvent> = events.receiveAsFlow()
 
     private var latestItems: List<MediaItem> = emptyList()
-    private var uploadJob: Job? = null
 
     val uiState: StateFlow<GalleryUiState> = permissionStatus
         .flatMapLatest { status -> stateFor(status) }
@@ -66,47 +68,29 @@ class GalleryViewModel @Inject constructor(
         selectedIds.value = emptySet()
     }
 
-    /** 선택한 항목을 순서대로 업로드한다. 진행 중이면 무시. */
+    /** 선택 항목을 업로드 큐에 넣는다. 실제 전송은 WorkManager 가 백그라운드에서 수행. */
     fun uploadSelected() {
-        if (uploadJob?.isActive == true) return
         val items = latestItems.filter { it.id in selectedIds.value }
         if (items.isEmpty()) return
-        uploadJob = viewModelScope.launch { runUploads(items) }
-    }
-
-    fun cancelUpload() {
-        uploadJob?.cancel()
-        uploadJob = null
-        uploadStatus.value = null
-    }
-
-    private suspend fun runUploads(items: List<MediaItem>) {
-        var failed = 0
-        try {
-            items.forEachIndexed { index, item ->
-                uploadStatus.value = UploadStatus(index + 1, items.size, item.displayName, 0f)
-                try {
-                    uploadMedia(item).collect { event ->
-                        if (event is UploadEvent.Progress) {
-                            uploadStatus.update { it?.copy(fraction = event.fraction) }
-                        }
-                    }
-                } catch (e: AuthException) {
-                    Timber.w(e, "upload needs sign-in")
-                    events.send(GalleryEvent.SignInRequired)
-                    return
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Timber.e(e, "upload failed: %s", item.displayName)
-                    failed++
-                }
+        viewModelScope.launch {
+            try {
+                val added = enqueueUploads(items)
+                clearSelection()
+                events.send(GalleryEvent.Enqueued(added = added, skipped = items.size - added))
+            } catch (e: AuthException) {
+                Timber.w(e, "upload needs sign-in")
+                events.send(GalleryEvent.SignInRequired)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "enqueue failed")
+                events.send(GalleryEvent.Error(e.message ?: e.toString()))
             }
-            clearSelection()
-            events.send(GalleryEvent.UploadFinished(succeeded = items.size - failed, failed = failed))
-        } finally {
-            uploadStatus.value = null
         }
+    }
+
+    fun cancelUploads() {
+        viewModelScope.launch { manageQueue.cancelAll() }
     }
 
     private fun stateFor(status: MediaPermissionStatus?): Flow<GalleryUiState> = when (status) {
@@ -117,13 +101,13 @@ class GalleryViewModel @Inject constructor(
 
     private fun contentFlow(status: MediaPermissionStatus): Flow<GalleryUiState> {
         val media = mediaRepository.observeMedia().onEach { latestItems = it }
-        return combine(media, selectedIds, uploadStatus) { items, selected, upload ->
+        return combine(media, selectedIds, uploadSummary) { items, selected, summary ->
             GalleryUiState.Content(
                 sections = groupByDate(items),
                 itemCount = items.size,
                 isPartialAccess = status == MediaPermissionStatus.Partial,
                 selectedIds = selected,
-                upload = upload,
+                upload = summary,
             ) as GalleryUiState
         }
             .onStart { emit(GalleryUiState.Loading) }
@@ -143,21 +127,15 @@ sealed interface GalleryUiState {
         val itemCount: Int,
         val isPartialAccess: Boolean,
         val selectedIds: Set<Long> = emptySet(),
-        val upload: UploadStatus? = null,
+        val upload: UploadSummary = UploadSummary(),
     ) : GalleryUiState {
         val isSelectionMode: Boolean get() = selectedIds.isNotEmpty()
     }
     data class Error(val throwable: Throwable) : GalleryUiState
 }
 
-data class UploadStatus(
-    val currentIndex: Int,
-    val total: Int,
-    val currentName: String,
-    val fraction: Float,
-)
-
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
-    data class UploadFinished(val succeeded: Int, val failed: Int) : GalleryEvent
+    data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
+    data class Error(val message: String) : GalleryEvent
 }

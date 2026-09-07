@@ -1,11 +1,15 @@
 package com.jjw.easygallery.feature.gallery
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,15 +52,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
 @Composable
 fun GalleryRoute(
     onSettingsClick: () -> Unit,
+    onUploadQueueClick: () -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -68,6 +75,21 @@ fun GalleryRoute(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { viewModel.onPermissionStatusChanged(MediaPermission.status(context)) }
+
+    // 업로드 진행 알림을 위해 13+ 에서는 알림 권한을 먼저 묻고, 결과와 무관하게 큐에 넣는다
+    val notificationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.uploadSelected() }
+    val startUpload = {
+        val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsNotificationPermission) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.uploadSelected()
+        }
+    }
 
     // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
     LifecycleResumeEffect(Unit) {
@@ -85,17 +107,14 @@ fun GalleryRoute(
                     )
                     if (result == SnackbarResult.ActionPerformed) onSettingsClick()
                 }
-                is GalleryEvent.UploadFinished -> snackbarHostState.showSnackbar(
-                    if (event.failed == 0) {
-                        resources.getQuantityString(
-                            R.plurals.gallery_upload_done,
-                            event.succeeded,
-                            event.succeeded,
-                        )
+                is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(
+                    if (event.skipped == 0) {
+                        resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
                     } else {
-                        resources.getString(R.string.gallery_upload_done_with_failures, event.succeeded, event.failed)
+                        resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
                 )
+                is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
     }
@@ -114,8 +133,9 @@ fun GalleryRoute(
         },
         onToggleSelection = viewModel::toggleSelection,
         onClearSelection = viewModel::clearSelection,
-        onUploadSelected = viewModel::uploadSelected,
-        onCancelUpload = viewModel::cancelUpload,
+        onUploadSelected = startUpload,
+        onCancelUpload = viewModel::cancelUploads,
+        onUploadQueueClick = onUploadQueueClick,
     )
 }
 
@@ -130,6 +150,7 @@ internal fun GalleryScreen(
     onClearSelection: () -> Unit,
     onUploadSelected: () -> Unit,
     onCancelUpload: () -> Unit,
+    onUploadQueueClick: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -146,7 +167,7 @@ internal fun GalleryScreen(
             if (selectionMode && content != null) {
                 SelectionTopBar(
                     selectedCount = content.selectedIds.size,
-                    uploadEnabled = content.upload == null,
+                    uploadEnabled = true,
                     onClear = onClearSelection,
                     onUpload = onUploadSelected,
                 )
@@ -178,7 +199,15 @@ internal fun GalleryScreen(
                 )
 
                 is GalleryUiState.Content -> Column(Modifier.fillMaxSize()) {
-                    uiState.upload?.let { UploadProgressBanner(status = it, onCancel = onCancelUpload) }
+                    if (uiState.upload.hasActive) {
+                        UploadProgressBanner(
+                            summary = uiState.upload,
+                            onCancel = onCancelUpload,
+                            onClick = onUploadQueueClick,
+                        )
+                    } else if (uiState.upload.failed > 0) {
+                        UploadFailedBanner(failed = uiState.upload.failed, onClick = onUploadQueueClick)
+                    }
                     if (uiState.isPartialAccess) {
                         PartialAccessBanner(onManageSelection = onRequestPermission)
                     }
@@ -255,19 +284,27 @@ private fun SelectionTopBar(
 
 @Composable
 private fun UploadProgressBanner(
-    status: UploadStatus,
+    summary: UploadSummary,
     onCancel: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primaryContainer) {
+    val current = summary.current
+    val doneCount = summary.completed + summary.failed
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.primaryContainer,
+    ) {
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(
                         R.string.gallery_uploading,
-                        status.currentIndex,
-                        status.total,
-                        status.currentName,
+                        (doneCount + 1).coerceAtMost(summary.total),
+                        summary.total,
+                        current?.displayName.orEmpty(),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -276,7 +313,33 @@ private fun UploadProgressBanner(
                 )
                 TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
             }
-            LinearProgressIndicator(progress = { status.fraction }, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { current?.fraction ?: 0f }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun UploadFailedBanner(
+    failed: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = pluralStringResource(R.plurals.gallery_upload_failed_banner, failed, failed),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onClick) { Text(stringResource(R.string.action_view)) }
         }
     }
 }
@@ -351,6 +414,7 @@ private fun GalleryScreenPermissionPreview() {
             onClearSelection = {},
             onUploadSelected = {},
             onCancelUpload = {},
+            onUploadQueueClick = {},
         )
     }
 }
@@ -364,7 +428,7 @@ private fun GalleryScreenUploadingPreview() {
                 sections = emptyList(),
                 itemCount = 0,
                 isPartialAccess = false,
-                upload = UploadStatus(currentIndex = 2, total = 5, currentName = "IMG_0002.jpg", fraction = 0.4f),
+                upload = UploadSummary(total = 5, active = 3, completed = 2),
             ),
             onSettingsClick = {},
             onRequestPermission = {},
@@ -373,6 +437,7 @@ private fun GalleryScreenUploadingPreview() {
             onClearSelection = {},
             onUploadSelected = {},
             onCancelUpload = {},
+            onUploadQueueClick = {},
         )
     }
 }

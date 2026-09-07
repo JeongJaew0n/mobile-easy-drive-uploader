@@ -12,17 +12,20 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
 │   ├── data/media/            # MediaRepository (interface) / MediaStoreRepository / MediaModule
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
-│   ├── data/upload/           # DriveUploader (resumable), ContentUriRequestBody
+│   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody, UploadQueueRepository
+│   │   ├── db/                # Room: AppDatabase, UploadTaskEntity, UploadTaskDao (schemas/ 에 내보냄)
+│   │   └── work/              # UploadWorker(@HiltWorker), UploadScheduler, UploadNotifications
 │   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount
-│   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, UploadMediaUseCase
+│   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, EnqueueUploadsUseCase, ManageUploadQueueUseCase
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
 │   └── ui/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
 │       └── theme/             # Material 3 테마
 └── feature/
     ├── gallery/               # GalleryRoute/Screen/Grid(선택·업로드 진행), GalleryViewModel, MediaPermission, GallerySection
-    ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더 진입
-    └── folderpicker/          # Drive 폴더 탐색·생성·선택 (FolderPickerKey 를 중첩 push)
+    ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
+    ├── folderpicker/          # Drive 폴더 탐색·생성·선택 (FolderPickerKey 를 중첩 push)
+    └── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
 ```
 
 ## 갤러리 데이터 흐름
@@ -65,26 +68,39 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 SettingsViewModel ─▶ SignInUseCase ─▶ AuthRepository.beginSignIn()
                                          │ hasResolution → NeedsConsent(PendingIntent) → UI 가 StartIntentSenderForResult
                                          │ 완료 → 토큰 캐시(45분) → DriveRepository.getAccount() → prefs.setAccount
-GalleryViewModel.uploadSelected ─▶ UploadMediaUseCase ─▶ GetUploadFolderUseCase(prefs → 없으면 ensureAppRootFolder)
-                                                        └▶ DriveUploader: POST uploadType=resumable → Location
-                                                                          PUT 세션 URI (ContentUriRequestBody 스트리밍, 진행률)
+GalleryViewModel.uploadSelected ─▶ EnqueueUploadsUseCase ─▶ Room upload_tasks(PENDING) + UploadScheduler.schedule()
 ```
 
 - **순환 의존 차단**: OkHttp `AuthInterceptor` 는 `TokenProvider` 만 알고, `GoogleAuthRepository` 가 이를 구현. Drive 계층은 Auth 를 모른다.
 - **토큰**: `AuthorizationClient.authorize()` 는 동의가 있으면 UI 없이 새 토큰을 준다. 45분 캐시 + 401 시 `TokenAuthenticator` 가 1회 재발급·재시도.
 - **예외**: `AuthException`(IOException) 계열 — `NotSignedIn`/`AuthorizationRequired`/`SignInCancelled`. 갤러리는 이를 받으면 "로그인 필요" 스낵바 → 설정으로 유도.
-- **업로드 (현 단계)**: ViewModel 스코프에서 순차 실행(포그라운드). 세션 URI 저장·재개·백그라운드는 다음 단계(WorkManager) 에서.
+- **업로드는 큐에 넣기만**: UI 는 Room 에 행을 추가하고 워커를 예약한 뒤 즉시 반환. 진행 상황은 `UploadQueueRepository.observeSummary()` 로 관찰.
 - **폴더 선택**: `drive.file` scope 는 앱이 만든 파일만 보이므로 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true` 로 식별) 아래를 탐색·생성한다.
 
-## 백그라운드 (예정)
+## 백그라운드 업로드 (WorkManager)
 
-- `feature/upload` 에 `@HiltWorker class UploadWorker : CoroutineWorker`.
-- 장시간 업로드는 `setForeground()` (foregroundServiceType `dataSync`).
-- 업로드 큐·세션 URL 은 Room (`core/data/upload`).
+```
+UploadWorker (유니크 워크 "upload-queue", KEEP)
+  loop: nextUnfinished()  ── PENDING/RUNNING 중 가장 오래된 것
+    ├─ folderId 없으면 GetUploadFolderUseCase 로 해석·저장
+    ├─ sessionUri 있으면 queryStatus(Content-Range: bytes */total)
+    │     308 + Range → 그 다음 바이트부터 이어 올림 / 200 → 완료 처리 / 404·410 → 새 세션
+    ├─ upload(offset..end) 스트리밍, 1초마다 DB bytesUploaded + 포그라운드 알림 갱신
+    └─ 결과 분기
+         AuthException            → 항목 PENDING 유지, 알림 "다시 연결", Result.failure()
+         FileNotFound / 4xx       → FAILED (영구)
+         IOException / 5xx / 세션 만료 → attemptCount+1, PENDING, Result.retry() (지수 백오프 30s~, 5회 후 FAILED)
+  큐가 비면 요약 알림 → Result.success()
+```
+
+- **제약 조건**: `UserPreferences.uploadWifiOnly`(기본 true → UNMETERED) / `uploadChargingOnly`, 배터리 부족 아님. 설정이 바뀌면 `schedule(replace = true)` — 진행 중 항목은 세션 상태 조회로 이어 올리므로 손실 없음.
+- **프로세스 종료 복구**: RUNNING 도 `nextUnfinished()` 대상. `MainActivity` 시작 시 `ensureScheduled()` 로 남은 큐가 있으면 워커 재예약.
+- **알림**: 채널 `upload`, 진행(1001, ongoing, FGS dataSync) / 요약·로그인 필요(1002). 13+ 는 업로드 버튼을 누를 때 `POST_NOTIFICATIONS` 를 묻고 결과와 무관하게 큐에 넣는다.
+- **중복 방지**: 같은 mediaId 가 PENDING/RUNNING 이면 건너뜀. 새 배치를 넣을 때 지난 COMPLETED 행은 정리해 진행률 분모를 현재 배치로 맞춘다.
 
 ## 테스트
 
 | 종류 | 위치 | 도구 |
 |---|---|---|
-| 단위 | `app/src/test` | JUnit4, MockK, Turbine, coroutines-test, MockWebServer3(Drive REST), Robolectric(sdk=35 — 36+ 이미지는 Java 21 필요) |
+| 단위 | `app/src/test` | JUnit4, MockK, Turbine, coroutines-test, MockWebServer3(Drive REST·resumable), Robolectric(sdk=35 — 36+ 이미지는 Java 21 필요) — Room 인메모리 DAO, `TestListenableWorkerBuilder` 로 워커 상태 전이 |
 | 계측 | `app/src/androidTest` | Compose UI Test, Hilt testing (`HiltTestRunner`) |

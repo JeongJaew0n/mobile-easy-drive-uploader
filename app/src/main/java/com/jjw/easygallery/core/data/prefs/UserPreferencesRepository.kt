@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.prefs
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +21,9 @@ data class UserPreferences(
     val accountName: String? = null,
     val uploadFolderId: String? = null,
     val uploadFolderName: String? = null,
+    /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
+    val uploadWifiOnly: Boolean = true,
+    val uploadChargingOnly: Boolean = false,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 }
@@ -36,6 +40,8 @@ class UserPreferencesRepository @Inject constructor(
             accountName = prefs[KEY_ACCOUNT_NAME],
             uploadFolderId = prefs[KEY_UPLOAD_FOLDER_ID],
             uploadFolderName = prefs[KEY_UPLOAD_FOLDER_NAME],
+            uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
+            uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
         )
     }
 
@@ -65,7 +71,17 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun setUploadWifiOnly(enabled: Boolean) {
+        store.edit { it[KEY_UPLOAD_WIFI_ONLY] = enabled }
+    }
+
+    suspend fun setUploadChargingOnly(enabled: Boolean) {
+        store.edit { it[KEY_UPLOAD_CHARGING_ONLY] = enabled }
+    }
+
     private companion object {
+        val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
+        val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")
         val KEY_ACCOUNT_NAME = stringPreferencesKey("account_name")
         val KEY_UPLOAD_FOLDER_ID = stringPreferencesKey("upload_folder_id")

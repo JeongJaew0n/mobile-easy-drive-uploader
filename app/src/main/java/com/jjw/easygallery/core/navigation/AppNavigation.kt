@@ -9,6 +9,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.jjw.easygallery.feature.folderpicker.FolderPickerRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
+import com.jjw.easygallery.feature.uploads.UploadQueueRoute
 
 @Composable
 fun AppNavigation() {
@@ -24,13 +25,20 @@ fun AppNavigation() {
         ),
         entryProvider = entryProvider {
             entry<GalleryKey> {
-                GalleryRoute(onSettingsClick = { backStack.add(SettingsKey) })
+                GalleryRoute(
+                    onSettingsClick = { backStack.add(SettingsKey) },
+                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
+                )
             }
             entry<SettingsKey> {
                 SettingsRoute(
                     onBackClick = { backStack.removeLastOrNull() },
                     onUploadFolderClick = { backStack.add(FolderPickerKey()) },
+                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
                 )
+            }
+            entry<UploadQueueKey> {
+                UploadQueueRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<FolderPickerKey> { key ->
                 FolderPickerRoute(

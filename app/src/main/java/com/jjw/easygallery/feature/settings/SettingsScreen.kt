@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -53,6 +54,7 @@ import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 fun SettingsRoute(
     onBackClick: () -> Unit,
     onUploadFolderClick: () -> Unit,
+    onUploadQueueClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,6 +86,9 @@ fun SettingsRoute(
         onSignInClick = viewModel::signIn,
         onSignOutClick = viewModel::signOut,
         onUploadFolderClick = onUploadFolderClick,
+        onUploadQueueClick = onUploadQueueClick,
+        onWifiOnlyChange = viewModel::setUploadWifiOnly,
+        onChargingOnlyChange = viewModel::setUploadChargingOnly,
     )
 }
 
@@ -95,6 +100,9 @@ internal fun SettingsScreen(
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit,
     onUploadFolderClick: () -> Unit,
+    onUploadQueueClick: () -> Unit,
+    onWifiOnlyChange: (Boolean) -> Unit,
+    onChargingOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -128,12 +136,88 @@ internal fun SettingsScreen(
                 onSignOutClick = onSignOutClick,
             )
             if (uiState.isSignedIn) {
+                Text(
+                    text = stringResource(R.string.settings_upload_section),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 UploadFolderRow(
                     folderName = uiState.uploadFolderName,
                     onClick = onUploadFolderClick,
                 )
+                NavigationRow(
+                    icon = painterResource(R.drawable.ic_cloud_upload),
+                    title = stringResource(R.string.settings_upload_queue),
+                    onClick = onUploadQueueClick,
+                )
+                SwitchRow(
+                    title = stringResource(R.string.settings_upload_wifi_only),
+                    description = stringResource(R.string.settings_upload_wifi_only_description),
+                    checked = uiState.uploadWifiOnly,
+                    onCheckedChange = onWifiOnlyChange,
+                )
+                SwitchRow(
+                    title = stringResource(R.string.settings_upload_charging_only),
+                    description = stringResource(R.string.settings_upload_charging_only_description),
+                    checked = uiState.uploadChargingOnly,
+                    onCheckedChange = onChargingOnlyChange,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun NavigationRow(
+    icon: androidx.compose.ui.graphics.painter.Painter,
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null)
+            Spacer(Modifier.width(16.dp))
+            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+        HorizontalDivider()
     }
 }
 
@@ -246,6 +330,9 @@ private fun SettingsScreenSignedOutPreview() {
             onSignInClick = {},
             onSignOutClick = {},
             onUploadFolderClick = {},
+            onUploadQueueClick = {},
+            onWifiOnlyChange = {},
+            onChargingOnlyChange = {},
         )
     }
 }
@@ -267,6 +354,9 @@ private fun SettingsScreenSignedInPreview() {
             onSignInClick = {},
             onSignOutClick = {},
             onUploadFolderClick = {},
+            onUploadQueueClick = {},
+            onWifiOnlyChange = {},
+            onChargingOnlyChange = {},
         )
     }
 }

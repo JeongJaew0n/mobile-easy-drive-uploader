@@ -3,9 +3,12 @@ package com.jjw.easygallery.feature.gallery
 import android.net.Uri
 import app.cash.turbine.test
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
-import com.jjw.easygallery.core.domain.usecase.UploadMediaUseCase
+import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -25,7 +28,11 @@ import org.junit.Test
 class GalleryViewModelTest {
 
     private val repository: MediaRepository = mockk()
-    private val uploadMedia: UploadMediaUseCase = mockk()
+    private val uploadQueue: UploadQueueRepository = mockk {
+        every { observeSummary() } returns flowOf(UploadSummary())
+    }
+    private val enqueueUploads: EnqueueUploadsUseCase = mockk()
+    private val manageQueue: ManageUploadQueueUseCase = mockk()
 
     // StandardTestDispatcher: 구독 전까지 upstream 이 실행되지 않아 상태 전이 순서를 관찰할 수 있다.
     private val testDispatcher = StandardTestDispatcher()
@@ -42,7 +49,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `stays Loading and does not query until permission status is known`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -53,7 +60,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `denied permission shows PermissionRequired without querying`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -67,7 +74,7 @@ class GalleryViewModelTest {
     fun `full permission loads content grouped by date`() = runTest(testDispatcher) {
         val item = sampleItem(id = 1)
         every { repository.observeMedia() } returns flowOf(listOf(item))
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -82,7 +89,7 @@ class GalleryViewModelTest {
     @Test
     fun `partial permission flags content as partial access`() = runTest(testDispatcher) {
         every { repository.observeMedia() } returns flowOf(emptyList())
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             awaitItem() // Loading
@@ -97,7 +104,7 @@ class GalleryViewModelTest {
     fun `toggleSelection adds and removes ids and clearSelection resets`() = runTest(testDispatcher) {
         val items = listOf(sampleItem(1), sampleItem(2))
         every { repository.observeMedia() } returns flowOf(items)
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             awaitItem() // Loading
@@ -124,7 +131,7 @@ class GalleryViewModelTest {
     fun `repository failure maps to Error state`() = runTest(testDispatcher) {
         val boom = IllegalStateException("boom")
         every { repository.observeMedia() } returns flow { throw boom }
-        val viewModel = GalleryViewModel(repository, uploadMedia)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue)
 
         viewModel.uiState.test {
             awaitItem() // Loading

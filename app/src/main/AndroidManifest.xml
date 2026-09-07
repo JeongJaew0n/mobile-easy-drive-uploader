@@ -42,6 +42,12 @@
             </intent-filter>
         </activity>
 
+        <!-- WorkManager 포그라운드 워커(업로드 진행 알림)는 dataSync 타입으로 실행 -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <!-- WorkManager 기본 초기화 제거: EasyGalleryApp에서 HiltWorkerFactory로 직접 구성 -->
         <provider
             android:name="androidx.startup.InitializationProvider"

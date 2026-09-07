@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.auth.SignInStep
 import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.domain.model.DriveAccount
+import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.SignInUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -29,10 +30,11 @@ import javax.inject.Inject
 @HiltViewModel
 @Suppress("TooGenericExceptionCaught") // UI 경계: 인증·네트워크 오류를 모두 메시지로 보여준다
 class SettingsViewModel @Inject constructor(
-    prefs: UserPreferencesRepository,
+    private val prefs: UserPreferencesRepository,
     private val signInUseCase: SignInUseCase,
     private val auth: AuthRepository,
     private val drive: DriveRepository,
+    private val manageQueue: ManageUploadQueueUseCase,
 ) : ViewModel() {
 
     private val isBusy = MutableStateFlow(false)
@@ -48,6 +50,8 @@ class SettingsViewModel @Inject constructor(
             storageUsedBytes = acc?.storageUsedBytes,
             storageLimitBytes = acc?.storageLimitBytes,
             uploadFolderName = p.uploadFolderName,
+            uploadWifiOnly = p.uploadWifiOnly,
+            uploadChargingOnly = p.uploadChargingOnly,
             isBusy = busy,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SettingsUiState())
@@ -77,8 +81,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun signOut() = runBusy {
+        manageQueue.cancelAll()
         auth.signOut()
         account.value = null
+    }
+
+    fun setUploadWifiOnly(enabled: Boolean) = viewModelScope.launch {
+        prefs.setUploadWifiOnly(enabled)
+        manageQueue.rescheduleWithCurrentConstraints()
+    }
+
+    fun setUploadChargingOnly(enabled: Boolean) = viewModelScope.launch {
+        prefs.setUploadChargingOnly(enabled)
+        manageQueue.rescheduleWithCurrentConstraints()
     }
 
     private suspend fun refreshAccount() {
@@ -122,6 +137,8 @@ data class SettingsUiState(
     val storageUsedBytes: Long? = null,
     val storageLimitBytes: Long? = null,
     val uploadFolderName: String? = null,
+    val uploadWifiOnly: Boolean = true,
+    val uploadChargingOnly: Boolean = false,
     val isBusy: Boolean = false,
 )
 
