@@ -10,7 +10,7 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
 │   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
-│   ├── data/media/            # MediaRepository (interface) / MediaStoreRepository / MediaModule
+│   ├── data/media/            # MediaRepository(조회+편집) / MediaStoreRepository / MediaActions(MediaAction, MediaActionRunner)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
 │   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody, UploadQueueRepository
 │   │   ├── db/                # Room: AppDatabase, UploadTaskEntity, UploadTaskDao (schemas/ 에 내보냄)
@@ -22,7 +22,8 @@ app/src/main/java/com/jjw/easygallery/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
 │       └── theme/             # Material 3 테마
 └── feature/
-    ├── gallery/               # GalleryRoute/Screen/Grid(선택·업로드 진행), GalleryViewModel, MediaPermission, GallerySection
+    ├── gallery/               # GalleryRoute/Screen/Grid, GalleryActions(하단 바·다이얼로그·메뉴), GalleryViewModel, MediaPermission
+    ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── folderpicker/          # Drive 폴더 탐색·생성·선택 (FolderPickerKey 를 중첩 push)
     └── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
@@ -76,6 +77,26 @@ GalleryViewModel.uploadSelected ─▶ EnqueueUploadsUseCase ─▶ Room upload_
 - **예외**: `AuthException`(IOException) 계열 — `NotSignedIn`/`AuthorizationRequired`/`SignInCancelled`. 갤러리는 이를 받으면 "로그인 필요" 스낵바 → 설정으로 유도.
 - **업로드는 큐에 넣기만**: UI 는 Room 에 행을 추가하고 워커를 예약한 뒤 즉시 반환. 진행 상황은 `UploadQueueRepository.observeSummary()` 로 관찰.
 - **폴더 선택**: `drive.file` scope 는 앱이 만든 파일만 보이므로 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true` 로 식별) 아래를 탐색·생성한다.
+
+## 갤러리 편집 (MediaStore CRUD)
+
+```
+ViewModel.perform(MediaAction) ─▶ MediaActionRunner.run()
+   Delete/Trash/Favorite → repo.createXxxRequest → NeedsConsent(IntentSender)
+   Rename/Move            → repo.requestWrite → NeedsConsent  (API 29: Done(0) 후 바로 update)
+UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResult(true)
+   ─▶ MediaActionRunner.afterConsent(pendingAction)
+        Rename/Move → writeGranted=true 로 재실행 → resolver.update(DISPLAY_NAME / RELATIVE_PATH)
+        그 외 API 30+ → 시스템이 이미 처리 → Done(items.size)
+        그 외 API 29  → 같은 요청 재시도 (RecoverableSecurityException 경로)
+```
+
+- `MediaActionRunner` 는 UI 프레임워크와 무관한 순수 로직이라 mock 저장소로 단위 테스트한다. 갤러리·휴지통 ViewModel 이 같은 러너를 공유.
+- 동의 다이얼로그가 떠 있는 동안 `isMutating` 으로 액션 버튼을 잠근다.
+- 조회 필터: `MediaFilter.All / Favorites(IS_FAVORITE=1) / Trashed(QUERY_ARG_MATCH_TRASHED=MATCH_ONLY)`. API 29 는 All 만.
+- 앨범 이동 대상은 현재 목록의 `RELATIVE_PATH` 집합(`albumsFrom`) + 새 앨범(`Pictures/<이름>/`).
+- 이름 변경 시 확장자를 생략하면 원본 확장자를 유지(`normalizeDisplayName`).
+- `MANAGE_MEDIA`(API 31+) 를 사용자가 시스템 설정에서 허용하면 createXxxRequest 가 다이얼로그 없이 즉시 OK 로 돌아온다 — 코드 경로는 동일.
 
 ## 백그라운드 업로드 (WorkManager)
 

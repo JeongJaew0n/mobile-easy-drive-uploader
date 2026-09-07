@@ -16,9 +16,16 @@ data class MediaItem(
     val dateTakenMillis: Long,
     val bucketId: Long,
     val bucketName: String,
+    /** 예: "DCIM/Camera/" — 앨범 이동의 대상 경로 단위 */
+    val relativePath: String = "",
     val width: Int = 0,
     val height: Int = 0,
     val durationMillis: Long? = null,
+    val isFavorite: Boolean = false,
+    val isTrashed: Boolean = false,
 ) {
     val isVideo: Boolean get() = type == MediaType.VIDEO
+
+    /** 확장자(점 제외). 없으면 빈 문자열 */
+    val extension: String get() = displayName.substringAfterLast('.', "")
 }

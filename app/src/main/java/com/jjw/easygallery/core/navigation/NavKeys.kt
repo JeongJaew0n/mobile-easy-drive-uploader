@@ -16,6 +16,9 @@ data object SettingsKey : AppNavKey
 @Serializable
 data object UploadQueueKey : AppNavKey
 
+@Serializable
+data object TrashKey : AppNavKey
+
 /** [parentId] 가 null 이면 앱 루트 폴더부터 시작. 하위 폴더로 들어갈 때마다 새 키를 push 한다. */
 @Serializable
 data class FolderPickerKey(

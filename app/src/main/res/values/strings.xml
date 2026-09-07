@@ -3,7 +3,42 @@
 
     <!-- 갤러리 -->
     <string name="gallery_title">갤러리</string>
+    <string name="gallery_title_favorites">즐겨찾기</string>
     <string name="gallery_empty">표시할 사진이나 영상이 없습니다</string>
+    <string name="gallery_favorites_empty">즐겨찾기한 항목이 없습니다</string>
+    <string name="gallery_menu_favorites_only">즐겨찾기만 보기</string>
+    <string name="gallery_menu_show_all">전체 보기</string>
+    <string name="gallery_menu_trash">휴지통</string>
+    <string name="gallery_rename_label">새 이름</string>
+    <string name="gallery_rename_hint">확장자를 생략하면 .%1$s 가 유지됩니다</string>
+    <string name="gallery_move_new_album">새 앨범 이름</string>
+    <string name="gallery_move_album_subtitle">%1$s · %2$d개</string>
+    <string name="gallery_action_cancelled">취소했습니다</string>
+    <plurals name="gallery_deleted">
+        <item quantity="other">%1$d개 항목을 삭제했습니다</item>
+    </plurals>
+    <plurals name="gallery_trashed">
+        <item quantity="other">%1$d개 항목을 휴지통으로 옮겼습니다</item>
+    </plurals>
+    <plurals name="gallery_restored">
+        <item quantity="other">%1$d개 항목을 복원했습니다</item>
+    </plurals>
+    <plurals name="gallery_favorited">
+        <item quantity="other">%1$d개 항목을 즐겨찾기에 추가했습니다</item>
+    </plurals>
+    <plurals name="gallery_unfavorited">
+        <item quantity="other">%1$d개 항목을 즐겨찾기에서 해제했습니다</item>
+    </plurals>
+    <string name="gallery_renamed">이름을 %1$s 로 바꿨습니다</string>
+    <plurals name="gallery_moved">
+        <item quantity="other">%1$d개 항목을 %2$s 로 옮겼습니다</item>
+    </plurals>
+
+    <!-- 휴지통 -->
+    <string name="trash_title">휴지통</string>
+    <string name="trash_subtitle">30일 후 자동으로 삭제됩니다</string>
+    <string name="trash_empty">휴지통이 비어 있습니다</string>
+    <string name="trash_empty_all">비우기</string>
     <plurals name="gallery_media_count">
         <item quantity="other">%1$d개의 항목</item>
     </plurals>
@@ -37,6 +72,10 @@
     <string name="settings_storage_usage_unlimited">Drive 저장공간 %1$s 사용</string>
     <string name="settings_scope_note">이 앱은 자신이 업로드한 파일에만 접근합니다 (drive.file 권한).</string>
     <string name="settings_upload_section">업로드</string>
+    <string name="settings_gallery_section">갤러리</string>
+    <string name="settings_manage_media">확인 없이 편집</string>
+    <string name="settings_manage_media_description">시스템 설정에서 미디어 관리 앱으로 허용하면 삭제·이동 시 확인 창이 뜨지 않습니다</string>
+    <string name="settings_manage_media_granted">허용됨 — 삭제·휴지통·이동을 바로 실행합니다</string>
     <string name="settings_upload_folder">업로드 폴더</string>
     <string name="settings_upload_queue">업로드 목록</string>
     <string name="settings_upload_wifi_only">Wi-Fi에서만 업로드</string>
@@ -84,5 +123,14 @@
     <string name="action_clear_selection">선택 해제</string>
     <string name="action_upload_to_drive">Drive에 업로드</string>
     <string name="action_view">보기</string>
+    <string name="action_more">더보기</string>
+    <string name="action_trash">휴지통으로 이동</string>
+    <string name="action_delete_forever">완전 삭제</string>
+    <string name="action_favorite">즐겨찾기</string>
+    <string name="action_unfavorite">즐겨찾기 해제</string>
+    <string name="action_rename">이름 변경</string>
+    <string name="action_move">앨범으로 이동</string>
+    <string name="action_restore">복원</string>
+    <string name="action_save">저장</string>
     <string name="action_remove">삭제</string>
 </resources>

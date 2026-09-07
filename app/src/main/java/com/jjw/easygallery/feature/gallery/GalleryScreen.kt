@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +68,7 @@ import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 fun GalleryRoute(
     onSettingsClick: () -> Unit,
     onUploadQueueClick: () -> Unit,
+    onTrashClick: () -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -91,6 +96,11 @@ fun GalleryRoute(
         }
     }
 
+    // MediaStore 편집 동의 다이얼로그
+    val consentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> viewModel.onConsentResult(result.resultCode == android.app.Activity.RESULT_OK) }
+
     // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
     LifecycleResumeEffect(Unit) {
         viewModel.onPermissionStatusChanged(MediaPermission.status(context))
@@ -114,6 +124,12 @@ fun GalleryRoute(
                         resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
                 )
+                is GalleryEvent.LaunchConsent ->
+                    consentLauncher.launch(IntentSenderRequest.Builder(event.intentSender).build())
+                is GalleryEvent.ActionDone ->
+                    snackbarHostState.showSnackbar(actionDoneMessage(resources, event.action, event.affected))
+                GalleryEvent.ActionCancelled ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.gallery_action_cancelled))
                 is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
@@ -136,8 +152,26 @@ fun GalleryRoute(
         onUploadSelected = startUpload,
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
+        onFavoritesOnlyChange = viewModel::setFavoritesOnly,
+        onTrashClick = onTrashClick,
+        actions = GalleryActionCallbacks(
+            onTrash = viewModel::trashSelected,
+            onDelete = viewModel::deleteSelected,
+            onToggleFavorite = viewModel::toggleFavoriteSelected,
+            onRename = viewModel::renameSelected,
+            onMove = viewModel::moveSelected,
+        ),
     )
 }
+
+/** 선택 항목 편집 콜백 묶음 — 파라미터 폭발 방지 */
+internal data class GalleryActionCallbacks(
+    val onTrash: () -> Unit = {},
+    val onDelete: () -> Unit = {},
+    val onToggleFavorite: () -> Unit = {},
+    val onRename: (String) -> Unit = {},
+    val onMove: (String) -> Unit = {},
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,10 +186,15 @@ internal fun GalleryScreen(
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onFavoritesOnlyChange: (Boolean) -> Unit = {},
+    onTrashClick: () -> Unit = {},
+    actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val content = uiState as? GalleryUiState.Content
     val selectionMode = content?.isSelectionMode == true
+    var showRename by rememberSaveable { mutableStateOf(false) }
+    var showMove by rememberSaveable { mutableStateOf(false) }
 
     // 선택 모드에서 뒤로가기는 선택 해제
     BackHandler(enabled = selectionMode, onBack = onClearSelection)
@@ -167,12 +206,33 @@ internal fun GalleryScreen(
             if (selectionMode && content != null) {
                 SelectionTopBar(
                     selectedCount = content.selectedIds.size,
-                    uploadEnabled = true,
                     onClear = onClearSelection,
                     onUpload = onUploadSelected,
                 )
             } else {
-                GalleryTopBar(itemCount = content?.itemCount, onSettingsClick = onSettingsClick)
+                GalleryTopBar(
+                    itemCount = content?.itemCount,
+                    favoritesOnly = content?.favoritesOnly == true,
+                    supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true,
+                    onSettingsClick = onSettingsClick,
+                    onFavoritesOnlyChange = onFavoritesOnlyChange,
+                    onTrashClick = onTrashClick,
+                )
+            }
+        },
+        bottomBar = {
+            if (selectionMode && content != null) {
+                SelectionBottomBar(
+                    selectedCount = content.selectedIds.size,
+                    allFavorite = content.selectedAllFavorite,
+                    supportsTrashAndFavorites = content.supportsTrashAndFavorites,
+                    enabled = !content.isMutating,
+                    onTrash = actions.onTrash,
+                    onDelete = actions.onDelete,
+                    onToggleFavorite = actions.onToggleFavorite,
+                    onRename = { showRename = true },
+                    onMove = { showMove = true },
+                )
             }
         },
     ) { innerPadding ->
@@ -198,33 +258,98 @@ internal fun GalleryScreen(
                         .padding(24.dp),
                 )
 
-                is GalleryUiState.Content -> Column(Modifier.fillMaxSize()) {
-                    if (uiState.upload.hasActive) {
-                        UploadProgressBanner(
-                            summary = uiState.upload,
-                            onCancel = onCancelUpload,
-                            onClick = onUploadQueueClick,
-                        )
-                    } else if (uiState.upload.failed > 0) {
-                        UploadFailedBanner(failed = uiState.upload.failed, onClick = onUploadQueueClick)
-                    }
-                    if (uiState.isPartialAccess) {
-                        PartialAccessBanner(onManageSelection = onRequestPermission)
-                    }
-                    if (uiState.sections.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.gallery_empty))
-                        }
-                    } else {
-                        GalleryGrid(
-                            sections = uiState.sections,
-                            selectedIds = uiState.selectedIds,
-                            onToggleSelection = onToggleSelection,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
+                is GalleryUiState.Content -> GalleryContent(
+                    uiState = uiState,
+                    onToggleSelection = onToggleSelection,
+                    onCancelUpload = onCancelUpload,
+                    onUploadQueueClick = onUploadQueueClick,
+                    onRequestPermission = onRequestPermission,
+                )
             }
+            if (content?.isMutating == true) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        }
+    }
+
+    if (content != null) {
+        GalleryDialogs(
+            content = content,
+            showRename = showRename,
+            showMove = showMove,
+            onDismissRename = { showRename = false },
+            onDismissMove = { showMove = false },
+            actions = actions,
+        )
+    }
+}
+
+@Composable
+private fun GalleryDialogs(
+    content: GalleryUiState.Content,
+    showRename: Boolean,
+    showMove: Boolean,
+    onDismissRename: () -> Unit,
+    onDismissMove: () -> Unit,
+    actions: GalleryActionCallbacks,
+) {
+    if (showRename) {
+        val selected = content.sections.asSequence().flatMap { it.items }.firstOrNull { it.id in content.selectedIds }
+        if (selected != null) {
+            RenameDialog(
+                currentName = selected.displayName,
+                onDismiss = onDismissRename,
+                onConfirm = { name ->
+                    onDismissRename()
+                    actions.onRename(name)
+                },
+            )
+        }
+    }
+    if (showMove) {
+        MoveDialog(
+            albums = content.albums,
+            onDismiss = onDismissMove,
+            onConfirm = { path ->
+                onDismissMove()
+                actions.onMove(path)
+            },
+        )
+    }
+}
+
+@Composable
+private fun GalleryContent(
+    uiState: GalleryUiState.Content,
+    onToggleSelection: (Long) -> Unit,
+    onCancelUpload: () -> Unit,
+    onUploadQueueClick: () -> Unit,
+    onRequestPermission: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        if (uiState.upload.hasActive) {
+            UploadProgressBanner(summary = uiState.upload, onCancel = onCancelUpload, onClick = onUploadQueueClick)
+        } else if (uiState.upload.failed > 0) {
+            UploadFailedBanner(failed = uiState.upload.failed, onClick = onUploadQueueClick)
+        }
+        if (uiState.isPartialAccess) {
+            PartialAccessBanner(onManageSelection = onRequestPermission)
+        }
+        if (uiState.sections.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    stringResource(
+                        if (uiState.favoritesOnly) R.string.gallery_favorites_empty else R.string.gallery_empty,
+                    ),
+                )
+            }
+        } else {
+            GalleryGrid(
+                sections = uiState.sections,
+                selectedIds = uiState.selectedIds,
+                onToggleSelection = onToggleSelection,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -233,12 +358,16 @@ internal fun GalleryScreen(
 @Composable
 private fun GalleryTopBar(
     itemCount: Int?,
+    favoritesOnly: Boolean,
+    supportsTrashAndFavorites: Boolean,
     onSettingsClick: () -> Unit,
+    onFavoritesOnlyChange: (Boolean) -> Unit,
+    onTrashClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
             Column {
-                Text(stringResource(R.string.gallery_title))
+                Text(stringResource(if (favoritesOnly) R.string.gallery_title_favorites else R.string.gallery_title))
                 if (itemCount != null) {
                     Text(
                         text = pluralStringResource(R.plurals.gallery_media_count, itemCount, itemCount),
@@ -252,6 +381,12 @@ private fun GalleryTopBar(
             IconButton(onClick = onSettingsClick) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.action_settings))
             }
+            GalleryOverflowMenu(
+                favoritesOnly = favoritesOnly,
+                supportsTrashAndFavorites = supportsTrashAndFavorites,
+                onFavoritesOnlyChange = onFavoritesOnlyChange,
+                onOpenTrash = onTrashClick,
+            )
         },
     )
 }
@@ -260,7 +395,6 @@ private fun GalleryTopBar(
 @Composable
 private fun SelectionTopBar(
     selectedCount: Int,
-    uploadEnabled: Boolean,
     onClear: () -> Unit,
     onUpload: () -> Unit,
 ) {
@@ -272,7 +406,7 @@ private fun SelectionTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onUpload, enabled = uploadEnabled) {
+            IconButton(onClick = onUpload) {
                 Icon(
                     painterResource(R.drawable.ic_cloud_upload),
                     contentDescription = stringResource(R.string.action_upload_to_drive),

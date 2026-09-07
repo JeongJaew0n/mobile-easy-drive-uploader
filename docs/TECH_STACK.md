@@ -47,7 +47,8 @@ iOS는 수요가 확인되면 "업로드 전용 축소판"으로 별도 판단.
 | 조회 (사진·영상, 앨범/버킷별, 날짜 정렬) | `ContentResolver` + `MediaStore.Images/Video/Files` 쿼리, `ContentObserver`로 변경 감지 |
 | 대량 목록 | 메모리 리스트 + `LazyVerticalGrid` (Paging 3 는 수십만 장 규모가 실측되면 도입 — 근거는 ARCHITECTURE.md) |
 | 썸네일·이미지 로딩 | **Coil 3** + 커스텀 Fetcher(`ContentResolver.loadThumbnail` 시스템 썸네일 캐시), 폴백은 `coil-video` |
-| 삭제 / 휴지통 / 복원 | `MediaStore.createDeleteRequest` / `createTrashRequest` (API 30+) |
+| 삭제 / 휴지통 / 복원 | `MediaStore.createDeleteRequest` / `createTrashRequest` (API 30+). API 29 는 `RecoverableSecurityException` 경로로 삭제·수정만 지원 |
+| 확인 없이 편집 (선택) | `MANAGE_MEDIA` (API 31+) — 설정의 "미디어 관리 앱" 으로 허용하면 시스템 확인 다이얼로그 생략 |
 | 즐겨찾기 | `MediaStore.createFavoriteRequest` (API 30+) |
 | 파일명 변경, 폴더(앨범) 이동 | `createWriteRequest` + `DISPLAY_NAME` / `RELATIVE_PATH` 업데이트 |
 | EXIF 조회·편집 | `androidx.exifinterface` |
@@ -130,5 +131,5 @@ Gradle은 프로젝트의 Gradle Wrapper(`./gradlew`)로 실행하므로 별도 
 2. 갤러리 조회 MVP — 권한 흐름, 타임라인 그리드, Coil 썸네일 ✅ (2026-09-07)
 3. Google 로그인 + Drive 폴더 선택 + 다중 선택 업로드(포그라운드) ✅ (2026-09-07, GCP OAuth 클라이언트 등록 후 기기 검증 예정)
 4. WorkManager 기반 백그라운드 업로드·재개·알림 ✅ (2026-09-07)
-5. 갤러리 CRUD 확장 — 삭제/휴지통/즐겨찾기/이름 변경/이동
+5. 갤러리 CRUD 확장 — 삭제/휴지통/즐겨찾기/이름 변경/이동 ✅ (2026-09-08)
 6. 고급 기능 — 중복 탐지, 영상 압축, 자동 백업 규칙

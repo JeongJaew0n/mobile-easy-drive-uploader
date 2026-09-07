@@ -1,5 +1,10 @@
 package com.jjw.easygallery.feature.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.provider.Settings
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -36,7 +41,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
@@ -60,6 +68,14 @@ fun SettingsRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
+    val context = LocalContext.current
+
+    // Android 12+: 시스템 설정에서 부여하는 특수 권한이라 RESUME 마다 다시 읽는다
+    var canManageMedia by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        canManageMedia = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(context)
+        onPauseOrDispose { }
+    }
 
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -89,6 +105,13 @@ fun SettingsRoute(
         onUploadQueueClick = onUploadQueueClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
+        manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
+        onManageMediaClick = {
+            context.startActivity(
+                Intent(Settings.ACTION_REQUEST_MANAGE_MEDIA, Uri.fromParts("package", context.packageName, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        },
     )
 }
 
@@ -104,6 +127,9 @@ internal fun SettingsScreen(
     onWifiOnlyChange: (Boolean) -> Unit,
     onChargingOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** null = 이 기기에서 지원 안 함(Android 11 이하) */
+    manageMedia: Boolean? = null,
+    onManageMediaClick: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -161,6 +187,41 @@ internal fun SettingsScreen(
                     checked = uiState.uploadChargingOnly,
                     onCheckedChange = onChargingOnlyChange,
                 )
+            }
+            if (manageMedia != null) {
+                Text(
+                    text = stringResource(R.string.settings_gallery_section),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onManageMediaClick)
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_manage_media),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = stringResource(
+                                    if (manageMedia) {
+                                        R.string.settings_manage_media_granted
+                                    } else {
+                                        R.string.settings_manage_media_description
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                    HorizontalDivider()
+                }
             }
         }
     }
