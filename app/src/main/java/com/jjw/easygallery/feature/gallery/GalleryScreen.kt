@@ -148,6 +148,7 @@ fun GalleryRoute(
             )
         },
         onToggleSelection = viewModel::toggleSelection,
+        onSelectionChange = viewModel::setSelection,
         onClearSelection = viewModel::clearSelection,
         onUploadSelected = startUpload,
         onCancelUpload = viewModel::cancelUploads,
@@ -186,6 +187,7 @@ internal fun GalleryScreen(
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelectionChange: (Set<Long>) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onTrashClick: () -> Unit = {},
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
@@ -261,6 +263,7 @@ internal fun GalleryScreen(
                 is GalleryUiState.Content -> GalleryContent(
                     uiState = uiState,
                     onToggleSelection = onToggleSelection,
+                    onSelectionChange = onSelectionChange,
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -322,6 +325,7 @@ private fun GalleryDialogs(
 private fun GalleryContent(
     uiState: GalleryUiState.Content,
     onToggleSelection: (Long) -> Unit,
+    onSelectionChange: (Set<Long>) -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -348,6 +352,7 @@ private fun GalleryContent(
                 sections = uiState.sections,
                 selectedIds = uiState.selectedIds,
                 onToggleSelection = onToggleSelection,
+                onSelectionChange = onSelectionChange,
                 modifier = Modifier.fillMaxSize(),
             )
         }

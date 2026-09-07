@@ -1,9 +1,8 @@
 package com.jjw.easygallery.feature.gallery
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,9 +47,20 @@ internal fun GalleryGrid(
     sections: List<GallerySection>,
     selectedIds: Set<Long>,
     onToggleSelection: (Long) -> Unit,
+    onSelectionChange: (Set<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectionMode = selectedIds.isNotEmpty()
+    val gridState = rememberLazyGridState()
+    // 그리드 인덱스 → 항목 ID (헤더는 null). 드래그 범위 선택에서 화면 밖 항목까지 포함하기 위해 필요
+    val entryIds = remember(sections) {
+        buildList<Long?> {
+            sections.forEach { section ->
+                add(null)
+                section.items.forEach { add(it.id) }
+            }
+        }
+    }
     val configuration = LocalConfiguration.current
     val locale = remember(configuration) {
         ConfigurationCompat.getLocales(configuration)[0] ?: Locale.getDefault()
@@ -59,8 +70,14 @@ internal fun GalleryGrid(
     }
 
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Adaptive(minSize = MIN_CELL_SIZE_DP.dp),
-        modifier = modifier,
+        modifier = modifier.dragSelect(
+            state = gridState,
+            entryIds = entryIds,
+            selectedIds = selectedIds,
+            onSelectionChange = onSelectionChange,
+        ),
         horizontalArrangement = Arrangement.spacedBy(CELL_SPACING_DP.dp),
         verticalArrangement = Arrangement.spacedBy(CELL_SPACING_DP.dp),
     ) {
@@ -74,7 +91,7 @@ internal fun GalleryGrid(
             }
             items(
                 items = section.items,
-                key = { it.uri.toString() },
+                key = { it.id },
                 contentType = { "media" },
             ) { item ->
                 MediaThumbnail(
@@ -101,7 +118,6 @@ private fun DateHeader(
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MediaThumbnail(
     item: MediaItem,
@@ -114,11 +130,8 @@ private fun MediaThumbnail(
         modifier = modifier
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            // 길게 누르면 선택 모드 진입, 선택 모드에서는 탭으로 토글 (탭 열기는 상세 화면 추가 시)
-            .combinedClickable(
-                onClick = { if (selectionMode) onToggleSelection() },
-                onLongClick = onToggleSelection,
-            ),
+            // 길게 누르기·드래그 선택은 그리드(dragSelect)가 처리. 선택 모드에서는 탭으로 토글
+            .clickable(enabled = selectionMode, onClick = onToggleSelection),
     ) {
         AsyncImage(
             model = item.uri,

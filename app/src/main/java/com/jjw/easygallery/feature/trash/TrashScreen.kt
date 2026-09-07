@@ -75,6 +75,7 @@ fun TrashRoute(
         snackbarHostState = snackbarHostState,
         onBackClick = onBackClick,
         onToggleSelection = viewModel::toggleSelection,
+        onSelectionChange = viewModel::setSelection,
         onClearSelection = viewModel::clearSelection,
         onRestore = viewModel::restoreSelected,
         onDelete = viewModel::deleteSelected,
@@ -93,6 +94,7 @@ internal fun TrashScreen(
     onDelete: () -> Unit,
     onEmptyTrash: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelectionChange: (Set<Long>) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     BackHandler(enabled = uiState.isSelectionMode, onBack = onClearSelection)
@@ -199,6 +201,7 @@ internal fun TrashScreen(
                         sections = uiState.sections,
                         selectedIds = uiState.selectedIds,
                         onToggleSelection = onToggleSelection,
+                        onSelectionChange = onSelectionChange,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

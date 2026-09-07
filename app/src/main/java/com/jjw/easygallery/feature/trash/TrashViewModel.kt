@@ -64,6 +64,10 @@ class TrashViewModel @Inject constructor(
         selectedIds.value = emptySet()
     }
 
+    fun setSelection(ids: Set<Long>) {
+        selectedIds.value = ids
+    }
+
     fun restoreSelected() = perform(MediaAction.Trash(selectedItems(), trashed = false))
 
     fun deleteSelected() = perform(MediaAction.Delete(selectedItems()))

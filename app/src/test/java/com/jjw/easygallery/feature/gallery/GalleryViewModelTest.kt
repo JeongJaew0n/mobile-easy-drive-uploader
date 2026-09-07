@@ -128,6 +128,9 @@ class GalleryViewModelTest {
 
             viewModel.clearSelection()
             assertEquals(false, (awaitItem() as GalleryUiState.Content).isSelectionMode)
+
+            viewModel.setSelection(setOf(1L, 2L))
+            assertEquals(setOf(1L, 2L), (awaitItem() as GalleryUiState.Content).selectedIds)
         }
     }
 

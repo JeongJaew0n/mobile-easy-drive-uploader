@@ -86,6 +86,11 @@ class GalleryViewModel @Inject constructor(
         selectedIds.value = emptySet()
     }
 
+    /** 드래그 범위 선택 결과를 통째로 반영 */
+    fun setSelection(ids: Set<Long>) {
+        selectedIds.value = ids
+    }
+
     // ---------- 업로드 ----------
 
     /** 선택 항목을 업로드 큐에 넣는다. 실제 전송은 WorkManager 가 백그라운드에서 수행. */
