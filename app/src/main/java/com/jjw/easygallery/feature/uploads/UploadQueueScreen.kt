@@ -1,6 +1,7 @@
 package com.jjw.easygallery.feature.uploads
 
 import android.text.format.Formatter
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.UploadTask
+import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
 @Composable
@@ -189,7 +191,12 @@ private fun UploadTaskRow(
             )
             if (task.state == UploadState.RUNNING) {
                 Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(progress = { task.fraction }, modifier = Modifier.fillMaxWidth())
+                val fraction by animateFloatAsState(
+                    targetValue = task.fraction,
+                    animationSpec = LocalMotion.current.progress(),
+                    label = "taskProgress",
+                )
+                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             }
         }
         IconButton(onClick = onRemove) {

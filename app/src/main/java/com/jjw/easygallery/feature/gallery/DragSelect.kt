@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -17,7 +18,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 /**
@@ -41,13 +41,17 @@ internal fun Modifier.dragSelect(
     val session = remember { DragSelectSession() }
     var autoScrollSpeed by remember { mutableFloatStateOf(0f) }
 
-    // 가장자리 자동 스크롤: 손가락이 멈춰 있어도 아래로 흘러가는 항목이 계속 선택되도록 매 틱 재계산
+    // 가장자리 자동 스크롤: 프레임마다 경과 시간에 비례해 스크롤한다 (10ms 타이머보다 웨이크업이 적고 주사율에 정렬됨).
+    // 손가락이 멈춰 있어도 아래로 흘러가는 항목이 계속 선택되도록 매 프레임 재계산
     LaunchedEffect(autoScrollSpeed) {
         if (autoScrollSpeed == 0f) return@LaunchedEffect
+        var lastFrameNanos = withFrameNanos { it }
         while (isActive) {
-            state.scrollBy(autoScrollSpeed)
+            val now = withFrameNanos { it }
+            val frames = (now - lastFrameNanos) / NANOS_PER_REFERENCE_FRAME
+            lastFrameNanos = now
+            state.scrollBy(autoScrollSpeed * frames)
             session.lastPosition?.let { session.update(state, it, currentEntryIds, currentSelected, currentOnChange) }
-            delay(AUTO_SCROLL_TICK_MILLIS)
         }
     }
 
@@ -141,5 +145,7 @@ private fun edgeScrollSpeed(y: Float, height: Int): Float {
 }
 
 private const val EDGE_FRACTION = 0.12f
-private const val MAX_SCROLL_PX_PER_TICK = 24f
-private const val AUTO_SCROLL_TICK_MILLIS = 10L
+
+/** 60Hz 기준 한 프레임(16.7ms)당 최대 스크롤 px. 실제 주사율이 달라도 초당 속도는 같다 */
+private const val MAX_SCROLL_PX_PER_TICK = 40f
+private const val NANOS_PER_REFERENCE_FRAME = 16_666_667f

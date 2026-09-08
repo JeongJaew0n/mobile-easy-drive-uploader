@@ -1,5 +1,9 @@
 package com.jjw.easygallery.feature.gallery
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,11 +33,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -44,6 +50,7 @@ import androidx.core.os.ConfigurationCompat
 import coil3.compose.AsyncImage
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.ui.motion.LocalMotion
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -58,9 +65,14 @@ internal fun GalleryGrid(
     onSelectionChange: (Set<Long>) -> Unit,
     modifier: Modifier = Modifier,
     onOpenItem: (Long) -> Unit = {},
+    /** false 면 항목 이동·등장 애니메이션 생략(필터 전환처럼 목록이 통째로 바뀔 때) */
+    animateChanges: Boolean = true,
 ) {
     val selectionMode = selectedIds.isNotEmpty()
     val gridState = rememberLazyGridState()
+    val motion = LocalMotion.current
+    val placementSpec = if (animateChanges) motion.settle<androidx.compose.ui.unit.IntOffset>() else null
+    val fadeSpec = if (animateChanges) motion.quick<Float>() else null
     // 그리드 인덱스 → 항목 ID (헤더는 null). 드래그 범위 선택에서 화면 밖 항목까지 포함하기 위해 필요
     val entryIds = remember(sections) {
         buildList<Long?> {
@@ -103,6 +115,11 @@ internal fun GalleryGrid(
                     allSelected = sectionIds.isNotEmpty() && sectionIds.all { it in selectedIds },
                     anySelected = sectionIds.any { it in selectedIds },
                     onToggleSection = { onSelectionChange(selectedIds.toggleSection(sectionIds)) },
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = fadeSpec,
+                        placementSpec = placementSpec,
+                        fadeOutSpec = fadeSpec,
+                    ),
                 )
             }
             items(
@@ -116,6 +133,12 @@ internal fun GalleryGrid(
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
                     onOpen = { onOpenItem(item.id) },
+                    // 삭제·이동 후 남은 항목이 미끄러져 빈자리를 채운다
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = fadeSpec,
+                        placementSpec = placementSpec,
+                        fadeOutSpec = fadeSpec,
+                    ),
                 )
             }
         }
@@ -198,6 +221,13 @@ private fun MediaThumbnail(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motion = LocalMotion.current
+    // 선택 시 살짝 축소 — padding 대신 graphicsLayer 라 레이아웃 재측정이 없다
+    val imageScale by animateFloatAsState(
+        targetValue = if (selected) SELECTED_SCALE else 1f,
+        animationSpec = motion.settle(),
+        label = "thumbScale",
+    )
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -212,15 +242,25 @@ private fun MediaThumbnail(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (selected) Modifier.padding(SELECTED_INSET_DP.dp) else Modifier),
+                .graphicsLayer {
+                    scaleX = imageScale
+                    scaleY = imageScale
+                },
         )
-        if (selectionMode) {
-            SelectionIndicator(
-                selected = selected,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp),
-            )
+        AnimatedVisibility(
+            visible = selectionMode,
+            enter = motion.enterScale(),
+            exit = motion.exitScale(),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(6.dp),
+        ) {
+            // 선택 ↔ 미선택 표시는 제자리에서 커지며 교차
+            AnimatedContent(
+                targetState = selected,
+                transitionSpec = { motion.enterScale() togetherWith motion.exitScale() },
+                label = "selectionIndicator",
+            ) { isSelected -> SelectionIndicator(selected = isSelected) }
         }
         if (item.isFavorite) {
             Icon(
@@ -312,6 +352,6 @@ private const val BADGE_ALPHA = 0.6f
 private const val SECTION_CIRCLE_SIZE_DP = 22
 private const val SELECTED_BORDER_DP = 3
 private const val UNSELECTED_BORDER_DP = 2
-private const val SELECTED_INSET_DP = 10
+private const val SELECTED_SCALE = 0.88f
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L

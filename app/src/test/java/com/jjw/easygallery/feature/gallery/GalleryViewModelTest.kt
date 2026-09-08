@@ -164,6 +164,27 @@ class GalleryViewModelTest {
     }
 
     @Test
+    fun `item animations are skipped right after a filter change and resume afterwards`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2)))
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            // 첫 목록: 버전 0 == 0 → 애니메이션 허용
+            assertTrue((awaitItem() as GalleryUiState.Content).animateItemChanges)
+
+            // 기간 필터 변경 직후 첫 목록은 통째로 바뀌므로 애니메이션 생략
+            viewModel.setDateRange(DateRange(java.time.LocalDate.of(2020, 1, 1), java.time.LocalDate.of(2030, 1, 1)))
+            assertEquals(false, (awaitItem() as GalleryUiState.Content).animateItemChanges)
+
+            // 그 뒤 선택 변경처럼 목록이 그대로인 갱신은 다시 애니메이션
+            viewModel.toggleSelection(1)
+            assertTrue((awaitItem() as GalleryUiState.Content).animateItemChanges)
+        }
+    }
+
+    @Test
     fun `repository failure maps to Error state`() = runTest(testDispatcher) {
         val boom = IllegalStateException("boom")
         every { repository.observeMedia(any()) } returns flow { throw boom }

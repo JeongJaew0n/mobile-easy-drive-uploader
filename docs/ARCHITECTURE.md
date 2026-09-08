@@ -22,7 +22,8 @@ app/src/main/java/com/jjw/easygallery/
 │   └── ui/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
 │       ├── media/             # MediaActionEffect (동의 실행 + 결과 스낵바, 3개 화면 공용)
-│       └── theme/             # Material 3 테마
+│       ├── motion/            # MotionSpecs 토큰 + LocalMotion (시스템 애니메이션 끄기 존중)
+│       └── theme/             # Material 3 테마 (LocalMotion 제공)
 └── feature/
     ├── gallery/               # GalleryRoute/Screen/Grid, GalleryActions(하단 바·다이얼로그·메뉴), GalleryViewModel, MediaPermission
     ├── viewer/                # 상세보기: 페이저 스와이프, 확대/축소, 영상 재생, 정보 패널, 단일 항목 편집
@@ -42,6 +43,7 @@ GalleryViewModel: permissionStatus.flatMapLatest ─▶ groupByDate() ─▶ Gal
 ```
 
 - **MediaStoreRepository**: `MediaStore.Files` 컬렉션을 `MEDIA_TYPE IN (IMAGE, VIDEO)` 로 한 번에 조회. `DATE_TAKEN` 이 0인 행은 `DATE_ADDED*1000` 으로 대체 후 메모리 정렬. 쿼리는 `ensureActive()` 로 취소 가능.
+- **파생 상태 분리**: `GalleryViewModel` 은 목록에서만 나오는 값(섹션·앨범·id 맵)을 `Catalog` 로 한 번 계산하고, 선택 변경은 그 위에 O(k) 로만 결합한다. 선택 토글마다 6천 장을 재그룹하던 비용을 없앤 것 — 애니메이션 첫 프레임이 끊기지 않게 하는 기반.
 - **전체 로드 (Paging 미사용)**: 수천~수만 장은 항목당 수백 바이트라 메모리 리스트로 충분하고(6천 장 ≈ 수 MB), 날짜 헤더·다중 선택·"이 날 전체 선택" 같은 기능이 훨씬 단순해진다. 수십만 장 규모 이슈가 실측되면 Paging 3 도입을 재검토한다.
 - **권한**: `MediaPermission` 이 SDK 별 권한 집합과 상태(Full/Partial/Denied)를 계산. `GalleryRoute` 가 `LifecycleResumeEffect` 마다 상태를 ViewModel 에 알려 설정 앱에서 돌아온 경우도 반영. ViewModel 은 상태를 모르는 동안(`null`) 쿼리하지 않는다.
 - **썸네일**: `MediaStoreThumbnailFetcher` 가 `content://media/...` URI 를 가로채 `ContentResolver.loadThumbnail` (시스템 썸네일 캐시) 사용. 실패 시 원본 스트림으로 폴백해 Coil 기본 디코더/`VideoFrameDecoder` 가 처리.
@@ -61,9 +63,17 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 - **ViewModel**: Repository Flow 를 `stateIn` 으로 `StateFlow<UiState>` 로 노출. `SharingStarted.WhileSubscribed(5s)`.
 - **Repository**: 인터페이스는 `core/data`, 구현은 Hilt `@Binds` 로 바인딩. 테스트에서는 인터페이스를 mock.
 
+## 모션
+
+- 모든 애니메이션 스펙은 `core/ui/motion/MotionSpecs` 토큰(`quick 150ms / standard 250ms / settle 스프링 / progress 200ms`)과 Enter/Exit 프리셋(`enterFromBottom`, `enterExpand`, `enterScale` …)만 쓴다. 리터럴 `tween(300)` 금지(detekt `MagicNumber` 로도 막힘).
+- `EasyGalleryTheme` 이 시스템 `ANIMATOR_DURATION_SCALE == 0` 이면 `reduceMotion = true` 인 스펙을 `LocalMotion` 으로 내려 모든 전환이 즉시(`snap`) 실행된다.
+- 원칙: `graphicsLayer(alpha/scale/translation)` 로만 움직이고 `size/padding` 애니메이션은 피한다. 연속·무한 애니메이션(shimmer, 매 프레임 보간) 금지 — 배경과 근거는 `ANIMATION_IMPROVEMENT.md`.
+- 적용 위치: 화면 전환(`NavDisplay` fade-through + 예측 뒤로가기), 선택 모드 상·하단 바, 썸네일 선택 축소(`graphicsLayer` scale)·체크 표시, 그리드 `animateItem`(필터 전환 직후 1회는 `animateItemChanges=false` 로 생략), 배너 expand/shrink, 상세보기 컨트롤 slide/scale, 업로드 진행 바 200ms 이즈.
+
 ## 내비게이션 (Navigation 3)
 
 - 백스택: `rememberNavBackStack(GalleryKey)` — `NavKey` 를 구현한 `@Serializable` 키만 사용.
+- 전환: `NavDisplay` 의 `transitionSpec`(새 화면 fade+scale 0.96→1) / `popTransitionSpec` / `predictivePopTransitionSpec` 을 전역으로 지정. 매니페스트 `enableOnBackInvokedCallback=true` 로 Android 14+ 예측 뒤로가기 활성.
 - `NavDisplay` 에 `rememberSaveableStateHolderNavEntryDecorator()` + `rememberViewModelStoreNavEntryDecorator()` 를 걸어 엔트리별 ViewModel 스코프를 보장.
 - 이동은 `backStack.add(Key)`, 뒤로는 `backStack.removeLastOrNull()`.
 

@@ -9,6 +9,10 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +67,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
+import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 import java.time.format.DateTimeFormatter
 
@@ -202,6 +207,7 @@ internal fun GalleryScreen(
 ) {
     val content = uiState as? GalleryUiState.Content
     val selectionMode = content?.isSelectionMode == true
+    val motion = LocalMotion.current
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
     var showDateRange by rememberSaveable { mutableStateOf(false) }
@@ -213,38 +219,52 @@ internal fun GalleryScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (selectionMode && content != null) {
-                SelectionTopBar(
-                    selectedCount = content.selectedIds.size,
-                    onClear = onClearSelection,
-                    onUpload = onUploadSelected,
-                )
-            } else {
-                GalleryTopBar(
-                    itemCount = content?.itemCount,
-                    favoritesOnly = content?.favoritesOnly == true,
-                    supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true,
-                    onSettingsClick = onSettingsClick,
-                    onFavoritesOnlyChange = onFavoritesOnlyChange,
-                    onTrashClick = onTrashClick,
-                    onDriveClick = onDriveClick,
-                    onPickDateRange = { showDateRange = true },
-                )
+            // 일반 ↔ 선택 상단바를 페이드로 교차 (순간 교체 방지)
+            AnimatedContent(
+                targetState = selectionMode,
+                transitionSpec = { motion.enterFade() togetherWith motion.exitFade() },
+                label = "galleryTopBar",
+            ) { selecting ->
+                if (selecting && content != null) {
+                    SelectionTopBar(
+                        selectedCount = content.selectedIds.size,
+                        onClear = onClearSelection,
+                        onUpload = onUploadSelected,
+                    )
+                } else {
+                    GalleryTopBar(
+                        itemCount = content?.itemCount,
+                        favoritesOnly = content?.favoritesOnly == true,
+                        supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true,
+                        onSettingsClick = onSettingsClick,
+                        onFavoritesOnlyChange = onFavoritesOnlyChange,
+                        onTrashClick = onTrashClick,
+                        onDriveClick = onDriveClick,
+                        onPickDateRange = { showDateRange = true },
+                    )
+                }
             }
         },
         bottomBar = {
-            if (selectionMode && content != null) {
-                SelectionBottomBar(
-                    selectedCount = content.selectedIds.size,
-                    allFavorite = content.selectedAllFavorite,
-                    supportsTrashAndFavorites = content.supportsTrashAndFavorites,
-                    enabled = !content.isMutating,
-                    onTrash = actions.onTrash,
-                    onDelete = actions.onDelete,
-                    onToggleFavorite = actions.onToggleFavorite,
-                    onRename = { showRename = true },
-                    onMove = { showMove = true },
-                )
+            // 하단 액션 바는 아래에서 올라오고 내려간다. 사라지는 동안에도 마지막 내용을 유지
+            AnimatedVisibility(
+                visible = selectionMode,
+                enter = motion.enterFromBottom(),
+                exit = motion.exitToBottom(),
+            ) {
+                if (content != null) {
+                    SelectionBottomBar(
+                        selectedCount = content.selectedIds.size,
+                        allFavorite = content.selectedAllFavorite,
+                        supportsTrashAndFavorites = content.supportsTrashAndFavorites,
+                        enabled = !content.isMutating,
+                        onTrash = actions.onTrash,
+                        onDelete = actions.onDelete,
+                        onToggleFavorite = actions.onToggleFavorite,
+                        onRename = { showRename = true },
+                        onMove = { showMove = true },
+                    )
+                }
             }
         },
     ) { innerPadding ->
@@ -354,17 +374,39 @@ private fun GalleryContent(
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
 ) {
+    val motion = LocalMotion.current
+    // 배너는 펴지며 등장해 그리드를 밀어내고, 접히며 사라진다 (그리드 점프 방지). 짧게(150ms) 유지
     Column(Modifier.fillMaxSize()) {
-        if (uiState.upload.hasActive) {
+        AnimatedVisibility(
+            visible = uiState.upload.hasActive,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
             UploadProgressBanner(summary = uiState.upload, onCancel = onCancelUpload, onClick = onUploadQueueClick)
-        } else if (uiState.upload.failed > 0) {
+        }
+        AnimatedVisibility(
+            visible = !uiState.upload.hasActive && uiState.upload.failed > 0,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
             UploadFailedBanner(failed = uiState.upload.failed, onClick = onUploadQueueClick)
         }
-        if (uiState.isPartialAccess) {
+        AnimatedVisibility(
+            visible = uiState.isPartialAccess,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
             PartialAccessBanner(onManageSelection = onRequestPermission)
         }
-        uiState.dateRange?.let { range ->
-            DateRangeBar(range = range, onClear = onClearDateRange)
+        // 사라지는 동안에도 마지막 기간을 보여주기 위해 non-null 값을 기억
+        val lastRange = remember { mutableStateOf(uiState.dateRange) }
+        if (uiState.dateRange != null) lastRange.value = uiState.dateRange
+        AnimatedVisibility(
+            visible = uiState.dateRange != null,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
+            lastRange.value?.let { range -> DateRangeBar(range = range, onClear = onClearDateRange) }
         }
         if (uiState.sections.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -385,6 +427,7 @@ private fun GalleryContent(
                 onToggleSelection = onToggleSelection,
                 onSelectionChange = onSelectionChange,
                 onOpenItem = onOpenItem,
+                animateChanges = uiState.animateItemChanges,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -488,7 +531,13 @@ private fun UploadProgressBanner(
                 )
                 TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
             }
-            LinearProgressIndicator(progress = { current?.fraction ?: 0f }, modifier = Modifier.fillMaxWidth())
+            // DB 갱신(1초 주기)마다 200ms 만 움직인다 — 계단 느낌은 없애고 연속 재구성은 피한다
+            val fraction by animateFloatAsState(
+                targetValue = current?.fraction ?: 0f,
+                animationSpec = LocalMotion.current.progress(),
+                label = "uploadProgress",
+            )
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
         }
     }
 }

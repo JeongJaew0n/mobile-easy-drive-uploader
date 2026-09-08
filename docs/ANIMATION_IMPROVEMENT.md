@@ -206,9 +206,10 @@ combine(catalog, selectedIds, uploadSummary, isMutating) { c, selected, ... ->
 
 ## 7. 우선순위 로드맵
 
-### 1단계 — 기반 + 값싼 승리 + 현재 낭비 제거 (하루 안)
+### 1단계 — 기반 + 값싼 승리 + 현재 낭비 제거 ✅ (2026-09-08 완료)
 G1 모션 토큰 → **D7 숨겨진 컨트롤 폴링 중단** → **§4.4 파생 상태 분리** → G4 predictive back → G3 전역 전환 → L1·L2 선택 모드 → L3 썸네일 선택(`graphicsLayer`) → L4 `animateItem`(+대량 변경 조건) → L5 배너(200ms) → D2 컨트롤 → R2 진행 바(200ms 이즈) → L7 프레임 동기 자동 스크롤.
 *"즉시 교체" 느낌이 대부분 사라지고, CPU 시간은 오히려 줄어야 한다.*
+구현 메모: D7 은 폴링 대신 `Player.Listener.onIsPlayingChanged` 로 재생 상태를 받고 위치 폴링은 컨트롤이 보일 때만(250ms). L4 는 `GalleryUiState.Content.animateItemChanges` 로 필터 전환 직후 1회 생략. 실기기 프레임·전력 측정(§5·§8)은 기기 재연결 후 수행 예정.
 
 ### 2단계 — 상세보기 다듬기 (2~3일)
 §4.3 파일 분할 → D1 확대 스프링·경계 보정(+디코딩 상한) → V2 상세보기 진입 전환 → V3 아래로 스와이프 닫기 → D6 썸네일→원본 2단계 → R1 리스트 `animateItem` → R4 바텀시트.

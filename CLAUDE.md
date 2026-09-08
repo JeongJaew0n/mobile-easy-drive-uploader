@@ -35,3 +35,4 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - Robolectric 테스트는 `robolectric.properties` 의 sdk=35 유지 (36+ 는 Java 21 필요, 테스트 JVM 은 17).
 - 벡터 아이콘은 `res/drawable/ic_*.xml` 에 직접 추가 (`material-icons-extended` 미사용, `?attr/colorControlNormal` 같은 AppCompat 속성 금지).
 - 줄 길이 120, 트레일링 콤마 사용 (detekt formatting 이 검사).
+- 애니메이션은 `LocalMotion.current`(`core/ui/motion/MotionSpecs`) 의 스펙·프리셋만 사용. `tween(숫자)` 리터럴, `size/padding` 애니메이션, 무한·매 프레임 애니메이션 금지. 새 `if` 로 컴포저블을 넣고 빼는 자리는 `AnimatedVisibility`/`AnimatedContent` 를 기본으로 한다.

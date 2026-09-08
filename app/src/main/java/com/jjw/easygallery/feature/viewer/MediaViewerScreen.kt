@@ -81,6 +81,7 @@ import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
+import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.gallery.MoveDialog
 import com.jjw.easygallery.feature.gallery.RenameDialog
 import com.jjw.easygallery.feature.gallery.formatDuration
@@ -172,6 +173,7 @@ internal fun MediaViewerScreen(
 
     var chromeVisible by rememberSaveable { mutableStateOf(true) }
     var videoPlaying by remember { mutableStateOf(false) }
+    val motion = LocalMotion.current
     // 항목을 넘겨도 유지되도록 화면 수준에서 들고 있는다
     var playbackSpeed by rememberSaveable { mutableFloatStateOf(1f) }
     var volume by rememberSaveable { mutableFloatStateOf(1f) }
@@ -219,7 +221,11 @@ internal fun MediaViewerScreen(
         containerColor = Color.Black,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            AnimatedVisibility(visible = chromeVisible) {
+            AnimatedVisibility(
+                visible = chromeVisible,
+                enter = motion.enterFromTop(),
+                exit = motion.exitToTop(),
+            ) {
                 ViewerTopBar(
                     item = current,
                     position = uiState.currentIndex + 1,
@@ -237,7 +243,11 @@ internal fun MediaViewerScreen(
             }
         },
         bottomBar = {
-            AnimatedVisibility(visible = chromeVisible) {
+            AnimatedVisibility(
+                visible = chromeVisible,
+                enter = motion.enterFromBottom(),
+                exit = motion.exitToBottom(),
+            ) {
                 ViewerBottomBar(
                     item = current,
                     details = uiState.details,
@@ -347,6 +357,7 @@ private fun VideoPage(
     settings: VideoSettings,
 ) {
     val context = LocalContext.current
+    val motion = LocalMotion.current
     val player = remember(item.id) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(Media3Item.fromUri(item.uri))
@@ -365,15 +376,26 @@ private fun VideoPage(
     // 드래그 중에는 재생 위치 대신 손가락 위치를 보여준다
     var scrubFraction by remember { mutableStateOf<Float?>(null) }
 
-    LaunchedEffect(player) {
+    // 재생/정지 상태는 폴링 대신 플레이어 이벤트로 받는다 (재생 끝나면 컨트롤을 다시 띄우기 위해서도 필요)
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                onPlayingChange(playing)
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+    // 위치·길이는 컨트롤이 보일 때만 읽는다. 숨겨진 동안 갱신하던 낭비(매 400ms 재구성)를 없앤다
+    LaunchedEffect(player, controlsVisible) {
+        if (!controlsVisible) return@LaunchedEffect
         while (true) {
-            isPlaying = player.isPlaying
             durationMillis = player.duration.coerceAtLeast(0L)
             positionMillis = player.currentPosition.coerceAtLeast(0L)
             delay(PROGRESS_POLL_MILLIS)
         }
     }
-    LaunchedEffect(isPlaying) { onPlayingChange(isPlaying) }
     LaunchedEffect(player, settings.speed) { player.setPlaybackSpeed(settings.speed) }
     LaunchedEffect(player, settings.volume) { player.volume = settings.volume }
 
@@ -389,7 +411,12 @@ private fun VideoPage(
     ) {
         PlayerSurface(player = player, modifier = Modifier.fillMaxSize())
 
-        AnimatedVisibility(visible = controlsVisible, modifier = Modifier.align(Alignment.Center)) {
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = motion.enterScale(),
+            exit = motion.exitScale(),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
             IconButton(
                 onClick = {
                     if (player.isPlaying) {
@@ -421,7 +448,12 @@ private fun VideoPage(
             }
         }
 
-        AnimatedVisibility(visible = controlsVisible, modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = motion.enterFromBottom(),
+            exit = motion.exitToBottom(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
             val scrub = scrubFraction
             Column(Modifier.background(Color.Black.copy(alpha = OVERLAY_ALPHA))) {
                 VideoSettingsRow(settings = settings)
@@ -780,7 +812,7 @@ private fun InfoRow(label: String, value: String) {
 
 private const val OVERLAY_ALPHA = 0.55f
 private const val LABEL_ALPHA = 0.7f
-private const val PROGRESS_POLL_MILLIS = 400L
+private const val PROGRESS_POLL_MILLIS = 250L
 private const val CONTROLS_AUTO_HIDE_MILLIS = 3_000L
 private const val PLAY_BUTTON_SIZE_DP = 64
 private const val PLAY_ICON_SIZE_DP = 36

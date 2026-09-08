@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -50,6 +49,10 @@ class GalleryViewModel @Inject constructor(
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
     private val filter = MutableStateFlow(MediaFilter.All)
     private val dateRange = MutableStateFlow<DateRange?>(null)
+
+    /** 필터·기간이 바뀔 때마다 증가. 이 값이 바뀐 직후 첫 목록 갱신은 항목 이동 애니메이션을 끈다(수백 개 동시 이동 방지) */
+    private var filterVersion = 0
+    private var animatedVersion = 0
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
@@ -75,12 +78,14 @@ class GalleryViewModel @Inject constructor(
 
     fun setFavoritesOnly(enabled: Boolean) {
         clearSelection()
+        filterVersion++
         filter.value = if (enabled) MediaFilter.Favorites else MediaFilter.All
     }
 
     /** null 이면 기간 제한 없음 */
     fun setDateRange(range: DateRange?) {
         clearSelection()
+        filterVersion++
         dateRange.value = range
     }
 
@@ -158,26 +163,42 @@ class GalleryViewModel @Inject constructor(
         MediaPermissionStatus.Full, MediaPermissionStatus.Partial -> contentFlow(status, filter)
     }
 
+    /** 목록에서만 파생되는 값. 선택이 바뀔 때는 다시 계산하지 않도록 분리했다(6천 장 O(n) 재계산 방지). */
+    private class Catalog(
+        val items: List<MediaItem>,
+        val sections: List<GallerySection>,
+        val albums: List<Album>,
+        val byId: Map<Long, MediaItem>,
+        val range: DateRange?,
+        val version: Int,
+    )
+
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다
-        val media = combine(mediaRepository.observeMedia(filter), dateRange) { all, range ->
-            all.filterByDate(range) to range
-        }.onEach { (items, _) -> latestItems = items }
+        val catalog = combine(mediaRepository.observeMedia(filter), dateRange) { all, range ->
+            val items = all.filterByDate(range)
+            latestItems = items
+            Catalog(items, groupByDate(items), albumsFrom(items), items.associateBy { it.id }, range, filterVersion)
+        }
 
-        return combine(media, selectedIds, uploadSummary, actionController.isMutating) {
-                (items, range), selected, summary, mutating ->
+        return combine(catalog, selectedIds, uploadSummary, actionController.isMutating) {
+                c, selected, summary, mutating ->
+            // 필터 변경 후 첫 목록은 애니메이션 없이 교체, 그 뒤(삭제·이동 등)부터 animateItem
+            val animate = c.version == animatedVersion
+            animatedVersion = c.version
             GalleryUiState.Content(
-                sections = groupByDate(items),
-                itemCount = items.size,
+                sections = c.sections,
+                itemCount = c.items.size,
                 isPartialAccess = status == MediaPermissionStatus.Partial,
                 selectedIds = selected,
                 upload = summary,
                 favoritesOnly = filter == MediaFilter.Favorites,
-                dateRange = range,
-                albums = albumsFrom(items),
+                dateRange = c.range,
+                albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
-                selectedAllFavorite = selected.isNotEmpty() && items.filter { it.id in selected }.all { it.isFavorite },
+                selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
                 isMutating = mutating,
+                animateItemChanges = animate,
             ) as GalleryUiState
         }
             .onStart { emit(GalleryUiState.Loading) }
@@ -211,6 +232,8 @@ sealed interface GalleryUiState {
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
         val isMutating: Boolean = false,
+        /** false 면 그리드가 항목 이동/등장 애니메이션을 생략한다(필터 전환 직후) */
+        val animateItemChanges: Boolean = true,
     ) : GalleryUiState {
         val isSelectionMode: Boolean get() = selectedIds.isNotEmpty()
     }
