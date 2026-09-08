@@ -33,6 +33,9 @@ object DatabaseModule {
     fun providesCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()
 
     @Provides
+    fun providesRemoteAccountDao(db: AppDatabase): RemoteAccountDao = db.remoteAccountDao()
+
+    @Provides
     @Singleton
     fun providesVideoCompressor(impl: Media3VideoCompressor): VideoCompressor = impl
 }

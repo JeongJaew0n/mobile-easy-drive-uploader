@@ -13,4 +13,6 @@ data class UploadedMediaEntity(
     val driveFileId: String,
     val folderId: String?,
     val uploadedAt: Long,
+    /** 어느 계정에 올라갔는지. null = Google Drive */
+    val accountId: String? = null,
 )

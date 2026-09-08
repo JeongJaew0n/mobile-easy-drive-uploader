@@ -8,6 +8,7 @@ import com.jjw.easygallery.core.data.drive.DriveApi
 import com.jjw.easygallery.core.data.drive.DriveFileDto
 import com.jjw.easygallery.core.data.drive.DriveFileMetadata
 import com.jjw.easygallery.core.data.drive.DriveHttpClient
+import com.jjw.easygallery.core.data.remote.RemoteUploader
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -74,17 +75,17 @@ class DriveUploader @Inject constructor(
     @param:DriveHttpClient private val client: OkHttpClient,
     private val json: Json,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
-) {
+) : RemoteUploader {
 
     /** 일부 프로바이더는 descriptor 를 열 수 없거나 길이를 모른다(-1) → MediaStore SIZE 로 대체 */
-    suspend fun resolveLength(source: UploadSource): Long = withContext(ioDispatcher) {
+    override suspend fun resolveLength(source: UploadSource): Long = withContext(ioDispatcher) {
         runCatching { context.contentResolver.openAssetFileDescriptor(source.uri, "r")?.use { it.length } }
             .getOrNull()
             ?.takeIf { it >= 0 }
             ?: source.sizeBytes
     }
 
-    suspend fun startSession(source: UploadSource, folderId: String, length: Long): String {
+    override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String {
         val response = api.startResumableUpload(
             metadata = DriveFileMetadata(
                 name = source.displayName,
@@ -101,7 +102,7 @@ class DriveUploader @Inject constructor(
     }
 
     /** `Content-Range: bytes *\/total` 로 서버가 받은 범위를 묻는다. */
-    suspend fun queryStatus(sessionUri: String, length: Long): SessionStatus = withContext(ioDispatcher) {
+    override suspend fun queryStatus(sessionUri: String, length: Long): SessionStatus = withContext(ioDispatcher) {
         val request = Request.Builder()
             .url(sessionUri)
             .put(ByteArray(0).toRequestBody(null))
@@ -124,31 +125,32 @@ class DriveUploader @Inject constructor(
     }
 
     /** [offset] 부터 끝까지 스트리밍 PUT. 진행률은 절대 바이트로 보고한다. */
-    fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> = channelFlow {
-        val mimeType = source.mimeType.ifBlank { DEFAULT_MIME_TYPE }
-        send(UploadEvent.Progress(offset, length))
-        val body = ContentUriRequestBody(
-            resolver = context.contentResolver,
-            uri = source.uri,
-            mediaType = mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
-            offset = offset,
-            totalLength = length,
-        ) { sent -> trySend(UploadEvent.Progress(sent, length)) }
-        val request = Request.Builder()
-            .url(sessionUri)
-            .put(body)
-            .apply { if (offset > 0) header("Content-Range", "bytes $offset-${length - 1}/$length") }
-            .build()
-        val file = client.newCall(request).await().use { response ->
-            when (response.code) {
-                HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response)
-                HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> throw SessionExpiredException(response.code)
-                else -> throw DriveUploadException("업로드 실패 (${response.code})", response.code)
+    override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
+        channelFlow {
+            val mimeType = source.mimeType.ifBlank { DEFAULT_MIME_TYPE }
+            send(UploadEvent.Progress(offset, length))
+            val body = ContentUriRequestBody(
+                resolver = context.contentResolver,
+                uri = source.uri,
+                mediaType = mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
+                offset = offset,
+                totalLength = length,
+            ) { sent -> trySend(UploadEvent.Progress(sent, length)) }
+            val request = Request.Builder()
+                .url(sessionUri)
+                .put(body)
+                .apply { if (offset > 0) header("Content-Range", "bytes $offset-${length - 1}/$length") }
+                .build()
+            val file = client.newCall(request).await().use { response ->
+                when (response.code) {
+                    HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response)
+                    HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> throw SessionExpiredException(response.code)
+                    else -> throw DriveUploadException("업로드 실패 (${response.code})", response.code)
+                }
             }
-        }
-        Timber.d("uploaded %s -> %s", source.displayName, file.id)
-        send(UploadEvent.Completed(file.id))
-    }.flowOn(ioDispatcher)
+            Timber.d("uploaded %s -> %s", source.displayName, file.id)
+            send(UploadEvent.Completed(file.id))
+        }.flowOn(ioDispatcher)
 
     private fun parseFile(response: Response): DriveFileDto =
         json.decodeFromString(DriveFileDto.serializer(), response.body.string())

@@ -29,4 +29,6 @@ data class UploadTaskEntity(
     val updatedAt: Long,
     @ColumnInfo(defaultValue = "0") val width: Int = 0,
     @ColumnInfo(defaultValue = "0") val height: Int = 0,
+    /** 업로드 대상 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §6) */
+    val accountId: String? = null,
 )
