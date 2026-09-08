@@ -24,6 +24,8 @@ data class RemoteAccount(
     val region: String? = null,
     val bucketOrRoot: String? = null,
     val username: String? = null,
+    /** WebDAV 자체 서명 인증서 지문(SHA-256, 소문자 hex). 있으면 이 인증서만 신뢰한다(`docs/NAS_STORAGE.md` §2) */
+    val certSha256: String? = null,
     val createdAt: Long = 0,
 ) {
     companion object {

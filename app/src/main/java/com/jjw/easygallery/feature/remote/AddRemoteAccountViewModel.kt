@@ -2,17 +2,25 @@ package com.jjw.easygallery.feature.remote
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jjw.easygallery.core.common.di.AppDispatcher
+import com.jjw.easygallery.core.common.di.Dispatcher
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageFactory
+import com.jjw.easygallery.core.data.remote.fetchServerCertificateSha256
+import com.jjw.easygallery.core.data.remote.isTlsFailure
+import com.jjw.easygallery.core.data.remote.s3.PlainHttpClient
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -37,6 +45,10 @@ data class AddRemoteAccountUiState(
     val isBusy: Boolean = false,
     /** 마지막 연결 테스트 결과. null = 아직 안 함 */
     val testResult: Result<Unit>? = null,
+    /** 사용자가 신뢰하기로 한 자체 서명 인증서 지문(WebDAV) */
+    val certSha256: String? = null,
+    /** TLS 실패 후 서버에서 읽어 온 지문 — 신뢰 여부 다이얼로그용 */
+    val pendingCertSha256: String? = null,
 ) {
     val canSubmit: Boolean
         get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() && secret.isNotBlank() &&
@@ -53,6 +65,8 @@ sealed interface AddRemoteAccountEvent {
 class AddRemoteAccountViewModel @Inject constructor(
     private val accounts: RemoteAccountRepository,
     private val factories: Map<RemoteAccountKind, @JvmSuppressWildcards RemoteStorageFactory>,
+    @PlainHttpClient private val httpClient: OkHttpClient,
+    @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddRemoteAccountUiState())
@@ -98,9 +112,29 @@ class AddRemoteAccountViewModel @Inject constructor(
                 Timber.w(e, "connection test failed")
                 Result.failure(e)
             }
+            // 자체 서명 인증서(WebDAV)면 지문을 읽어 와 사용자에게 신뢰 여부를 묻는다
+            val failure = result.exceptionOrNull()
+            if (state.kind == RemoteAccountKind.WEBDAV && failure?.isTlsFailure() == true && state.certSha256 == null) {
+                val fingerprint = runCatching {
+                    withContext(ioDispatcher) { fetchServerCertificateSha256(httpClient, state.endpoint.trim()) }
+                }.getOrNull()
+                if (fingerprint != null) {
+                    _uiState.update { it.copy(isBusy = false, pendingCertSha256 = fingerprint) }
+                    return@launch
+                }
+            }
             _uiState.update { it.copy(isBusy = false, testResult = result) }
         }
     }
+
+    /** 지문 다이얼로그에서 "신뢰" → 저장하고 바로 다시 테스트 */
+    fun trustPendingCertificate() {
+        val fingerprint = _uiState.value.pendingCertSha256 ?: return
+        _uiState.update { it.copy(certSha256 = fingerprint, pendingCertSha256 = null) }
+        testConnection()
+    }
+
+    fun dismissPendingCertificate() = _uiState.update { it.copy(pendingCertSha256 = null) }
 
     fun save() {
         val state = _uiState.value
@@ -129,5 +163,6 @@ class AddRemoteAccountViewModel @Inject constructor(
         region = region.trim().ifBlank { null },
         bucketOrRoot = bucketOrRoot.trim().ifBlank { null },
         username = username.trim(),
+        certSha256 = certSha256,
     )
 }

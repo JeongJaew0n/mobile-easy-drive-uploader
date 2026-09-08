@@ -15,4 +15,6 @@ data class RemoteAccountEntity(
     val username: String?,
     val secretRef: String,
     val createdAt: Long,
+    /** 자체 서명 인증서 지문(SHA-256 hex). null 이면 시스템 신뢰 저장소 */
+    val certSha256: String? = null,
 )

@@ -9,6 +9,7 @@ import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.remote.awaitResponse
+import com.jjw.easygallery.core.data.remote.pinCertificate
 import com.jjw.easygallery.core.data.remote.requireSuccess
 import com.jjw.easygallery.core.data.upload.ContentUriRequestBody
 import com.jjw.easygallery.core.data.upload.SessionStatus
@@ -48,6 +49,8 @@ class WebDavStorage(
 
     private val baseUrl: HttpUrl = account.endpoint.trimEnd('/').toHttpUrl()
     private val client: OkHttpClient = baseClient.newBuilder()
+        // 자체 서명 인증서: 저장된 지문과 정확히 같은 인증서만 신뢰(전체 신뢰는 하지 않는다)
+        .apply { account.certSha256?.let { pinCertificate(it) } }
         .addInterceptor { chain ->
             chain.proceed(
                 chain.request().newBuilder()

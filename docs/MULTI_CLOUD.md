@@ -120,4 +120,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 S3 멀티파트 재개(8MB 파트, ListParts 로 이어 올리기) 구현, 탐색 화면 부제에 계정 이름.
 - 2026-09-09 S3 폴더 이름 변경/이동(접두어 아래 오브젝트 복사 후 삭제, `FOLDER_MUTATION`), 자동 백업·알림이 Drive 전제를 벗어남(`canUpload`, 문구 중립화).
 - 2026-09-09 M6: 갤러리 배지·"백업 안 됨"·상세보기 업로드 아이콘·자동 백업 중복 판단이 **현재 업로드 대상 계정** 기준(`observeUploadedIds(accountId)`, `uploadedAmong(ids, accountId)`; 중복 정리는 여전히 전체 합집합). 영구 실패 시 `RemoteUploader.abort()` 로 S3 미완료 멀티파트 삭제.
-- 남은 것: WebDAV 자체 서명 인증서 지문 고정, S3 폴더 이동 진행 표시, SMB(W2), Dropbox/OneDrive.
+- 2026-09-09 WebDAV 자체 서명 인증서 지문 고정(Room v7 `certSha256`).
+- 남은 것: S3 폴더 이동 진행 표시, SMB(W2), Dropbox/OneDrive, Google Drive 행을 저장소 목록에 미러.

@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.data.remote.toFingerprintDisplay
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 
 @Composable
@@ -88,6 +91,27 @@ fun AddRemoteAccountRoute(
         onTest = viewModel::testConnection,
         onSave = viewModel::save,
     )
+    uiState.pendingCertSha256?.let { fingerprint ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPendingCertificate,
+            title = { Text(stringResource(R.string.remote_cert_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.remote_cert_message, uiState.endpoint, fingerprint.toFingerprintDisplay()),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::trustPendingCertificate) {
+                    Text(stringResource(R.string.remote_cert_trust))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissPendingCertificate) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 /** 저장소 추가 폼(`docs/MULTI_CLOUD.md` §5, `NAS_STORAGE.md` §3) */
@@ -189,6 +213,13 @@ internal fun AddRemoteAccountScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            uiState.certSha256?.let { pinned ->
+                Text(
+                    text = stringResource(R.string.remote_cert_pinned, pinned.toFingerprintDisplay()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             OutlinedTextField(
                 value = uiState.secret,
                 onValueChange = { v -> onUpdate { copy(secret = v) } },

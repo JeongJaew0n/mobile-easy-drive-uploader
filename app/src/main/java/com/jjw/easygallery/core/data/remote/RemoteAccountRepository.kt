@@ -46,6 +46,7 @@ class RemoteAccountRepository @Inject constructor(
         region = region,
         bucketOrRoot = bucketOrRoot,
         username = username,
+        certSha256 = certSha256,
         createdAt = createdAt,
     )
 
@@ -59,5 +60,6 @@ class RemoteAccountRepository @Inject constructor(
         username = username,
         secretRef = id,
         createdAt = createdAt,
+        certSha256 = certSha256,
     )
 }

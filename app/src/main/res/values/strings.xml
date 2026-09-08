@@ -226,6 +226,10 @@
     <string name="remote_upload_target_badge">업로드 대상</string>
     <string name="remote_upload_target">%1$s · %2$s</string>
     <string name="remote_secret_note">비밀 키는 기기 Keystore로 암호화해 이 기기에만 저장됩니다.</string>
+    <string name="remote_cert_title">서버 인증서를 신뢰할까요?</string>
+    <string name="remote_cert_message">%1$s의 인증서가 공인 기관 발급이 아닙니다(자체 서명 NAS일 수 있음). 아래 지문이 NAS 관리 화면의 인증서와 같으면 신뢰하세요. 이 인증서 하나만 신뢰합니다.\n\nSHA-256: %2$s</string>
+    <string name="remote_cert_trust">이 인증서 신뢰</string>
+    <string name="remote_cert_pinned">신뢰한 인증서 SHA-256: %1$s</string>
     <string name="drive_menu_open">열기</string>
     <string name="drive_menu_move">이동</string>
     <string name="drive_rename_label">이름</string>

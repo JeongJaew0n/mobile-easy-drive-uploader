@@ -38,3 +38,9 @@
 - 호스트 발견은 하지 않는다(mDNS 광고가 제각각). 주소·공유 이름·계정 직접 입력.
 - 재개: `SMB2 Write` 는 오프셋 지정이 가능하므로 `queryStatus` 로 원격 파일 크기를 읽어 그 지점부터 이어 쓴다(`RESUMABLE_UPLOAD` 가능).
 - 위험: BouncyCastle 이 R8 규칙과 크기를 늘린다. W1 이 충분하면 미룬다.
+
+## 6. 진행 기록
+
+- 2026-09-09 W1 구현(`0a2c34d`): `WebDavStorage`(PROPFIND/MKCOL/MOVE/DELETE/PUT), 계정 추가 폼, 탐색·CRUD·업로드 대상 지정.
+- 2026-09-09 자체 서명 인증서 지문 고정: 연결 테스트가 TLS 오류로 실패하면 서버 리프 인증서의 SHA-256 을 읽어 "이 인증서 신뢰" 다이얼로그를 띄우고, 수락 시 `RemoteAccount.certSha256`(Room v7)에 저장. `WebDavStorage` 는 그 인증서와 **정확히 같은** 경우만 연결(`pinCertificate`, 호스트 이름 검사는 생략 — 인증서 자체를 고정). 전체 신뢰 옵션은 두지 않았다. `PinnedTlsTest`(okhttp-tls 자체 서명 서버).
+- 남은 것: Digest 인증, SMB(W2).
