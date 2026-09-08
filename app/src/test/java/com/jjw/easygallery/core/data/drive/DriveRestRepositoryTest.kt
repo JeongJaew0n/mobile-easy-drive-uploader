@@ -140,6 +140,53 @@ class DriveRestRepositoryTest {
         assertTrue(body.contains("\"parents\":[\"p1\"]"))
     }
 
+    @Test
+    fun `rename patches only the name`() = runTest {
+        server.enqueue(json("""{"id":"f1","name":"new.jpg","mimeType":"image/jpeg"}"""))
+
+        val entry = repository.rename("f1", "new.jpg")
+
+        assertEquals("new.jpg", entry.name)
+        val request = server.takeRequest()
+        assertEquals("PATCH", request.method)
+        assertEquals("/drive/v3/files/f1", request.url.encodedPath)
+        assertEquals("""{"name":"new.jpg"}""", request.body!!.utf8())
+    }
+
+    @Test
+    fun `move swaps parents through query parameters with empty body`() = runTest {
+        server.enqueue(json("""{"id":"f1","name":"a.jpg","parents":["to"]}"""))
+
+        repository.move("f1", fromParentId = "from", toParentId = "to")
+
+        val request = server.takeRequest()
+        assertEquals("PATCH", request.method)
+        assertEquals("to", request.url.queryParameter("addParents"))
+        assertEquals("from", request.url.queryParameter("removeParents"))
+        assertEquals("{}", request.body!!.utf8())
+    }
+
+    @Test
+    fun `setTrashed patches trashed flag`() = runTest {
+        server.enqueue(json("""{"id":"f1","name":"a.jpg","trashed":true}"""))
+        repository.setTrashed("f1", trashed = true)
+        assertEquals("""{"trashed":true}""", server.takeRequest().body!!.utf8())
+
+        server.enqueue(json("""{"id":"f1","name":"a.jpg","trashed":false}"""))
+        repository.setTrashed("f1", trashed = false)
+        assertEquals("""{"trashed":false}""", server.takeRequest().body!!.utf8())
+    }
+
+    @Test
+    fun `listChildren foldersOnly adds mimeType clause`() = runTest {
+        server.enqueue(json("""{"files":[]}"""))
+
+        repository.listChildren("root", foldersOnly = true)
+
+        val q = server.takeRequest().url.queryParameter("q")!!
+        assertTrue(q, q.contains("mimeType = '${DriveApi.FOLDER_MIME_TYPE}'"))
+    }
+
     private fun json(body: String): MockResponse =
         MockResponse.Builder().code(200).setHeader("Content-Type", "application/json").body(body.trimIndent()).build()
 }

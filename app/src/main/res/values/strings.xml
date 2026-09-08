@@ -187,6 +187,17 @@
     <string name="drive_folder_created">%1$s 폴더를 만들었습니다</string>
     <string name="folder_picker_new_folder">새 폴더</string>
     <string name="folder_picker_folder_name">폴더 이름</string>
+    <string name="drive_menu_open">열기</string>
+    <string name="drive_menu_move">이동</string>
+    <string name="drive_rename_label">이름</string>
+    <string name="drive_renamed">이름을 %1$s(으)로 바꿨습니다</string>
+    <string name="drive_move_title">이동할 폴더</string>
+    <string name="drive_move_here">여기로 이동</string>
+    <string name="drive_move_no_folders">하위 폴더가 없습니다</string>
+    <string name="drive_moved">%1$s을(를) %2$s(으)로 옮겼습니다</string>
+    <string name="drive_trashed">%1$s을(를) 휴지통으로 옮겼습니다</string>
+    <string name="drive_restored">복원했습니다</string>
+    <string name="action_undo">실행 취소</string>
 
     <!-- 업로드 목록 -->
     <string name="upload_queue_title">업로드 목록</string>

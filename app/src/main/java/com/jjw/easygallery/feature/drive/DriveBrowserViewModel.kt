@@ -72,8 +72,7 @@ class DriveBrowserViewModel @Inject constructor(
                 )
                 _uiState.update { state ->
                     // 폴더 먼저·이름순 정렬을 유지하며 삽입
-                    val folders = (state.entries.filter { it.isFolder } + entry).sortedBy { it.name.lowercase() }
-                    state.copy(entries = folders + state.entries.filterNot { it.isFolder }, isMutating = false)
+                    state.copy(entries = (state.entries + entry).sortedForDrive(), isMutating = false)
                 }
                 events.send(DriveBrowserEvent.FolderCreated(created))
             } catch (e: CancellationException) {
@@ -81,6 +80,79 @@ class DriveBrowserViewModel @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "create folder failed")
                 _uiState.update { it.copy(isMutating = false) }
+                events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+            }
+        }
+    }
+
+    /** 이동 대상 선택기용: [parentId] 의 하위 폴더 전부(페이지 이어서) */
+    suspend fun listFolders(parentId: String): List<DriveFolder> {
+        val result = ArrayList<DriveFolder>()
+        var token: String? = null
+        do {
+            val page = drive.listChildren(parentId, token, foldersOnly = true)
+            result += page.entries.map { it.toFolder() }
+            token = page.nextPageToken
+        } while (token != null)
+        return result
+    }
+
+    fun rename(entry: DriveEntry, newName: String) {
+        val name = newName.trim()
+        if (name.isEmpty() || name == entry.name) return
+        mutate(
+            optimistic = { list -> list.replaceSorted(entry.id) { it.copy(name = name) } },
+            action = { drive.rename(entry.id, name) },
+            onSuccess = { DriveBrowserEvent.Renamed(name) },
+        )
+    }
+
+    fun move(entry: DriveEntry, target: DriveFolder) {
+        val current = _uiState.value.current ?: return
+        if (target.id == current.id) return
+        mutate(
+            optimistic = { list -> list.filterNot { it.id == entry.id } },
+            action = { drive.move(entry.id, fromParentId = current.id, toParentId = target.id) },
+            onSuccess = { DriveBrowserEvent.Moved(entry, target) },
+        )
+    }
+
+    /** 확인 없이 휴지통으로. 스낵바 "실행 취소" → [restore] */
+    fun trash(entry: DriveEntry) {
+        mutate(
+            optimistic = { list -> list.filterNot { it.id == entry.id } },
+            action = { drive.setTrashed(entry.id, trashed = true) },
+            onSuccess = { DriveBrowserEvent.Trashed(entry) },
+        )
+    }
+
+    fun restore(entry: DriveEntry) {
+        mutate(
+            optimistic = { list -> (list + entry).sortedForDrive() },
+            action = { drive.setTrashed(entry.id, trashed = false) },
+            onSuccess = { DriveBrowserEvent.Restored },
+        )
+    }
+
+    /** 낙관적 갱신 → API → 실패 시 원래 목록으로 되돌리고 오류 이벤트 */
+    private fun mutate(
+        optimistic: (List<DriveEntry>) -> List<DriveEntry>,
+        action: suspend () -> Unit,
+        onSuccess: () -> DriveBrowserEvent,
+    ) {
+        if (_uiState.value.isMutating) return
+        val before = _uiState.value.entries
+        _uiState.update { it.copy(entries = optimistic(it.entries), isMutating = true) }
+        viewModelScope.launch {
+            try {
+                action()
+                _uiState.update { it.copy(isMutating = false) }
+                events.send(onSuccess())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "drive mutation failed")
+                _uiState.update { it.copy(entries = before, isMutating = false) }
                 events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
             }
         }
@@ -132,8 +204,19 @@ data class DriveBrowserUiState(
     val error: String? = null,
 )
 
+/** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */
+internal fun List<DriveEntry>.sortedForDrive(): List<DriveEntry> =
+    sortedWith(compareBy<DriveEntry> { !it.isFolder }.thenBy { it.name.lowercase() })
+
+private inline fun List<DriveEntry>.replaceSorted(id: String, transform: (DriveEntry) -> DriveEntry): List<DriveEntry> =
+    map { if (it.id == id) transform(it) else it }.sortedForDrive()
+
 sealed interface DriveBrowserEvent {
     data class FolderCreated(val folder: DriveFolder) : DriveBrowserEvent
+    data class Renamed(val name: String) : DriveBrowserEvent
+    data class Moved(val entry: DriveEntry, val target: DriveFolder) : DriveBrowserEvent
+    data class Trashed(val entry: DriveEntry) : DriveBrowserEvent
+    data object Restored : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent
 }

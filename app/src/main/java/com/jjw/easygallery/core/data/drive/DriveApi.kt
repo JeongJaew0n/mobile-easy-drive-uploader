@@ -4,7 +4,9 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /** Google Drive REST v3. 공식 Java 클라이언트 대신 필요한 엔드포인트만 직접 정의한다. */
@@ -30,6 +32,19 @@ interface DriveApi {
     suspend fun createFile(
         @Body metadata: DriveFileMetadata,
         @Query("fields") fields: String = "id,name,mimeType,parents",
+    ): DriveFileDto
+
+    /**
+     * 메타데이터 수정. 이름 변경은 본문 `name`, 휴지통은 `trashed`, 이동은 `addParents/removeParents` 쿼리(본문은 `{}`).
+     * `docs/DRIVE_FILE_CRUD.md` §2
+     */
+    @PATCH("drive/v3/files/{fileId}")
+    suspend fun updateFile(
+        @Path("fileId") fileId: String,
+        @Body patch: DriveFilePatch,
+        @Query("addParents") addParents: String? = null,
+        @Query("removeParents") removeParents: String? = null,
+        @Query("fields") fields: String = "id,name,mimeType,parents,trashed,modifiedTime,size,webViewLink",
     ): DriveFileDto
 
     /** 재개 가능 업로드 세션 시작. 응답 `Location` 헤더가 세션 URI. */

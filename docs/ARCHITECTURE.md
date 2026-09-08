@@ -33,7 +33,8 @@ app/src/main/java/com/jjw/easygallery/
     ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
-    ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)
+    ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push),
+    │                          # 행 ⋮ 이름 변경·이동(DriveFolderPickerSheet)·휴지통(실행 취소) — 낙관적 갱신, DRIVE_FILE_CRUD.md
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
     ├── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
     └── duplicates/            # 완전 중복: 검사 진행률, 그룹 카드, 유지/제거 선택, 휴지통 이동

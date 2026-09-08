@@ -20,10 +20,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -88,6 +94,20 @@ fun DriveBrowserRoute(
                     snackbarHostState.showSnackbar(message)
                 }
                 is DriveBrowserEvent.UploadFolderSelected -> onUploadFolderSelected(event.folder)
+                is DriveBrowserEvent.Renamed ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_renamed, event.name))
+                is DriveBrowserEvent.Moved -> snackbarHostState.showSnackbar(
+                    resources.getString(R.string.drive_moved, event.entry.name, event.target.name),
+                )
+                is DriveBrowserEvent.Trashed -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = resources.getString(R.string.drive_trashed, event.entry.name),
+                        actionLabel = resources.getString(R.string.action_undo),
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.restore(event.entry)
+                }
+                DriveBrowserEvent.Restored ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
                 is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
@@ -112,8 +132,29 @@ fun DriveBrowserRoute(
         onRefresh = viewModel::refresh,
         onCreateFolder = viewModel::createFolder,
         onSelectAsUploadFolder = viewModel::selectAsUploadFolder,
+        entryActions = DriveEntryActions(
+            onOpen = { entry ->
+                entry.webViewLink?.let { link ->
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                }
+            },
+            onRename = viewModel::rename,
+            onMove = viewModel::move,
+            onTrash = viewModel::trash,
+            loadFolders = viewModel::listFolders,
+        ),
     )
 }
+
+/** 행 ⋮ 메뉴의 콜백 묶음(`docs/DRIVE_FILE_CRUD.md` §4) */
+internal data class DriveEntryActions(
+    val onOpen: (DriveEntry) -> Unit = {},
+    val onRename: (DriveEntry, String) -> Unit = { _, _ -> },
+    val onMove: (DriveEntry, DriveFolder) -> Unit = { _, _ -> },
+    val onTrash: (DriveEntry) -> Unit = {},
+    val loadFolders: suspend (parentId: String) -> List<DriveFolder> = { emptyList() },
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,8 +168,11 @@ internal fun DriveBrowserScreen(
     onSelectAsUploadFolder: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    entryActions: DriveEntryActions = DriveEntryActions(),
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<DriveEntry?>(null) }
+    var moving by remember { mutableStateOf<DriveEntry?>(null) }
     val listState = rememberLazyListState()
     val motion = LocalMotion.current
 
@@ -222,6 +266,11 @@ internal fun DriveBrowserScreen(
                         DriveEntryRow(
                             entry = entry,
                             onClick = { onEntryClick(entry) },
+                            enabled = !uiState.isMutating,
+                            onOpen = { entryActions.onOpen(entry) },
+                            onRename = { renaming = entry },
+                            onMove = { moving = entry },
+                            onTrash = { entryActions.onTrash(entry) },
                             modifier = Modifier.animateItem(
                                 fadeInSpec = motion.quick(),
                                 placementSpec = motion.settle(),
@@ -245,12 +294,61 @@ internal fun DriveBrowserScreen(
         }
     }
 
+    DriveBrowserDialogs(
+        uiState = uiState,
+        showCreateDialog = showCreateDialog,
+        renaming = renaming,
+        moving = moving,
+        onDismissCreate = { showCreateDialog = false },
+        onDismissRename = { renaming = null },
+        onDismissMove = { moving = null },
+        onCreateFolder = onCreateFolder,
+        entryActions = entryActions,
+    )
+}
+
+@Composable
+private fun DriveBrowserDialogs(
+    uiState: DriveBrowserUiState,
+    showCreateDialog: Boolean,
+    renaming: DriveEntry?,
+    moving: DriveEntry?,
+    onDismissCreate: () -> Unit,
+    onDismissRename: () -> Unit,
+    onDismissMove: () -> Unit,
+    onCreateFolder: (String) -> Unit,
+    entryActions: DriveEntryActions,
+) {
     if (showCreateDialog) {
         CreateFolderDialog(
-            onDismiss = { showCreateDialog = false },
+            onDismiss = onDismissCreate,
             onConfirm = { name ->
-                showCreateDialog = false
+                onDismissCreate()
                 onCreateFolder(name)
+            },
+        )
+    }
+    if (renaming != null) {
+        DriveRenameDialog(
+            currentName = renaming.name,
+            onDismiss = onDismissRename,
+            onConfirm = { name ->
+                onDismissRename()
+                entryActions.onRename(renaming, name)
+            },
+        )
+    }
+    val current = uiState.current
+    if (moving != null && current != null) {
+        DriveFolderPickerSheet(
+            start = current,
+            excludeFolderId = moving.takeIf { it.isFolder }?.id,
+            currentParentId = current.id,
+            loadFolders = entryActions.loadFolders,
+            onDismiss = onDismissMove,
+            onPick = { target ->
+                onDismissMove()
+                entryActions.onMove(moving, target)
             },
         )
     }
@@ -260,9 +358,15 @@ internal fun DriveBrowserScreen(
 private fun DriveEntryRow(
     entry: DriveEntry,
     onClick: () -> Unit,
+    enabled: Boolean,
+    onOpen: () -> Unit,
+    onRename: () -> Unit,
+    onMove: () -> Unit,
+    onTrash: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -295,7 +399,74 @@ private fun DriveEntryRow(
             }
         }
         if (entry.isFolder) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        Box {
+            IconButton(onClick = { menuExpanded = true }, enabled = enabled) {
+                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                if (!entry.isFolder) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.drive_menu_open)) },
+                        onClick = {
+                            menuExpanded = false
+                            onOpen()
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_rename)) },
+                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onRename()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.drive_menu_move)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onMove()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_trash)) },
+                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onTrash()
+                    },
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun DriveRenameDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.action_rename)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.drive_rename_label)) },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank() && name.trim() != currentName) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable

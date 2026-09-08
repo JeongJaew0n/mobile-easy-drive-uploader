@@ -24,12 +24,23 @@ class DriveRestRepository @Inject constructor(
         )
     }
 
-    override suspend fun listChildren(parentId: String, pageToken: String?): DrivePage {
+    override suspend fun listChildren(parentId: String, pageToken: String?, foldersOnly: Boolean): DrivePage {
+        val folderClause = if (foldersOnly) " and mimeType = '${DriveApi.FOLDER_MIME_TYPE}'" else ""
         val page = api.listFiles(
-            query = "'${escape(parentId)}' in parents and trashed = false",
+            query = "'${escape(parentId)}' in parents and trashed = false$folderClause",
             pageToken = pageToken,
         )
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
+    }
+
+    override suspend fun rename(fileId: String, name: String): DriveEntry =
+        api.updateFile(fileId, DriveFilePatch(name = name)).toEntry()
+
+    override suspend fun move(fileId: String, fromParentId: String, toParentId: String): DriveEntry =
+        api.updateFile(fileId, DriveFilePatch(), addParents = toParentId, removeParents = fromParentId).toEntry()
+
+    override suspend fun setTrashed(fileId: String, trashed: Boolean) {
+        api.updateFile(fileId, DriveFilePatch(trashed = trashed))
     }
 
     override suspend fun createFolder(name: String, parentId: String): DriveFolder =

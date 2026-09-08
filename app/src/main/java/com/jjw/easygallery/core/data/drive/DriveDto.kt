@@ -28,6 +28,13 @@ data class DriveFileMetadata(
     val appProperties: Map<String, String>? = null,
 )
 
+/** `files.update` 본문. null 필드는 직렬화되지 않는다(`explicitNulls = false`) */
+@Serializable
+data class DriveFilePatch(
+    val name: String? = null,
+    val trashed: Boolean? = null,
+)
+
 @Serializable
 data class DriveAboutDto(
     val user: DriveUserDto,

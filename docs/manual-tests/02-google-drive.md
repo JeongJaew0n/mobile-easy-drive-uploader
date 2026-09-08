@@ -19,6 +19,10 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 | DRV-10 | 파일 탭 | Drive 앱(있으면) 또는 브라우저로 열림 | ⬜ | `webViewLink` |
 | DRV-11 | "이 폴더를 업로드 폴더로 지정" | 설정 화면으로 복귀(Drive 스택 전부 pop), 업로드 폴더 이름 갱신 | ⬜ | |
 | DRV-12 | 업로드 폴더 미지정 상태에서 첫 업로드 | Drive 에 "Easy Gallery" 폴더가 자동 생성되고 그 안에 업로드 | ⬜ | appProperties `easyGalleryRoot=true` |
+| DRV-13 | Drive 파일 행 ⋮ → 이름 변경 | 목록이 즉시 새 이름·정렬 위치로, 스낵바 "이름을 …(으)로 바꿨습니다". 실패 시 원래대로 + 오류 | ⬜ | `PATCH files/{id}` — `../DRIVE_FILE_CRUD.md` |
+| DRV-14 | ⋮ → 이동 → 폴더 선택기에서 하위 폴더 진입·경로 탭으로 복귀 → "여기로 이동" | 항목이 목록에서 빠지고 대상 폴더에 존재. 원래 폴더에서는 버튼 비활성, 폴더 이동 시 자기 자신 제외 | ⬜ | `addParents/removeParents` |
+| DRV-15 | ⋮ → 휴지통으로 이동 → 스낵바 "실행 취소" | 즉시 빠짐 → 실행 취소로 원래 위치에 복귀. Drive 웹 휴지통에도 반영 | ⬜ | `trashed` 토글 |
+| DRV-16 | 폴더에 ⋮ 메뉴 | 열기 없음(이름 변경·이동·휴지통만) | ⬜ | |
 | UPL-01 | 사진 3장 선택 → 업로드 버튼 (Android 13+) | 알림 권한 요청 → 거부해도 큐 등록 → 스낵바 "3개 항목을 대기열에 추가" | ⬜ | |
 | UPL-02 | 업로드 진행 | 갤러리 상단 진행 배너(n/total·파일명), 상태바에 진행 알림(dataSync FGS) | ⬜ | |
 | UPL-03 | 완료 | 요약 알림 "n개 항목을 업로드했습니다", Drive 폴더에 파일 존재, appProperties `mediaStoreId` | ⬜ | |
