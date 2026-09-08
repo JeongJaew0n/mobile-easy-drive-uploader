@@ -7,7 +7,6 @@ import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
 import com.jjw.easygallery.core.ui.image.MediaStoreThumbnailFetcher
 import dagger.hilt.android.HiltAndroidApp
@@ -41,6 +40,7 @@ class EasyGalleryApp : Application(), Configuration.Provider, SingletonImageLoad
                 add(MediaStoreThumbnailFetcher.Factory())
                 add(VideoFrameDecoder.Factory())
             }
-            .crossfade(true)
+            // 전역 crossfade 는 쓰지 않는다 — 시작 시 썸네일이 조각조각 페이드인해 화면이 '천천히 켜지는' 느낌을 준다
+            // (ANIMATION_IMPROVEMENT.md §10)
             .build()
 }

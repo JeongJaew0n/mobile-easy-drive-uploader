@@ -179,8 +179,8 @@ class GalleryViewModelTest {
         viewModel.uiState.test {
             awaitItem() // Loading
             viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
-            // 첫 목록: 버전 0 == 0 → 애니메이션 허용
-            assertTrue((awaitItem() as GalleryUiState.Content).animateItemChanges)
+            // 최초 목록은 애니메이션 없이 바로 그린다(시작 페이드 제거)
+            assertEquals(false, (awaitItem() as GalleryUiState.Content).animateItemChanges)
 
             // 기간 필터 변경 직후 첫 목록은 통째로 바뀌므로 애니메이션 생략
             viewModel.setDateRange(DateRange(java.time.LocalDate.of(2020, 1, 1), java.time.LocalDate.of(2030, 1, 1)))

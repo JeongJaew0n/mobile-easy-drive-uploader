@@ -56,7 +56,9 @@ class GalleryViewModel @Inject constructor(
 
     /** 필터·기간이 바뀔 때마다 증가. 이 값이 바뀐 직후 첫 목록 갱신은 항목 이동 애니메이션을 끈다(수백 개 동시 이동 방지) */
     private var filterVersion = 0
-    private var animatedVersion = 0
+
+    // -1 로 시작해 최초 목록은 애니메이션 없이 바로 그린다(시작 페이드 제거, ANIMATION_IMPROVEMENT.md §10)
+    private var animatedVersion = -1
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)

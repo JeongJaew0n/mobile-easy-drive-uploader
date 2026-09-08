@@ -238,3 +238,15 @@ V1 자체 히어로 오버레이 ✅ → G2 standard 모션 스킴 ❌ → Macro
 - `animateItem` 은 key 안정성에 의존. 그리드 key 는 `item.id`, 헤더는 `"header-$date"` 로 안정적
 - 낙관적 제거는 MediaStore 재조회와 경합 → 재조회 결과를 항상 진실로 삼는다
 - 애니메이션을 넣을수록 `MagicNumber` 위반이 늘어난다 → G1 토큰을 먼저
+
+## 10. 결정 변경 — 앱 시작 시 그리드 페이드인 제거 (2026-09-08)
+
+사용자 피드백: 앱이 열릴 때 화면이 "천천히 켜지는" 느낌이 과하다.
+
+원인 두 가지:
+- `EasyGalleryApp.newImageLoader` 의 전역 `crossfade(true)` — 썸네일 하나하나가 디코딩되는 순서대로 200ms 씩 페이드인해 그리드가 조각조각 밝아진다. 첫 화면·빠른 스크롤 모두 해당.
+- `GalleryViewModel` 의 `animatedVersion` 초기값이 0 이라 **첫 목록**도 `animateItem` 페이드(150ms) 대상이 됐다. 원래 의도는 "필터 전환 직후 1회는 생략"이었는데 최초 로드는 예외로 처리하지 않았다.
+
+결정: 둘 다 제거한다. 썸네일은 디코딩 즉시 표시(Coil 전역 crossfade 끔), 최초 목록은 즉시 표시(`animatedVersion = -1` 로 시작). 삭제·이동 뒤 남은 항목이 미끄러지는 `animateItem` 은 그대로 둔다 — 그건 변화를 설명하는 동작이고, 시작 페이드는 아무것도 설명하지 않는 장식이라 §1 의 기준("의미 없는 동작은 넣지 않는다")에 어긋난다. 상세보기의 썸네일→원본 교체는 이미 `crossfade(false)` 라 영향 없음.
+
+검증: `manual-tests/05-animation-performance.md` ANI-22.
