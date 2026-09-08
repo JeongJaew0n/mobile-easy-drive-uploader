@@ -1,5 +1,8 @@
 package com.jjw.easygallery.core.navigation
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -12,6 +15,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.core.ui.motion.MotionSpecs
 import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
@@ -30,35 +34,23 @@ fun AppNavigation() {
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
         // fade-through: 새 화면은 살짝 작은 상태에서 커지며 나타나고, 이전 화면은 빨리 사라진다.
-        // 상세보기는 히어로 오버레이가 있으면 페이드만(움직임은 오버레이가 담당), 없으면 조금 더 작게(0.92)서 커진다
+        // 상세보기(히어로): 갤러리를 불투명하게 남겨 두고 뷰어만 페이드인 — 검은 배경이 서서히 덮이고 썸네일이
+        // 제자리에서 커진다. 두 화면을 동시에 반투명하게 하면 뒤의 윈도우 배경이 비쳐 '찰칵' 번쩍인다(VIEWER_STABILITY §7).
+        // 상세보기(히어로 없음)는 조금 더 작게(0.92)서 커진다
         transitionSpec = {
             val target = targetState.entries.lastOrNull()?.contentKey
-            val scale = when {
-                target is MediaViewerKey && target.hero != null -> null
-                target is MediaViewerKey -> VIEWER_ENTER_SCALE
-                else -> ENTER_SCALE
+            when {
+                target is MediaViewerKey && target.hero != null ->
+                    fadeIn(motion.standard()) togetherWith ExitTransition.KeepUntilTransitionsFinished
+                target is MediaViewerKey -> motion.fadeThrough(VIEWER_ENTER_SCALE)
+                else -> motion.fadeThrough(ENTER_SCALE)
             }
-            val enter = if (scale == null) {
-                fadeIn(motion.quick())
-            } else {
-                fadeIn(motion.standard()) + scaleIn(motion.standard(), initialScale = scale)
-            }
-            enter togetherWith fadeOut(motion.quick())
         },
-        // 뒤로: 이전 화면은 제자리에서 나타나고, 떠나는 화면이 작아지며 사라진다
-        popTransitionSpec = {
-            val leaving = initialState.entries.lastOrNull()?.contentKey
-            val scale = if (leaving is MediaViewerKey) VIEWER_ENTER_SCALE else ENTER_SCALE
-            fadeIn(motion.standard()) togetherWith
-                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = scale))
-        },
+        // 뒤로: 이전 화면은 제자리에서 나타나고, 떠나는 화면이 작아지며 사라진다.
+        // 상세보기에서 돌아올 때는 갤러리를 즉시 깔고 뷰어만 축소·페이드(역방향도 반투명 겹침 없이)
+        popTransitionSpec = { popTransition(motion, initialState.entries.lastOrNull()?.contentKey) },
         // 예측 뒤로가기 제스처 중에도 같은 연출을 진행률에 따라 보여준다
-        predictivePopTransitionSpec = { _ ->
-            val leaving = initialState.entries.lastOrNull()?.contentKey
-            val scale = if (leaving is MediaViewerKey) VIEWER_ENTER_SCALE else ENTER_SCALE
-            fadeIn(motion.standard()) togetherWith
-                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = scale))
-        },
+        predictivePopTransitionSpec = { _ -> popTransition(motion, initialState.entries.lastOrNull()?.contentKey) },
         entryDecorators = listOf(
             rememberSaveableStateHolderNavEntryDecorator(),
             // 각 NavEntry 에 ViewModel 스코프를 부여 (hiltViewModel() 이 엔트리 단위로 동작)
@@ -126,6 +118,18 @@ fun AppNavigation() {
         },
     )
 }
+
+private fun MotionSpecs.fadeThrough(scale: Float): ContentTransform =
+    (fadeIn(standard()) + scaleIn(standard(), initialScale = scale)) togetherWith fadeOut(quick())
+
+private fun popTransition(motion: MotionSpecs, leaving: Any?): ContentTransform =
+    if (leaving is MediaViewerKey) {
+        EnterTransition.None togetherWith
+            (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = VIEWER_ENTER_SCALE))
+    } else {
+        fadeIn(motion.standard()) togetherWith
+            (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = ENTER_SCALE))
+    }
 
 private const val ENTER_SCALE = 0.96f
 private const val VIEWER_ENTER_SCALE = 0.92f

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 다크 모드: 화면 전환·콜드 스타트 때 드러나는 윈도우 배경이 흰색이면 번쩍인다 (VIEWER_STABILITY.md §7) -->
+    <style name="Theme.EasyGallery" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
