@@ -1,48 +1,23 @@
 package com.jjw.easygallery.feature.gallery
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,138 +25,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.UploadSummary
-import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
-import java.time.format.DateTimeFormatter
-
-@Composable
-fun GalleryRoute(
-    onSettingsClick: () -> Unit,
-    onUploadQueueClick: () -> Unit,
-    onTrashClick: () -> Unit,
-    onDriveClick: () -> Unit,
-    onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit,
-    viewModel: GalleryViewModel = hiltViewModel(),
-) {
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    // LocalContext.getString 은 Configuration 변경을 따라가지 못해 lint 가 막는다 → LocalResources 사용
-    val resources = LocalResources.current
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { viewModel.onPermissionStatusChanged(MediaPermission.status(context)) }
-
-    // 업로드 진행 알림을 위해 13+ 에서는 알림 권한을 먼저 묻고, 결과와 무관하게 큐에 넣는다
-    val notificationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { viewModel.uploadSelected() }
-    val startUpload = {
-        val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        if (needsNotificationPermission) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            viewModel.uploadSelected()
-        }
-    }
-
-    // 편집 동의 다이얼로그 + 결과 스낵바 (공용)
-    MediaActionEffect(
-        events = viewModel.actionEvents,
-        snackbarHostState = snackbarHostState,
-        onConsentResult = viewModel::onConsentResult,
-        onActionDone = { viewModel.clearSelection() },
-    )
-
-    // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
-    LifecycleResumeEffect(Unit) {
-        viewModel.onPermissionStatusChanged(MediaPermission.status(context))
-        onPauseOrDispose { }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.eventFlow.collect { event ->
-            when (event) {
-                GalleryEvent.SignInRequired -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = resources.getString(R.string.gallery_sign_in_required),
-                        actionLabel = resources.getString(R.string.action_settings),
-                    )
-                    if (result == SnackbarResult.ActionPerformed) onSettingsClick()
-                }
-                is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(
-                    if (event.skipped == 0) {
-                        resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
-                    } else {
-                        resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
-                    },
-                )
-                is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
-            }
-        }
-    }
-
-    GalleryScreen(
-        uiState = uiState,
-        snackbarHostState = snackbarHostState,
-        onSettingsClick = onSettingsClick,
-        onRequestPermission = { permissionLauncher.launch(MediaPermission.required()) },
-        onOpenAppSettings = {
-            val packageUri = Uri.fromParts("package", context.packageName, null)
-            context.startActivity(
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        },
-        onToggleSelection = viewModel::toggleSelection,
-        onSelectionChange = viewModel::setSelection,
-        onClearSelection = viewModel::clearSelection,
-        onUploadSelected = startUpload,
-        onCancelUpload = viewModel::cancelUploads,
-        onUploadQueueClick = onUploadQueueClick,
-        onFavoritesOnlyChange = viewModel::setFavoritesOnly,
-        onDateRangeChange = viewModel::setDateRange,
-        onTrashClick = onTrashClick,
-        onDriveClick = onDriveClick,
-        onOpenItem = onOpenItem,
-        actions = GalleryActionCallbacks(
-            onTrash = viewModel::trashSelected,
-            onDelete = viewModel::deleteSelected,
-            onToggleFavorite = viewModel::toggleFavoriteSelected,
-            onRename = viewModel::renameSelected,
-            onMove = viewModel::moveSelected,
-        ),
-    )
-}
-
-/** 선택 항목 편집 콜백 묶음 — 파라미터 폭발 방지 */
-internal data class GalleryActionCallbacks(
-    val onTrash: () -> Unit = {},
-    val onDelete: () -> Unit = {},
-    val onToggleFavorite: () -> Unit = {},
-    val onRename: (String) -> Unit = {},
-    val onMove: (String) -> Unit = {},
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -430,230 +281,6 @@ private fun GalleryContent(
                 animateChanges = uiState.animateItemChanges,
                 modifier = Modifier.fillMaxSize(),
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GalleryTopBar(
-    itemCount: Int?,
-    favoritesOnly: Boolean,
-    supportsTrashAndFavorites: Boolean,
-    onSettingsClick: () -> Unit,
-    onFavoritesOnlyChange: (Boolean) -> Unit,
-    onTrashClick: () -> Unit,
-    onDriveClick: () -> Unit,
-    onPickDateRange: () -> Unit,
-) {
-    TopAppBar(
-        title = {
-            Column {
-                Text(stringResource(if (favoritesOnly) R.string.gallery_title_favorites else R.string.gallery_title))
-                if (itemCount != null) {
-                    Text(
-                        text = pluralStringResource(R.plurals.gallery_media_count, itemCount, itemCount),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        actions = {
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.action_settings))
-            }
-            GalleryOverflowMenu(
-                favoritesOnly = favoritesOnly,
-                supportsTrashAndFavorites = supportsTrashAndFavorites,
-                onFavoritesOnlyChange = onFavoritesOnlyChange,
-                onOpenTrash = onTrashClick,
-                onOpenDrive = onDriveClick,
-                onPickDateRange = onPickDateRange,
-            )
-        },
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SelectionTopBar(
-    selectedCount: Int,
-    onClear: () -> Unit,
-    onUpload: () -> Unit,
-) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.gallery_selected_count, selectedCount)) },
-        navigationIcon = {
-            IconButton(onClick = onClear) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear_selection))
-            }
-        },
-        actions = {
-            IconButton(onClick = onUpload) {
-                Icon(
-                    painterResource(R.drawable.ic_cloud_upload),
-                    contentDescription = stringResource(R.string.action_upload_to_drive),
-                )
-            }
-        },
-    )
-}
-
-@Composable
-private fun UploadProgressBanner(
-    summary: UploadSummary,
-    onCancel: () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val current = summary.current
-    val doneCount = summary.completed + summary.failed
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(
-                        R.string.gallery_uploading,
-                        (doneCount + 1).coerceAtMost(summary.total),
-                        summary.total,
-                        current?.displayName.orEmpty(),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
-            }
-            // DB 갱신(1초 주기)마다 200ms 만 움직인다 — 계단 느낌은 없애고 연속 재구성은 피한다
-            val fraction by animateFloatAsState(
-                targetValue = current?.fraction ?: 0f,
-                animationSpec = LocalMotion.current.progress(),
-                label = "uploadProgress",
-            )
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-private fun UploadFailedBanner(
-    failed: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.errorContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = pluralStringResource(R.plurals.gallery_upload_failed_banner, failed, failed),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onClick) { Text(stringResource(R.string.action_view)) }
-        }
-    }
-}
-
-@Composable
-private fun PermissionRequiredContent(
-    onRequestPermission: () -> Unit,
-    onOpenAppSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.gallery_permission_title),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.gallery_permission_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
-        Button(onClick = onRequestPermission) {
-            Text(stringResource(R.string.gallery_permission_grant))
-        }
-        TextButton(onClick = onOpenAppSettings) {
-            Text(stringResource(R.string.gallery_permission_open_settings))
-        }
-    }
-}
-
-/** 적용 중인 기간을 보여주고 한 번에 해제한다 */
-@Composable
-private fun DateRangeBar(
-    range: DateRange,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val formatter = remember { DateTimeFormatter.ofPattern("yyyy.MM.dd") }
-    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.tertiaryContainer) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (range.isSingleDay) {
-                    formatter.format(range.start)
-                } else {
-                    stringResource(
-                        R.string.gallery_date_range_label,
-                        formatter.format(range.start),
-                        formatter.format(range.endInclusive),
-                    )
-                },
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onClear) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.gallery_date_clear))
-            }
-        }
-    }
-}
-
-@Composable
-private fun PartialAccessBanner(
-    onManageSelection: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.gallery_partial_access_message),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onManageSelection) {
-                Text(stringResource(R.string.gallery_partial_access_manage))
-            }
         }
     }
 }

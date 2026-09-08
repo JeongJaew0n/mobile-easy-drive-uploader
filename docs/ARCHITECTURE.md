@@ -25,8 +25,9 @@ app/src/main/java/com/jjw/easygallery/
 │       ├── motion/            # MotionSpecs 토큰 + LocalMotion (시스템 애니메이션 끄기 존중)
 │       └── theme/             # Material 3 테마 (LocalMotion 제공)
 └── feature/
-    ├── gallery/               # GalleryRoute/Screen/Grid, GalleryActions(하단 바·다이얼로그·메뉴), GalleryViewModel, MediaPermission
-    ├── viewer/                # 상세보기: 페이저 스와이프, 확대/축소, 영상 재생, 정보 패널, 단일 항목 편집
+    ├── gallery/               # GalleryRoute(권한·이벤트 배선) / GalleryScreen(Scaffold 조립) / GalleryTopBars / GalleryBanners
+    │                          # GalleryGrid(+DragSelect), GalleryActions(하단 바·다이얼로그·메뉴), DateRangeDialog, GalleryViewModel, MediaPermission
+    ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)

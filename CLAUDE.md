@@ -25,7 +25,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 ## 규칙
 
 - 패키지: `com.jjw.easygallery`. feature-first (`feature/<name>`), 공용은 `core/*`.
-- UI 는 Compose 만. 화면은 `XxxRoute`(ViewModel 연결) + `XxxScreen`(순수 UI, Preview·테스트 대상) 으로 나눈다.
+- UI 는 Compose 만. 화면은 `XxxRoute`(ViewModel 연결) + `XxxScreen`(순수 UI, Preview·테스트 대상) 으로 나누고, 한 파일이 ~350줄을 넘으면 상단바·배너·페이지 같은 조각 단위로 파일을 나눈다(갤러리·상세보기가 예시). 파일 간 공유는 `internal`.
 - ViewModel 은 `@HiltViewModel`, 상태는 `StateFlow<UiState>` 단일 노출. UiState 는 sealed interface.
 - Compose 에서 ViewModel 은 `androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()` 사용 (`hilt-navigation-compose` 의 것은 deprecated, Nav2 전용).
 - 내비게이션은 Navigation 3. 화면 키는 `core/navigation/NavKeys.kt` 의 `AppNavKey` 에 `@Serializable` 로 추가.
