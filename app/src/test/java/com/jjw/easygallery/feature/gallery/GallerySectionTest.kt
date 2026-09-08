@@ -89,6 +89,20 @@ class GallerySectionTest {
         assertEquals("1:00:00", formatDuration(3_600_000))
     }
 
+    @Test
+    fun `countByDay counts items per local date`() {
+        val a = item(id = 1, date = LocalDate.of(2026, 9, 7), time = LocalTime.NOON)
+        val b = item(id = 2, date = LocalDate.of(2026, 9, 7), time = LocalTime.MIDNIGHT)
+        val c = item(id = 3, date = LocalDate.of(2026, 9, 6), time = LocalTime.NOON)
+
+        val counts = countByDay(listOf(a, b, c), zone)
+
+        assertEquals(2, counts[LocalDate.of(2026, 9, 7)])
+        assertEquals(1, counts[LocalDate.of(2026, 9, 6)])
+        assertEquals(null, counts[LocalDate.of(2026, 9, 5)])
+        assertTrue(countByDay(emptyList(), zone).isEmpty())
+    }
+
     private fun MediaItem.date(): LocalDate =
         java.time.Instant.ofEpochMilli(dateTakenMillis).atZone(zone).toLocalDate()
 

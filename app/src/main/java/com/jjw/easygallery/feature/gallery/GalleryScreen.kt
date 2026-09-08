@@ -171,8 +171,9 @@ internal fun GalleryScreen(
     }
 
     if (showDateRange) {
-        DateRangeDialog(
+        DateRangeSheet(
             current = content?.dateRange,
+            dayCounts = content?.dayCounts ?: emptyMap(),
             onDismiss = { showDateRange = false },
             onConfirm = { range ->
                 showDateRange = false

@@ -35,3 +35,13 @@ fun groupByDate(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): 
     currentDate?.let { sections += GallerySection(it, bucket) }
     return sections
 }
+
+/** 날짜별 항목 수. 기간 선택 달력에서 사진이 있는 날을 표시하는 데 쓴다(기간 필터 이전 목록 기준) */
+fun countByDay(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Int> {
+    val counts = HashMap<LocalDate, Int>()
+    for (item in items) {
+        val date = Instant.ofEpochMilli(item.dateTakenMillis).atZone(zone).toLocalDate()
+        counts[date] = (counts[date] ?: 0) + 1
+    }
+    return counts
+}

@@ -146,6 +146,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.kizitonwose.calendar.compose)
 
     // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)

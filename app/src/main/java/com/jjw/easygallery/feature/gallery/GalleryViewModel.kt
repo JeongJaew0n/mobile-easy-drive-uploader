@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -177,6 +178,7 @@ class GalleryViewModel @Inject constructor(
     }
 
     /** 목록에서만 파생되는 값. 선택이 바뀔 때는 다시 계산하지 않도록 분리했다(6천 장 O(n) 재계산 방지). */
+    @Suppress("LongParameterList") // 파생값 묶음 — 한 곳에서만 생성
     private class Catalog(
         val items: List<MediaItem>,
         val sections: List<GallerySection>,
@@ -186,6 +188,8 @@ class GalleryViewModel @Inject constructor(
         val uploadedIds: Set<Long>,
         val uploadedCount: Int,
         val notBackedUpOnly: Boolean,
+        /** 기간 필터 이전 목록의 날짜별 개수 — 기간 선택 달력용 */
+        val dayCounts: Map<LocalDate, Int>,
         val version: Int,
     )
 
@@ -198,8 +202,9 @@ class GalleryViewModel @Inject constructor(
             uploadedIds,
             notBackedUpOnly,
         ) { all, range, uploaded, onlyPending ->
-            val inRange = all.filterByDate(range)
-            val items = if (onlyPending) inRange.filter { it.id !in uploaded } else inRange
+            val base = if (onlyPending) all.filter { it.id !in uploaded } else all
+            val inRange = base.filterByDate(range)
+            val items = inRange
             latestItems = items
             Catalog(
                 items = items,
@@ -210,6 +215,7 @@ class GalleryViewModel @Inject constructor(
                 uploadedIds = uploaded,
                 uploadedCount = inRange.count { it.id in uploaded },
                 notBackedUpOnly = onlyPending,
+                dayCounts = countByDay(base),
                 version = filterVersion,
             )
         }
@@ -230,6 +236,7 @@ class GalleryViewModel @Inject constructor(
                 uploadedIds = c.uploadedIds,
                 uploadedCount = c.uploadedCount,
                 notBackedUpOnly = c.notBackedUpOnly,
+                dayCounts = c.dayCounts,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -269,6 +276,8 @@ sealed interface GalleryUiState {
         /** 현재 기간·즐겨찾기 조건 안에서 백업된 개수 */
         val uploadedCount: Int = 0,
         val notBackedUpOnly: Boolean = false,
+        /** 기간 필터 이전 목록의 날짜별 개수(기간 선택 달력에서 사진 있는 날 표시) */
+        val dayCounts: Map<LocalDate, Int> = emptyMap(),
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,

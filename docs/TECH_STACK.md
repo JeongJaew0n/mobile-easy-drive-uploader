@@ -47,6 +47,7 @@ iOS는 수요가 확인되면 "업로드 전용 축소판"으로 별도 판단.
 | 조회 (사진·영상, 앨범/버킷별, 날짜 정렬) | `ContentResolver` + `MediaStore.Images/Video/Files` 쿼리, `ContentObserver`로 변경 감지 |
 | 대량 목록 | 메모리 리스트 + `LazyVerticalGrid` (Paging 3 는 수십만 장 규모가 실측되면 도입 — 근거는 ARCHITECTURE.md) |
 | 썸네일·이미지 로딩 | **Coil 3** + 커스텀 Fetcher(`ContentResolver.loadThumbnail` 시스템 썸네일 캐시), 폴백은 `coil-video` |
+| 달력(기간 선택) | **kizitonwose Calendar** `compose` 2.10.1 — 월 그리드·스크롤만 제공, 셀은 직접 그림(사진 있는 날 강조). M3 `DateRangePicker` 는 셀 커스터마이즈 불가라 교체(`DATE_RANGE_PICKER.md`) |
 | 삭제 / 휴지통 / 복원 | `MediaStore.createDeleteRequest` / `createTrashRequest` (API 30+). API 29 는 `RecoverableSecurityException` 경로로 삭제·수정만 지원 |
 | 확인 없이 편집 (선택) | `MANAGE_MEDIA` (API 31+) — 설정의 "미디어 관리 앱" 으로 허용하면 시스템 확인 다이얼로그 생략 |
 | 즐겨찾기 | `MediaStore.createFavoriteRequest` (API 30+) |
