@@ -1,6 +1,7 @@
 package com.jjw.easygallery.core.data.remote.s3
 
 import android.content.Context
+import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
 import com.jjw.easygallery.core.data.remote.RemoteNames
@@ -8,6 +9,7 @@ import com.jjw.easygallery.core.data.remote.RemotePage
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
+import com.jjw.easygallery.core.data.remote.ReportsMutationProgress
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.remote.awaitResponse
 import com.jjw.easygallery.core.data.remote.requireSuccess
@@ -20,6 +22,9 @@ import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
@@ -46,7 +51,10 @@ class S3Storage(
     private val ioDispatcher: CoroutineDispatcher,
     /** 이 크기 이상이면 멀티파트(파트 크기도 같음). 테스트에서 작게 준다 */
     private val partSize: Long = DEFAULT_PART_SIZE,
-) : RemoteStorage {
+) : RemoteStorage, ReportsMutationProgress {
+
+    private val _mutationProgress = MutableStateFlow<MutationProgress?>(null)
+    override val mutationProgress: StateFlow<MutationProgress?> = _mutationProgress.asStateFlow()
 
     private val bucket = requireNotNull(account.bucketOrRoot) { "S3 계정에 버킷이 없습니다" }
     private val signer = S3Signer(requireNotNull(account.username), secretKey, account.region ?: DEFAULT_REGION)
@@ -144,7 +152,25 @@ class S3Storage(
         return RemoteEntry(toPrefix, name, RemoteEntry.FOLDER_MIME_TYPE, null, System.currentTimeMillis(), null)
     }
 
+    /**
+     * 접두어 아래 모든 키(마커 제외)를 먼저 모은 뒤 하나씩 [action] — 전체 개수를 알아야 진행을 보일 수 있다.
+     * 키 목록만 메모리에 두므로 수천 개 폴더도 문제없다.
+     */
     private suspend fun forEachKeyUnder(prefix: String, action: suspend (String) -> Unit) {
+        val keys = keysUnder(prefix)
+        _mutationProgress.value = MutationProgress(0, keys.size)
+        try {
+            keys.forEachIndexed { index, key ->
+                action(key)
+                _mutationProgress.value = MutationProgress(index + 1, keys.size)
+            }
+        } finally {
+            _mutationProgress.value = null
+        }
+    }
+
+    private suspend fun keysUnder(prefix: String): List<String> {
+        val keys = ArrayList<String>()
         var token: String? = null
         do {
             val url = bucketUrl.newBuilder()
@@ -154,9 +180,10 @@ class S3Storage(
                 .apply { if (token != null) addQueryParameter("continuation-token", token) }
                 .build()
             val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
-            result.objects.filter { it.key != prefix }.forEach { action(it.key) }
+            result.objects.filter { it.key != prefix }.forEach { keys += it.key }
             token = result.nextContinuationToken
         } while (token != null)
+        return keys
     }
 
     override suspend fun delete(entryId: String) {

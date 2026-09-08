@@ -10,6 +10,15 @@ import com.jjw.easygallery.core.domain.model.DrivePage
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+
+/** 여러 오브젝트를 순차 처리하는 변경(S3 폴더 이름 변경·이동·삭제)의 진행 — 화면이 "n / total" 로 보인다 */
+data class MutationProgress(val done: Int, val total: Int)
+
+/** 변경 진행을 보고할 수 있는 제공자(선택). 작업이 끝나면 null 로 돌린다 */
+interface ReportsMutationProgress {
+    val mutationProgress: StateFlow<MutationProgress?>
+}
 
 // Drive 에서 시작한 모델을 그대로 쓴다. 의미는 제공자마다 다르다(Drive: 파일 ID, S3: 오브젝트 키, WebDAV: 경로).
 typealias RemoteEntry = DriveEntry

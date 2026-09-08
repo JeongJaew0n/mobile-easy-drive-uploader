@@ -123,4 +123,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 WebDAV 자체 서명 인증서 지문 고정(Room v7 `certSha256`).
 - 2026-09-09 SMB(W2) 제공자 추가(`NAS_STORAGE.md` §5) — 네 번째 `RemoteAccountKind`. 재개 업로드를 지원하는 첫 비-Drive 제공자.
 - 2026-09-09 업로드 목록 행 부제에 계정 이름(`계정 · 상태`) 표시(`UploadQueueUiState.accountNames`; 해제된 계정은 "연결 해제된 저장소"). 계정 추가 폼에서 종류를 바꾸면 버킷/공유 이름을 비운다.
-- 남은 것: S3 폴더 이동 진행 표시, Dropbox/OneDrive.
+- 2026-09-09 S3 폴더 이름 변경·이동·삭제 진행 표시: `ReportsMutationProgress`(선택 인터페이스, `StateFlow<MutationProgress?>`) 를 `S3Storage` 가 구현 — 접두어 아래 키를 먼저 모아 전체 개수를 알고 오브젝트마다 갱신, 끝나면 null. 탐색 화면 하단 진행바가 "n / total 개 처리 중" 으로 바뀐다(다른 제공자는 불확정 진행바 그대로).
+- 남은 것: Dropbox/OneDrive, WebDAV Digest 인증.

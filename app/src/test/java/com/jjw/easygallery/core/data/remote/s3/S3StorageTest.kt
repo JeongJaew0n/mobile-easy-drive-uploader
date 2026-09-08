@@ -17,6 +17,7 @@ import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -249,6 +250,7 @@ class S3StorageTest {
 
         assertEquals("new/", entry.id)
         assertTrue(entry.isFolder)
+        assertNull(storage.mutationProgress.value) // 끝나면 진행 표시를 지운다
         server.takeRequest() // list
         val copy = server.takeRequest()
         assertEquals("/photos/new/a.jpg", copy.url.encodedPath)

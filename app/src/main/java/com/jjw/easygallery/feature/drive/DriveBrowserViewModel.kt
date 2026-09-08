@@ -3,7 +3,9 @@ package com.jjw.easygallery.feature.drive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.ReportsMutationProgress
 import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
@@ -59,6 +61,7 @@ class DriveBrowserViewModel @Inject constructor(
                         accountName = drive.account.displayName,
                     )
                 }
+                observeMutationProgress()
                 fetchPage(reset = true)
             } catch (e: CancellationException) {
                 throw e
@@ -66,6 +69,14 @@ class DriveBrowserViewModel @Inject constructor(
                 Timber.e(e, "storage unavailable")
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
             }
+        }
+    }
+
+    /** S3 처럼 폴더 변경이 오브젝트 단위로 진행되는 제공자면 "n / total" 을 상태에 흘린다 */
+    private fun observeMutationProgress() {
+        val reporter = drive as? ReportsMutationProgress ?: return
+        viewModelScope.launch {
+            reporter.mutationProgress.collect { progress -> _uiState.update { it.copy(mutationProgress = progress) } }
         }
     }
 
@@ -230,6 +241,8 @@ data class DriveBrowserUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val isMutating: Boolean = false,
+    /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
+    val mutationProgress: MutationProgress? = null,
     val error: String? = null,
     /** 저장소가 지원하는 동작 — 메뉴 구성에 쓴다 */
     val capabilities: Set<Capability> = emptySet(),

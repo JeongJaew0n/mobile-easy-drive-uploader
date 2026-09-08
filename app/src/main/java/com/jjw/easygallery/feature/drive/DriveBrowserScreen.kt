@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
 import android.text.format.Formatter
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -287,7 +289,7 @@ internal fun DriveBrowserScreen(
                     }
                 }
             }
-            if (uiState.isMutating) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (uiState.isMutating) MutationProgressBar(uiState.mutationProgress)
         }
     }
 
@@ -589,6 +591,29 @@ private fun DriveBrowserScreenPreview() {
             onRefresh = {},
             onCreateFolder = {},
             onSelectAsUploadFolder = {},
+        )
+    }
+}
+
+/** 변경 중 진행바 — 오브젝트 단위 진행을 아는 제공자(S3)는 "n / total", 아니면 불확정 */
+@Composable
+private fun MutationProgressBar(progress: MutationProgress?) {
+    if (progress == null || progress.total == 0) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+        return
+    }
+    Column(Modifier.fillMaxWidth()) {
+        val fraction by animateFloatAsState(
+            targetValue = progress.done.toFloat() / progress.total,
+            animationSpec = LocalMotion.current.progress(),
+            label = "mutationProgress",
+        )
+        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        Text(
+            text = stringResource(R.string.drive_mutation_progress, progress.done, progress.total),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
     }
 }
