@@ -13,8 +13,10 @@ import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccount
+import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.SignInUseCase
@@ -46,6 +48,9 @@ class SettingsViewModel @Inject constructor(
 
     private val isBusy = MutableStateFlow(false)
     private val account = MutableStateFlow<DriveAccount?>(null)
+
+    /** QUOTA 능력이 있는 원격 계정의 용량(`about()`), 계정 id → 정보. 실패한 계정은 빠진다 */
+    private val remoteInfos = MutableStateFlow<Map<String, RemoteAccountInfo>>(emptyMap())
     private val events = Channel<SettingsEvent>(Channel.BUFFERED)
     val eventFlow = events.receiveAsFlow()
 
@@ -54,7 +59,8 @@ class SettingsViewModel @Inject constructor(
         account,
         isBusy,
         remoteAccounts.observeAccounts(),
-    ) { p, acc, busy, remotes ->
+        remoteInfos,
+    ) { p, acc, busy, remotes, infos ->
         SettingsUiState(
             isSignedIn = p.isSignedIn,
             accountEmail = p.accountEmail,
@@ -65,6 +71,7 @@ class SettingsViewModel @Inject constructor(
             uploadAccountId = p.uploadAccountId,
             uploadAccountName = remotes.firstOrNull { it.id == p.uploadAccountId }?.displayName,
             remoteAccounts = remotes,
+            remoteInfos = infos,
             uploadWifiOnly = p.uploadWifiOnly,
             uploadChargingOnly = p.uploadChargingOnly,
             showCategoryBadges = p.showCategoryBadges,
@@ -79,6 +86,21 @@ class SettingsViewModel @Inject constructor(
                 if (p.isSignedIn && account.value == null) refreshAccount() else if (!p.isSignedIn) account.value = null
             }
         }
+        viewModelScope.launch { remoteAccounts.observeAccounts().collect { refreshRemoteInfos(it) } }
+    }
+
+    /** 계정 목록이 바뀔 때마다 QUOTA 지원 계정의 용량을 한 번씩 읽는다(네트워크 — 실패는 조용히 건너뜀) */
+    private suspend fun refreshRemoteInfos(accounts: List<RemoteAccount>) {
+        val infos = HashMap<String, RemoteAccountInfo>()
+        for (acc in accounts) {
+            val info = runCatching {
+                val storage = storages.storage(acc.id)
+                if (Capability.QUOTA in storage.capabilities) storage.about() else null
+            }.onFailure { if (it is CancellationException) throw it else Timber.i(it, "about() failed %s", acc.id) }
+                .getOrNull()
+            if (info?.storageUsedBytes != null) infos[acc.id] = info
+        }
+        remoteInfos.value = infos
     }
 
     fun signIn() = runBusy {
@@ -172,6 +194,8 @@ data class SettingsUiState(
     val uploadAccountId: String? = null,
     val uploadAccountName: String? = null,
     val remoteAccounts: List<RemoteAccount> = emptyList(),
+    /** 계정 id → 용량 정보(QUOTA 능력이 있고 읽기에 성공한 것만) */
+    val remoteInfos: Map<String, RemoteAccountInfo> = emptyMap(),
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
     val showCategoryBadges: Boolean = true,

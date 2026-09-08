@@ -64,6 +64,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.RemoteAccount
+import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
@@ -200,6 +201,7 @@ internal fun SettingsScreen(
             )
             RemoteAccountsSection(
                 accounts = uiState.remoteAccounts,
+                remoteInfos = uiState.remoteInfos,
                 uploadAccountId = uiState.uploadAccountId,
                 driveEmail = uiState.accountEmail,
                 onOpenDrive = onDriveClick,
@@ -579,6 +581,7 @@ private fun SettingsScreenSignedInPreview() {
 @Composable
 private fun RemoteAccountsSection(
     accounts: List<RemoteAccount>,
+    remoteInfos: Map<String, RemoteAccountInfo>,
     uploadAccountId: String?,
     driveEmail: String?,
     onOpenDrive: () -> Unit,
@@ -615,6 +618,7 @@ private fun RemoteAccountsSection(
                 isUploadTarget = account.id == uploadAccountId,
                 onOpen = { onOpen(account.id) },
                 onRemove = { removing = account },
+                usage = remoteInfos[account.id],
             )
         }
         TextButton(onClick = onAdd) {
@@ -652,8 +656,10 @@ private fun RemoteAccountRow(
     isUploadTarget: Boolean,
     onOpen: () -> Unit,
     onRemove: (() -> Unit)?,
+    usage: RemoteAccountInfo? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     Column {
         Row(
             modifier = Modifier
@@ -677,6 +683,19 @@ private fun RemoteAccountRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
+                usage?.storageUsedBytes?.let { used ->
+                    val usedText = Formatter.formatShortFileSize(context, used)
+                    val limitText = usage.storageLimitBytes?.let { Formatter.formatShortFileSize(context, it) }
+                    Text(
+                        text = if (limitText != null) {
+                            stringResource(R.string.remote_storage_usage, usedText, limitText)
+                        } else {
+                            stringResource(R.string.remote_storage_usage_unlimited, usedText)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (isUploadTarget) {
                     Text(
                         text = stringResource(R.string.remote_upload_target_badge),

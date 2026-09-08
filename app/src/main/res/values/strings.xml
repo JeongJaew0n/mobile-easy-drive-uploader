@@ -163,6 +163,8 @@
     <string name="settings_sign_in_failed_generic">Google 인증 실패 (%1$d): Google Play 서비스 상태를 확인하세요</string>
     <string name="settings_storage_usage">Drive 저장공간 %1$s / %2$s 사용</string>
     <string name="settings_storage_usage_unlimited">Drive 저장공간 %1$s 사용</string>
+    <string name="remote_storage_usage">%1$s / %2$s 사용</string>
+    <string name="remote_storage_usage_unlimited">%1$s 사용</string>
     <string name="settings_scope_note">Drive 파일을 탐색하고 폴더를 만들기 위해 Google Drive 전체 접근 권한을 요청합니다.</string>
     <string name="settings_upload_section">업로드</string>
     <string name="settings_gallery_section">갤러리</string>

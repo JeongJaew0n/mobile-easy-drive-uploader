@@ -126,4 +126,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 S3 폴더 이름 변경·이동·삭제 진행 표시: `ReportsMutationProgress`(선택 인터페이스, `StateFlow<MutationProgress?>`) 를 `S3Storage` 가 구현 — 접두어 아래 키를 먼저 모아 전체 개수를 알고 오브젝트마다 갱신, 끝나면 null. 탐색 화면 하단 진행바가 "n / total 개 처리 중" 으로 바뀐다(다른 제공자는 불확정 진행바 그대로).
 - 2026-09-09 WebDAV Digest 인증(`NAS_STORAGE.md` §2).
 - 2026-09-09 `Capability.SEARCH`(Drive 만)·`Capability.DOWNLOAD`(네 제공자) 추가 — `DRIVE_FILE_CRUD.md` §8·§9.
+- 2026-09-09 설정 "연결된 저장소" 행에 용량(`about()`, QUOTA 능력 — WebDAV `quota-used/available-bytes`) 표시. 계정 목록이 바뀔 때 한 번씩 읽고 실패는 조용히 건너뛴다.
 - 남은 것: Dropbox/OneDrive.
