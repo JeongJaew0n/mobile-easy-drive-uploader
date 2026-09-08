@@ -5,12 +5,16 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jjw.easygallery.core.data.auth.AuthFailedException
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.SignInCancelledException
 import com.jjw.easygallery.core.data.auth.SignInStep
 import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
+import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.domain.model.DriveAccount
+import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.SignInUseCase
@@ -36,6 +40,8 @@ class SettingsViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val drive: DriveRepository,
     private val manageQueue: ManageUploadQueueUseCase,
+    private val remoteAccounts: RemoteAccountRepository,
+    private val storages: StorageRegistry,
 ) : ViewModel() {
 
     private val isBusy = MutableStateFlow(false)
@@ -43,7 +49,12 @@ class SettingsViewModel @Inject constructor(
     private val events = Channel<SettingsEvent>(Channel.BUFFERED)
     val eventFlow = events.receiveAsFlow()
 
-    val uiState: StateFlow<SettingsUiState> = combine(prefs.preferences, account, isBusy) { p, acc, busy ->
+    val uiState: StateFlow<SettingsUiState> = combine(
+        prefs.preferences,
+        account,
+        isBusy,
+        remoteAccounts.observeAccounts(),
+    ) { p, acc, busy, remotes ->
         SettingsUiState(
             isSignedIn = p.isSignedIn,
             accountEmail = p.accountEmail,
@@ -51,6 +62,9 @@ class SettingsViewModel @Inject constructor(
             storageUsedBytes = acc?.storageUsedBytes,
             storageLimitBytes = acc?.storageLimitBytes,
             uploadFolderName = p.uploadFolderName,
+            uploadAccountId = p.uploadAccountId,
+            uploadAccountName = remotes.firstOrNull { it.id == p.uploadAccountId }?.displayName,
+            remoteAccounts = remotes,
             uploadWifiOnly = p.uploadWifiOnly,
             uploadChargingOnly = p.uploadChargingOnly,
             showCategoryBadges = p.showCategoryBadges,
@@ -98,6 +112,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowCategoryBadges(enabled: Boolean) = viewModelScope.launch { prefs.setShowCategoryBadges(enabled) }
 
+    /** 계정 연결 해제: 메타·비밀 삭제, 캐시된 제공자 제거, 업로드 대상이었으면 Drive 로 되돌림 */
+    fun removeRemoteAccount(id: String) = runBusy {
+        remoteAccounts.remove(id)
+        storages.evict(id)
+        prefs.clearUploadTargetIfAccount(id)
+    }
+
     fun setUploadChargingOnly(enabled: Boolean) = viewModelScope.launch {
         prefs.setUploadChargingOnly(enabled)
         manageQueue.rescheduleWithCurrentConstraints()
@@ -121,6 +142,9 @@ class SettingsViewModel @Inject constructor(
                 block()
             } catch (e: SignInCancelledException) {
                 events.send(SettingsEvent.SignInCancelled)
+            } catch (e: AuthFailedException) {
+                Timber.w(e, "sign-in failed")
+                events.send(SettingsEvent.SignInFailed(e.statusCode))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -144,15 +168,26 @@ data class SettingsUiState(
     val storageUsedBytes: Long? = null,
     val storageLimitBytes: Long? = null,
     val uploadFolderName: String? = null,
+    /** 업로드 대상 계정(null = Google Drive)과 표시 이름 */
+    val uploadAccountId: String? = null,
+    val uploadAccountName: String? = null,
+    val remoteAccounts: List<RemoteAccount> = emptyList(),
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
     val showCategoryBadges: Boolean = true,
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     val isBusy: Boolean = false,
-)
+) {
+    /** Drive 로그인 또는 다른 저장소 대상이면 업로드 설정을 보여준다 */
+    val canUpload: Boolean get() = isSignedIn || uploadAccountId != null
+}
 
 sealed interface SettingsEvent {
     data class LaunchConsent(val pendingIntent: PendingIntent) : SettingsEvent
+
+    /** Play 서비스 상태 코드. 화면이 사람이 읽을 문구로 바꾼다 */
+    data class SignInFailed(val statusCode: Int) : SettingsEvent
+
     data object SignedIn : SettingsEvent
     data object SignInCancelled : SettingsEvent
     data class Error(val message: String) : SettingsEvent

@@ -22,6 +22,7 @@ import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
+import com.jjw.easygallery.feature.remote.AddRemoteAccountRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
 import com.jjw.easygallery.feature.uploads.UploadQueueRoute
@@ -94,7 +95,12 @@ fun AppNavigation() {
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
                     onCategoriesClick = { backStack.add(CategoriesKey) },
+                    onAddRemoteAccountClick = { backStack.add(AddRemoteAccountKey) },
+                    onOpenRemoteAccount = { accountId -> backStack.add(DriveBrowserKey(accountId = accountId)) },
                 )
+            }
+            entry<AddRemoteAccountKey> {
+                AddRemoteAccountRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<DuplicatesKey> {
                 DuplicatesRoute(onBackClick = { backStack.removeLastOrNull() })
@@ -118,7 +124,7 @@ fun AppNavigation() {
             entry<DriveBrowserKey> { key ->
                 DriveBrowserRoute(
                     key = key,
-                    onOpenFolder = { folder -> backStack.add(DriveBrowserKey(folder.id, folder.name)) },
+                    onOpenFolder = { folder -> backStack.add(DriveBrowserKey(folder.id, folder.name, key.accountId)) },
                     // 업로드 폴더를 지정하면 Drive 탐색 스택 전체를 걷어내고 이전 화면으로 복귀
                     onUploadFolderSelected = { backStack.removeAll { it is DriveBrowserKey } },
                     onBackClick = { backStack.removeLastOrNull() },

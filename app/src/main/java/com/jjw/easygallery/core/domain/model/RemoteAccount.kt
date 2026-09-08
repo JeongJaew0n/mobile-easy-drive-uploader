@@ -41,6 +41,9 @@ enum class Capability {
 
     MOVE,
 
+    /** 폴더도 이름 변경·이동할 수 있다(S3 는 오브젝트 전부 복사가 필요해 없음) */
+    FOLDER_MUTATION,
+
     /** 중단된 업로드를 이어 올릴 수 있다 */
     RESUMABLE_UPLOAD,
 

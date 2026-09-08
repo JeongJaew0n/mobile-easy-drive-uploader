@@ -24,6 +24,8 @@ data class UploadTask(
     val createdAt: Long,
     val width: Int = 0,
     val height: Int = 0,
+    /** 업로드 대상 계정. null = Google Drive */
+    val accountId: String? = null,
 ) {
     val fraction: Float get() = if (sizeBytes > 0) (bytesUploaded.toFloat() / sizeBytes).coerceIn(0f, 1f) else 0f
     val isActive: Boolean get() = state == UploadState.PENDING || state == UploadState.RUNNING

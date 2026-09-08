@@ -2,8 +2,10 @@ package com.jjw.easygallery.feature.drive
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,9 +23,12 @@ import javax.inject.Inject
 @HiltViewModel
 @Suppress("TooGenericExceptionCaught") // UI 경계: 네트워크·API 오류를 모두 메시지로 보여준다
 class DriveBrowserViewModel @Inject constructor(
-    private val drive: DriveRepository,
+    private val storages: StorageRegistry,
     private val prefs: UserPreferencesRepository,
 ) : ViewModel() {
+
+    private lateinit var drive: RemoteStorage
+    private var accountId: String? = null
 
     private val _uiState = MutableStateFlow(DriveBrowserUiState())
     val uiState: StateFlow<DriveBrowserUiState> = _uiState.asStateFlow()
@@ -33,12 +38,29 @@ class DriveBrowserViewModel @Inject constructor(
 
     private var loaded = false
 
-    /** NavEntry 키의 폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다. */
-    fun load(folder: DriveFolder) {
+    /**
+     * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
+     * [folderId] null 이면 그 저장소의 루트, [rootName] 은 루트 표시 이름.
+     */
+    fun load(accountId: String?, folderId: String?, folderName: String?, rootName: String) {
         if (loaded) return
         loaded = true
-        _uiState.update { it.copy(current = folder, isLoading = true, error = null) }
-        fetchPage(reset = true)
+        this.accountId = accountId
+        viewModelScope.launch {
+            try {
+                drive = storages.storage(accountId)
+                val folder = DriveFolder(folderId ?: drive.rootId, folderName ?: rootName)
+                _uiState.update {
+                    it.copy(current = folder, isLoading = true, error = null, capabilities = drive.capabilities)
+                }
+                fetchPage(reset = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "storage unavailable")
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
+            }
+        }
     }
 
     fun refresh() {
@@ -117,19 +139,20 @@ class DriveBrowserViewModel @Inject constructor(
         )
     }
 
-    /** 확인 없이 휴지통으로. 스낵바 "실행 취소" → [restore] */
+    /** 휴지통이 있는 저장소면 확인 없이 휴지통으로(스낵바 "실행 취소" → [restore]), 없으면 영구 삭제(UI 가 먼저 확인) */
     fun trash(entry: DriveEntry) {
+        val hasTrash = Capability.TRASH in _uiState.value.capabilities
         mutate(
             optimistic = { list -> list.filterNot { it.id == entry.id } },
-            action = { drive.setTrashed(entry.id, trashed = true) },
-            onSuccess = { DriveBrowserEvent.Trashed(entry) },
+            action = { drive.delete(entry.id) },
+            onSuccess = { if (hasTrash) DriveBrowserEvent.Trashed(entry) else DriveBrowserEvent.Deleted(entry) },
         )
     }
 
     fun restore(entry: DriveEntry) {
         mutate(
             optimistic = { list -> (list + entry).sortedForDrive() },
-            action = { drive.setTrashed(entry.id, trashed = false) },
+            action = { drive.restore(entry.id) },
             onSuccess = { DriveBrowserEvent.Restored },
         )
     }
@@ -161,7 +184,7 @@ class DriveBrowserViewModel @Inject constructor(
     fun selectAsUploadFolder() {
         val current = _uiState.value.current ?: return
         viewModelScope.launch {
-            prefs.setUploadFolder(current.id, current.name)
+            prefs.setUploadTarget(accountId, current.id, current.name)
             events.send(DriveBrowserEvent.UploadFolderSelected(current))
         }
     }
@@ -202,6 +225,8 @@ data class DriveBrowserUiState(
     val isLoadingMore: Boolean = false,
     val isMutating: Boolean = false,
     val error: String? = null,
+    /** 저장소가 지원하는 동작 — 메뉴 구성에 쓴다 */
+    val capabilities: Set<Capability> = emptySet(),
 )
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */
@@ -216,6 +241,7 @@ sealed interface DriveBrowserEvent {
     data class Renamed(val name: String) : DriveBrowserEvent
     data class Moved(val entry: DriveEntry, val target: DriveFolder) : DriveBrowserEvent
     data class Trashed(val entry: DriveEntry) : DriveBrowserEvent
+    data class Deleted(val entry: DriveEntry) : DriveBrowserEvent
     data object Restored : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent

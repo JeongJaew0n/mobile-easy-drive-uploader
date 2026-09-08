@@ -12,8 +12,8 @@ import javax.inject.Singleton
 class UploadLedgerRepository @Inject constructor(
     private val dao: UploadedMediaDao,
 ) {
-    suspend fun record(mediaId: Long, driveFileId: String, folderId: String?) {
-        dao.upsert(UploadedMediaEntity(mediaId, driveFileId, folderId, System.currentTimeMillis()))
+    suspend fun record(mediaId: Long, driveFileId: String, folderId: String?, accountId: String? = null) {
+        dao.upsert(UploadedMediaEntity(mediaId, driveFileId, folderId, System.currentTimeMillis(), accountId))
     }
 
     /** [mediaIds] 중 이미 올라간 것. SQLite 변수 한도(999) 아래로 잘라 조회한다. */

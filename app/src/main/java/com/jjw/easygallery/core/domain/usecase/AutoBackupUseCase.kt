@@ -44,7 +44,7 @@ class AutoBackupUseCase internal constructor(
         if (!p.autoBackupEnabled || !p.isSignedIn || p.autoBackupPaths.isEmpty()) return Result.Skipped
         val since = p.autoBackupSinceSeconds.takeIf { it > 0 } ?: (clock() / MILLIS_PER_SECOND)
         val candidates = media.queryAddedSince(since, p.autoBackupPaths, p.autoBackupIncludeVideos)
-        val result = enqueueNew(candidates, p.uploadFolder())
+        val result = enqueueNew(candidates, p.uploadFolder(), p.uploadAccountId)
         // 같은 초에 여러 장이 들어와도 놓치지 않도록 '>=' 로 조회하고, 원장·큐로 중복을 걸러낸다
         val nextSince = candidates.maxOfOrNull { it.dateAddedSeconds }?.coerceAtLeast(since) ?: since
         prefs.markAutoBackupRun(nextSince, clock())
@@ -63,15 +63,15 @@ class AutoBackupUseCase internal constructor(
     /** 선택한 앨범의 기존 항목을 전부 큐에 넣는다 (사용자가 명시적으로 눌렀을 때만) */
     suspend fun backfill(): Result {
         val p = prefs.current()
-        if (!p.isSignedIn || p.autoBackupPaths.isEmpty()) return Result.Skipped
+        if (!p.canUpload || p.autoBackupPaths.isEmpty()) return Result.Skipped
         val all = media.queryAddedSince(0, p.autoBackupPaths, p.autoBackupIncludeVideos)
-        return enqueueNew(all, p.uploadFolder())
+        return enqueueNew(all, p.uploadFolder(), p.uploadAccountId)
     }
 
-    private suspend fun enqueueNew(candidates: List<MediaItem>, folder: DriveFolder?): Result {
+    private suspend fun enqueueNew(candidates: List<MediaItem>, folder: DriveFolder?, accountId: String?): Result {
         if (candidates.isEmpty()) return Result(0, 0, 0)
         val fresh = filterNew(candidates)
-        val added = if (fresh.isEmpty()) 0 else queue.enqueue(fresh, folder)
+        val added = if (fresh.isEmpty()) 0 else queue.enqueue(fresh, folder, accountId)
         if (added > 0) scheduler.schedule()
         return Result(scanned = candidates.size, enqueued = added, skipped = candidates.size - added)
     }

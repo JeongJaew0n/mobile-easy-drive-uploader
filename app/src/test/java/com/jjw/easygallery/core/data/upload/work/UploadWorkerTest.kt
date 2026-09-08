@@ -10,8 +10,10 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.jjw.easygallery.core.data.auth.NotSignedInException
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.RemoteUploader
+import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.upload.DriveUploadException
-import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
@@ -47,7 +49,12 @@ class UploadWorkerTest {
     private lateinit var db: AppDatabase
     private lateinit var queue: UploadQueueRepository
     private lateinit var ledger: UploadLedgerRepository
-    private val uploader: DriveUploader = mockk()
+    private val uploader: RemoteUploader = mockk()
+    private val storage: RemoteStorage = mockk {
+        every { uploader() } returns uploader
+        every { rootId } returns "root"
+    }
+    private val storages: StorageRegistry = mockk { coEvery { storage(any()) } returns storage }
     private val getUploadFolder: GetUploadFolderUseCase = mockk()
     private val notifications = UploadNotifications(context)
     private val compressor: VideoCompressor = mockk(relaxed = true) {
@@ -243,7 +250,7 @@ class UploadWorkerTest {
                         workerParameters,
                         queue,
                         ledger,
-                        uploader,
+                        storages,
                         getUploadFolder,
                         notifications,
                         compressor,

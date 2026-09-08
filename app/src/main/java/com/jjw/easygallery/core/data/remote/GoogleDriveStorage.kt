@@ -26,6 +26,7 @@ class GoogleDriveStorage @Inject constructor(
         Capability.TRASH,
         Capability.RENAME,
         Capability.MOVE,
+        Capability.FOLDER_MUTATION,
         Capability.RESUMABLE_UPLOAD,
         Capability.QUOTA,
         Capability.WEB_LINK,

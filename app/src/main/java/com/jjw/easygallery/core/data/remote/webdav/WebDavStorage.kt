@@ -57,7 +57,8 @@ class WebDavStorage(
         }
         .build()
 
-    override val capabilities: Set<Capability> = setOf(Capability.RENAME, Capability.MOVE, Capability.QUOTA)
+    override val capabilities: Set<Capability> =
+        setOf(Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.QUOTA)
 
     override val rootId: String get() = "/"
 

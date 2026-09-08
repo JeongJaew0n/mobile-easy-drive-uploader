@@ -57,9 +57,17 @@ data class MediaViewerKey(
     val hero: HeroOrigin? = null,
 ) : AppNavKey
 
-/** Drive 탐색. 기본은 내 드라이브(`root`). 하위 폴더로 들어갈 때마다 새 키를 push 한다. */
+/**
+ * 원격 저장소 탐색. [accountId] null 은 Google Drive. [folderId] null 이면 그 저장소의 루트.
+ * 하위 폴더로 들어갈 때마다 새 키를 push 한다.
+ */
 @Serializable
 data class DriveBrowserKey(
-    val folderId: String = "root",
+    val folderId: String? = null,
     val folderName: String? = null,
+    val accountId: String? = null,
 ) : AppNavKey
+
+/** 저장소 계정 추가(S3 호환 / WebDAV) */
+@Serializable
+data object AddRemoteAccountKey : AppNavKey

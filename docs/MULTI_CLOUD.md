@@ -110,3 +110,11 @@ data class RemoteAccountEntity(
 - Dropbox/OneDrive(OAuth PKCE + 각 REST) — `RemoteStorage` 구현 하나씩.
 - 계정별 폴더 매핑(카테고리 → 폴더, `CATEGORIES.md` §10).
 - 여러 계정에 동시 백업(태스크 복제).
+
+## 9. 진행 기록
+
+- 2026-09-09 M1(`ee33045`): `RemoteStorage`/`RemoteUploader`, `GoogleDriveStorage`, `remote_account`(Room v6)·`KeystoreSecretStore`·`StorageRegistry`(Hilt `@IntoMap` 팩토리).
+- 2026-09-09 M2(`92b4b37`): `S3Signer`(AWS 테스트 벡터 통과)·`S3Storage`(목록·폴더·복사+삭제 이름 변경/이동·삭제·단일 PUT). 폴더 이름 변경/이동은 `Capability.FOLDER_MUTATION` 없음으로 표현.
+- 2026-09-09 M3(`0a2c34d`): `WebDavStorage`.
+- 2026-09-09 M4·M5: 설정 "연결된 저장소" 섹션(추가·탐색·연결 해제), `AddRemoteAccount` 폼(프리셋·연결 테스트·Keystore 저장), 탐색 화면을 `StorageRegistry`·능력 기반으로 일반화(`DriveBrowserKey.accountId`, 휴지통 없는 저장소는 확인 후 영구 삭제), `uploadAccountId` 업로드 대상, 큐·원장 `accountId`, `UploadWorker` 가 계정별 `RemoteUploader` 사용. Drive 없이 다른 저장소만 연결해도 업로드 가능(`canUpload`).
+- 남은 것: S3 멀티파트 재개(M5 일부), 갤러리 배지·필터의 계정 기준(M6), 탐색 화면 부제의 계정 이름, WebDAV 자체 서명 인증서 지문 고정, SMB(W2).

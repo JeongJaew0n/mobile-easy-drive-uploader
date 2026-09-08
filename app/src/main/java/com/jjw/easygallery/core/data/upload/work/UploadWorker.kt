@@ -7,9 +7,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
+import com.jjw.easygallery.core.data.remote.RemoteUploader
+import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.upload.CompressionException
-import com.jjw.easygallery.core.data.upload.DriveUploadException
-import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionExpiredException
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
@@ -37,7 +38,7 @@ class UploadWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val queue: UploadQueueRepository,
     private val ledger: UploadLedgerRepository,
-    private val uploader: DriveUploader,
+    private val storages: StorageRegistry,
     private val getUploadFolder: GetUploadFolderUseCase,
     private val notifications: UploadNotifications,
     private val compressor: VideoCompressor,
@@ -89,13 +90,19 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private suspend fun uploadTask(task: UploadTask): Outcome {
-        val folderId = task.folderId ?: getUploadFolder().also { queue.setFolder(task.id, it) }.id
+        val storage = storages.storage(task.accountId)
+        val uploader = storage.uploader()
+        // Drive 는 지정 폴더가 없으면 앱 루트 폴더를 만든다. 다른 저장소는 루트에 올린다
+        val folderId = task.folderId ?: when (task.accountId) {
+            null -> getUploadFolder().also { queue.setFolder(task.id, it) }.id
+            else -> storage.rootId
+        }
         // 영상은 설정에 따라 압축 사본을 올린다. 캐시가 재사용되므로 재시도·세션 재개에서도 같은 바이트.
         val source = compressor.compress(task.toSource(), prefs.current().videoCompression) { fraction ->
             updateForeground(task, fraction, compressing = true)
         } ?: task.toSource()
         val length = uploader.resolveLength(source)
-        val (sessionUri, offset) = resolveSession(task, source, folderId, length) ?: run {
+        val (sessionUri, offset) = resolveSession(uploader, task, source, folderId, length) ?: run {
             compressor.cleanup(source)
             return Outcome.Success
         }
@@ -118,6 +125,7 @@ class UploadWorker @AssistedInject constructor(
      * 세션이 만료됐거나 없으면 새로 만든다.
      */
     private suspend fun resolveSession(
+        uploader: RemoteUploader,
         task: UploadTask,
         source: UploadSource,
         folderId: String,
@@ -153,7 +161,7 @@ class UploadWorker @AssistedInject constructor(
             queue.setSession(task.id, null)
             retryTransient(task, e)
         }
-        is DriveUploadException -> {
+        is RemoteStorageException -> {
             val isClientError = e.httpCode?.let { it in CLIENT_ERROR_RANGE } == true
             if (isClientError) failPermanently(task, e) else retryTransient(task, e)
         }
@@ -164,7 +172,7 @@ class UploadWorker @AssistedInject constructor(
     /** 큐 완료 처리 + 영구 원장 기록(자동 백업 중복 방지·업로드됨 표시의 근거) */
     private suspend fun markUploaded(task: UploadTask, driveFileId: String) {
         queue.complete(task.id, driveFileId)
-        ledger.record(task.mediaId, driveFileId, task.folderId)
+        ledger.record(task.mediaId, driveFileId, task.folderId, task.accountId)
     }
 
     private suspend fun failPermanently(task: UploadTask, e: Exception): Outcome {

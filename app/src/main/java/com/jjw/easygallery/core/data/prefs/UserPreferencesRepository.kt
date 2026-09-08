@@ -24,6 +24,8 @@ data class UserPreferences(
     val accountName: String? = null,
     val uploadFolderId: String? = null,
     val uploadFolderName: String? = null,
+    /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
+    val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
@@ -40,6 +42,9 @@ data class UserPreferences(
     val showCategoryBadges: Boolean = true,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
+
+    /** 업로드 가능: Drive 대상이면 로그인, 다른 계정 대상이면 항상 */
+    val canUpload: Boolean get() = uploadAccountId != null || isSignedIn
 }
 
 @Singleton
@@ -54,6 +59,7 @@ class UserPreferencesRepository @Inject constructor(
             accountName = prefs[KEY_ACCOUNT_NAME],
             uploadFolderId = prefs[KEY_UPLOAD_FOLDER_ID],
             uploadFolderName = prefs[KEY_UPLOAD_FOLDER_NAME],
+            uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
             autoBackupEnabled = prefs[KEY_AUTO_BACKUP_ENABLED] ?: false,
@@ -83,6 +89,26 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(KEY_ACCOUNT_NAME)
             prefs.remove(KEY_UPLOAD_FOLDER_ID)
             prefs.remove(KEY_UPLOAD_FOLDER_NAME)
+        }
+    }
+
+    /** 업로드 대상 계정과 폴더를 함께 바꾼다. [accountId] null 은 Google Drive */
+    suspend fun setUploadTarget(accountId: String?, folderId: String, folderName: String) {
+        store.edit {
+            if (accountId == null) it.remove(KEY_UPLOAD_ACCOUNT_ID) else it[KEY_UPLOAD_ACCOUNT_ID] = accountId
+            it[KEY_UPLOAD_FOLDER_ID] = folderId
+            it[KEY_UPLOAD_FOLDER_NAME] = folderName
+        }
+    }
+
+    /** 계정을 지우면 그 계정을 향하던 업로드 대상도 Drive 기본값으로 되돌린다 */
+    suspend fun clearUploadTargetIfAccount(accountId: String) {
+        store.edit {
+            if (it[KEY_UPLOAD_ACCOUNT_ID] == accountId) {
+                it.remove(KEY_UPLOAD_ACCOUNT_ID)
+                it.remove(KEY_UPLOAD_FOLDER_ID)
+                it.remove(KEY_UPLOAD_FOLDER_NAME)
+            }
         }
     }
 
@@ -140,6 +166,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")
         val KEY_AUTO_BACKUP_LAST_RUN = longPreferencesKey("auto_backup_last_run")
         val KEY_VIDEO_COMPRESSION = stringPreferencesKey("video_compression")
+        val KEY_UPLOAD_ACCOUNT_ID = stringPreferencesKey("upload_account_id")
         val KEY_SHOW_CATEGORY_BADGES = booleanPreferencesKey("show_category_badges")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")

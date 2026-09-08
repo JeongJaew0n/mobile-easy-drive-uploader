@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.navigation.DriveBrowserKey
@@ -85,7 +86,7 @@ fun DriveBrowserRoute(
     val context = LocalContext.current
     val rootName = stringResource(R.string.drive_root_name)
 
-    LaunchedEffect(key) { viewModel.load(DriveFolder(key.folderId, key.folderName ?: rootName)) }
+    LaunchedEffect(key) { viewModel.load(key.accountId, key.folderId, key.folderName, rootName) }
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
             when (event) {
@@ -106,6 +107,8 @@ fun DriveBrowserRoute(
                     )
                     if (result == SnackbarResult.ActionPerformed) viewModel.restore(event.entry)
                 }
+                is DriveBrowserEvent.Deleted ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_deleted, event.entry.name))
                 DriveBrowserEvent.Restored ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
                 is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
@@ -173,6 +176,8 @@ internal fun DriveBrowserScreen(
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<DriveEntry?>(null) }
     var moving by remember { mutableStateOf<DriveEntry?>(null) }
+    var deleting by remember { mutableStateOf<DriveEntry?>(null) }
+    val hasTrash = Capability.TRASH in uiState.capabilities
     val listState = rememberLazyListState()
     val motion = LocalMotion.current
 
@@ -267,10 +272,11 @@ internal fun DriveBrowserScreen(
                             entry = entry,
                             onClick = { onEntryClick(entry) },
                             enabled = !uiState.isMutating,
+                            menu = entryMenu(entry, uiState.capabilities),
                             onOpen = { entryActions.onOpen(entry) },
                             onRename = { renaming = entry },
                             onMove = { moving = entry },
-                            onTrash = { entryActions.onTrash(entry) },
+                            onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
                             modifier = Modifier.animateItem(
                                 fadeInSpec = motion.quick(),
                                 placementSpec = motion.settle(),
@@ -304,6 +310,46 @@ internal fun DriveBrowserScreen(
         onDismissMove = { moving = null },
         onCreateFolder = onCreateFolder,
         entryActions = entryActions,
+    )
+    deleting?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text(stringResource(R.string.drive_delete_title, entry.name)) },
+            text = { Text(stringResource(R.string.drive_delete_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleting = null
+                        entryActions.onTrash(entry)
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete_forever))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+/** 행 ⋮ 메뉴에 무엇을 보일지 — 저장소 능력과 항목 종류로 결정 */
+internal data class EntryMenu(
+    val open: Boolean,
+    val rename: Boolean,
+    val move: Boolean,
+    val delete: Boolean,
+    val deleteIsTrash: Boolean,
+)
+
+internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>): EntryMenu {
+    val folderOk = !entry.isFolder || Capability.FOLDER_MUTATION in capabilities
+    return EntryMenu(
+        open = !entry.isFolder && Capability.WEB_LINK in capabilities && entry.webViewLink != null,
+        rename = Capability.RENAME in capabilities && folderOk,
+        move = Capability.MOVE in capabilities && folderOk,
+        delete = true,
+        deleteIsTrash = Capability.TRASH in capabilities,
     )
 }
 
@@ -359,6 +405,7 @@ private fun DriveEntryRow(
     entry: DriveEntry,
     onClick: () -> Unit,
     enabled: Boolean,
+    menu: EntryMenu,
     onOpen: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
@@ -404,7 +451,7 @@ private fun DriveEntryRow(
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                if (!entry.isFolder) {
+                if (menu.open) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.drive_menu_open)) },
                         onClick = {
@@ -413,24 +460,33 @@ private fun DriveEntryRow(
                         },
                     )
                 }
+                if (menu.rename) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_rename)) },
+                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onRename()
+                        },
+                    )
+                }
+                if (menu.move) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.drive_menu_move)) },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onMove()
+                        },
+                    )
+                }
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_rename)) },
-                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onRename()
+                    text = {
+                        val label = if (menu.deleteIsTrash) R.string.action_trash else R.string.action_delete_forever
+                        Text(stringResource(label))
                     },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.drive_menu_move)) },
-                    leadingIcon = { Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onMove()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_trash)) },
                     leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                     onClick = {
                         menuExpanded = false

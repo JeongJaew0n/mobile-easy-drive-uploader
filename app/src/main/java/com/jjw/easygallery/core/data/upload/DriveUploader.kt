@@ -8,6 +8,7 @@ import com.jjw.easygallery.core.data.drive.DriveApi
 import com.jjw.easygallery.core.data.drive.DriveFileDto
 import com.jjw.easygallery.core.data.drive.DriveFileMetadata
 import com.jjw.easygallery.core.data.drive.DriveHttpClient
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -58,7 +59,7 @@ sealed interface SessionStatus {
     data object Expired : SessionStatus
 }
 
-open class DriveUploadException(message: String, val httpCode: Int? = null) : IOException(message)
+open class DriveUploadException(message: String, httpCode: Int? = null) : RemoteStorageException(message, httpCode)
 
 /** 세션 URI 가 만료/삭제됨(404·410). 새 세션을 만들어 처음부터 올려야 한다. */
 class SessionExpiredException(httpCode: Int) : DriveUploadException("업로드 세션이 만료되었습니다", httpCode)

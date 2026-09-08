@@ -1,12 +1,15 @@
 package com.jjw.easygallery.feature.drive
 
 import app.cash.turbine.test
-import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,9 +31,12 @@ class DriveBrowserViewModelTest {
     private val folderA = entry("d1", "Album", DriveEntry.FOLDER_MIME_TYPE)
     private val fileA = entry("f1", "a.jpg", "image/jpeg")
     private val fileB = entry("f2", "b.jpg", "image/jpeg")
-    private val drive: DriveRepository = mockk {
+    private val drive: RemoteStorage = mockk {
         coEvery { listChildren("root", null, false) } returns DrivePage(listOf(folderA, fileA, fileB), null)
+        every { rootId } returns "root"
+        every { capabilities } returns setOf(Capability.TRASH, Capability.RENAME, Capability.MOVE)
     }
+    private val storages: StorageRegistry = mockk { coEvery { storage(null) } returns drive }
     private val prefs: UserPreferencesRepository = mockk()
     private val testDispatcher = StandardTestDispatcher()
 
@@ -41,8 +47,8 @@ class DriveBrowserViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(drive, prefs)
-        viewModel.load(DriveFolder("root", "내 드라이브"))
+        val viewModel = DriveBrowserViewModel(storages, prefs)
+        viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
     }
@@ -63,7 +69,7 @@ class DriveBrowserViewModelTest {
 
     @Test
     fun `failed mutation restores the previous list and reports an error`() = runTest(testDispatcher) {
-        coEvery { drive.setTrashed("f1", true) } throws IOException("offline")
+        coEvery { drive.delete("f1") } throws IOException("offline")
         val viewModel = loadedViewModel()
 
         viewModel.trash(fileA)
@@ -76,7 +82,8 @@ class DriveBrowserViewModelTest {
 
     @Test
     fun `trash then restore re-inserts the entry in sorted position`() = runTest(testDispatcher) {
-        coEvery { drive.setTrashed("f1", any()) } returns Unit
+        coEvery { drive.delete("f1") } returns Unit
+        coEvery { drive.restore("f1") } returns Unit
         val viewModel = loadedViewModel()
 
         viewModel.trash(fileA)

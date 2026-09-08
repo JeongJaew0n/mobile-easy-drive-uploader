@@ -51,8 +51,9 @@ class GoogleAuthRepository @Inject constructor(
         val result = try {
             client.getAuthorizationResultFromIntent(data)
         } catch (e: ApiException) {
+            // RESULT_CANCELED 는 onConsentResult 가 이미 걸렀으므로 여기 오는 ApiException 은 진짜 오류다
             Timber.w(e, "authorization result parse failed: status=%d", e.statusCode)
-            throw SignInCancelledException()
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
         }
         cache(result)
     }
@@ -87,7 +88,15 @@ class GoogleAuthRepository @Inject constructor(
             .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
             .apply { if (account != null) setAccount(account) }
             .build()
-        return client.authorize(request).await()
+        Timber.i("authorize scope=%s account=%s", DRIVE_SCOPE, account?.name?.let { "set" } ?: "picker")
+        return try {
+            val result = client.authorize(request).await()
+            Timber.i("authorize result: hasResolution=%s", result.hasResolution())
+            result
+        } catch (e: ApiException) {
+            Timber.w(e, "authorize failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
     }
 
     private fun cache(result: AuthorizationResult): CachedToken {

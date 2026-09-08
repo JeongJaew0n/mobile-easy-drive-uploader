@@ -33,7 +33,7 @@ class UploadQueueRepository @Inject constructor(
     }
 
     /** 이미 대기·진행 중인 미디어는 건너뛴다. 반환값은 실제로 추가된 개수. */
-    suspend fun enqueue(items: List<MediaItem>, folder: DriveFolder?): Int {
+    suspend fun enqueue(items: List<MediaItem>, folder: DriveFolder?, accountId: String? = null): Int {
         val active = dao.unfinishedMediaIds().toHashSet()
         val now = clock()
         val entities = items.filter { it.id !in active }.map { item ->
@@ -47,6 +47,7 @@ class UploadQueueRepository @Inject constructor(
                 height = item.height,
                 folderId = folder?.id,
                 folderName = folder?.name,
+                accountId = accountId,
                 createdAt = now,
                 updatedAt = now,
             )
@@ -109,5 +110,6 @@ class UploadQueueRepository @Inject constructor(
         createdAt = createdAt,
         width = width,
         height = height,
+        accountId = accountId,
     )
 }

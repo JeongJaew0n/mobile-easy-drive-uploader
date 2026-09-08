@@ -96,3 +96,9 @@ adb -s R3CTC0CSZ1R logcat -d | grep -E "GoogleAuthRepository|SettingsViewModel|S
 3. 등록 직후에는 Play 서비스 캐시 때문에 수 분 정도 같은 오류가 날 수 있다. 안 되면 설정 → 앱 → Google Play 서비스 → 저장공간 → 캐시 삭제 후 재시도.
 4. 앱 쪽(§5): `RESULT_CANCELED` 를 "취소"로만 보여 주는 문구를 "취소되었거나 앱 등록(패키지·SHA-1)이 맞지 않습니다" 로 바꾸고, 문서 §4 의 로그 명령을 안내하는 것을 검토.
 
+## 9. 코드 반영 (2026-09-09)
+
+§5 의 제안을 적용했다(`AuthFailedException(statusCode)`):
+- `GoogleAuthRepository.authorize()`·`completeSignIn()` 의 `ApiException` 을 상태 코드와 함께 던지고, 시도·결과를 `Timber.i` 로 남긴다.
+- 설정 화면은 코드별 문구를 띄운다: 10 → "패키지명·SHA-1 이 Google Cloud 콘솔에 등록되지 않았습니다", 7 → 네트워크, 그 외 → Play 서비스 상태.
+- `RESULT_CANCELED` 문구를 "취소되었거나 앱 등록(패키지명·SHA-1)이 GCP 와 맞지 않습니다" 로 바꿨다 — `UNREGISTERED_ON_API_CONSOLE` 이 이 경로로 오기 때문(§7).

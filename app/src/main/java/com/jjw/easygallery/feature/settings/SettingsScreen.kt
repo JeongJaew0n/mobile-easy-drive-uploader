@@ -11,6 +11,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,9 +24,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +43,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +63,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.RemoteAccount
+import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
@@ -68,6 +77,8 @@ fun SettingsRoute(
     onAutoBackupClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
     onCategoriesClick: () -> Unit = {},
+    onAddRemoteAccountClick: () -> Unit = {},
+    onOpenRemoteAccount: (accountId: String) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -95,6 +106,9 @@ fun SettingsRoute(
                     snackbarHostState.showSnackbar(resources.getString(R.string.settings_signed_in))
                 SettingsEvent.SignInCancelled ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.settings_sign_in_cancelled))
+                is SettingsEvent.SignInFailed -> snackbarHostState.showSnackbar(
+                    resources.getString(signInFailureMessage(event.statusCode), event.statusCode),
+                )
                 is SettingsEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
@@ -112,6 +126,9 @@ fun SettingsRoute(
         onAutoBackupClick = onAutoBackupClick,
         onDuplicatesClick = onDuplicatesClick,
         onCategoriesClick = onCategoriesClick,
+        onAddRemoteAccountClick = onAddRemoteAccountClick,
+        onOpenRemoteAccount = onOpenRemoteAccount,
+        onRemoveRemoteAccount = viewModel::removeRemoteAccount,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
         onCategoryBadgesChange = viewModel::setShowCategoryBadges,
@@ -144,6 +161,9 @@ internal fun SettingsScreen(
     onAutoBackupClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
     onCategoriesClick: () -> Unit = {},
+    onAddRemoteAccountClick: () -> Unit = {},
+    onOpenRemoteAccount: (accountId: String) -> Unit = {},
+    onRemoveRemoteAccount: (accountId: String) -> Unit = {},
     /** null = 이 기기에서 지원 안 함(Android 11 이하) */
     manageMedia: Boolean? = null,
     onManageMediaClick: () -> Unit = {},
@@ -178,13 +198,26 @@ internal fun SettingsScreen(
                 onSignInClick = onSignInClick,
                 onSignOutClick = onSignOutClick,
             )
-            if (uiState.isSignedIn) {
+            RemoteAccountsSection(
+                accounts = uiState.remoteAccounts,
+                uploadAccountId = uiState.uploadAccountId,
+                onAdd = onAddRemoteAccountClick,
+                onOpen = onOpenRemoteAccount,
+                onRemove = onRemoveRemoteAccount,
+            )
+            if (uiState.canUpload) {
                 Text(
                     text = stringResource(R.string.settings_upload_section),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 UploadFolderRow(
-                    folderName = uiState.uploadFolderName,
+                    folderName = uiState.uploadFolderName?.let { folder ->
+                        stringResource(
+                            R.string.remote_upload_target,
+                            uiState.uploadAccountName ?: stringResource(R.string.remote_kind_google),
+                            folder,
+                        )
+                    },
                     onClick = onUploadFolderClick,
                 )
                 NavigationRow(
@@ -539,3 +572,124 @@ private fun SettingsScreenSignedInPreview() {
         )
     }
 }
+
+/** 연결된 원격 저장소 목록 + 추가(`docs/MULTI_CLOUD.md` §5) */
+@Composable
+private fun RemoteAccountsSection(
+    accounts: List<RemoteAccount>,
+    uploadAccountId: String?,
+    onAdd: () -> Unit,
+    onOpen: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    var removing by remember { mutableStateOf<RemoteAccount?>(null) }
+    Column {
+        Text(text = stringResource(R.string.remote_section), style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = stringResource(R.string.remote_section_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+        )
+        accounts.forEach { account ->
+            RemoteAccountRow(
+                account = account,
+                isUploadTarget = account.id == uploadAccountId,
+                onOpen = { onOpen(account.id) },
+                onRemove = { removing = account },
+            )
+        }
+        TextButton(onClick = onAdd) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.remote_add))
+        }
+    }
+    removing?.let { account ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(R.string.remote_remove)) },
+            text = { Text(stringResource(R.string.remote_remove_confirm, account.displayName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRemove(account.id)
+                        removing = null
+                    },
+                ) {
+                    Text(stringResource(R.string.remote_remove))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { removing = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RemoteAccountRow(
+    account: RemoteAccount,
+    isUploadTarget: Boolean,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpen)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val icon = when (account.kind) {
+                RemoteAccountKind.WEBDAV -> R.drawable.ic_folder
+                else -> R.drawable.ic_cloud_upload
+            }
+            Icon(painterResource(icon), contentDescription = null)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(account.displayName, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = account.endpoint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                if (isUploadTarget) {
+                    Text(
+                        text = stringResource(R.string.remote_upload_target_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.remote_remove)) },
+                        onClick = {
+                            menuExpanded = false
+                            onRemove()
+                        },
+                    )
+                }
+            }
+        }
+        HorizontalDivider()
+    }
+}
+
+/** Play 서비스 상태 코드 → 안내 문구(`docs/GOOGLE_SIGN_IN_TROUBLESHOOTING.md` §3) */
+internal fun signInFailureMessage(statusCode: Int): Int = when (statusCode) {
+    STATUS_DEVELOPER_ERROR -> R.string.settings_sign_in_failed_developer
+    STATUS_NETWORK_ERROR -> R.string.settings_sign_in_failed_network
+    else -> R.string.settings_sign_in_failed_generic
+}
+
+private const val STATUS_DEVELOPER_ERROR = 10
+private const val STATUS_NETWORK_ERROR = 7
