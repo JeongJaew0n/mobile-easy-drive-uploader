@@ -26,4 +26,5 @@
 | NAS-09 | SMB 폴더를 업로드 폴더로 지정 → 큰 영상 업로드 중 Wi-Fi 를 끄고 다시 켬 | 워커 재시도 시 원격 파일 크기부터 이어 올림(처음부터 아님), 완료 후 NAS 에서 재생 가능 | ⬜ | `queryStatus` → `Incomplete(size)` |
 | NAS-10 | 같은 이름 파일이 이미 있는 폴더로 업로드 | 덮어쓰지 않고 `이름 (1).jpg` 로 생성 | ⬜ | `RemoteNames.unique` |
 | NAS-12 | Digest 인증만 켠 WebDAV 서버(Apache `AuthType Digest`, lighttpd) 연결 테스트·탐색·업로드 | 첫 요청 401 뒤 자동으로 Digest 로 전환해 성공, 업로드(PUT)도 401 없이 바로 성공 | ⬜ | `DigestAuth` 챌린지 캐시 |
+| NAS-13 | SMB 폼 → "네트워크에서 찾기" | 8초 안에 같은 Wi-Fi 의 NAS 가 "이름 · IP" 칩으로 나타남(NAS 가 mDNS 를 켠 경우), 칩 누르면 주소·표시 이름 채움. 없으면 안내 문구만 | ⬜ | `NsdManager _smb._tcp` |
 | NAS-11 | 모바일 데이터(Wi-Fi 끔)에서 SMB 연결 테스트 | 30초 안에 "SMB 오류: … timed out/unreachable" — 앱이 멈추지 않음 | ⬜ | 외부망 불가는 폼 힌트로 안내 |

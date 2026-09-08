@@ -3,6 +3,8 @@ package com.jjw.easygallery.feature.remote
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageFactory
+import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
+import com.jjw.easygallery.core.data.remote.smb.HostDiscovery
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import io.mockk.coEvery
@@ -12,6 +14,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -47,12 +50,32 @@ class AddRemoteAccountViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
+    private val discovery = HostDiscovery { flowOf(listOf(DiscoveredHost("Synology", "192.168.0.10", 445))) }
+
     private fun viewModel() = AddRemoteAccountViewModel(
         accounts,
         mapOf(RemoteAccountKind.S3 to factory, RemoteAccountKind.WEBDAV to factory),
         OkHttpClient(),
         testDispatcher,
+        discovery,
     )
+
+    @Test
+    fun `discovering smb hosts lists them and picking one fills endpoint and name`() = runTest(testDispatcher) {
+        val vm = viewModel()
+        vm.setKind(RemoteAccountKind.SMB)
+
+        vm.discoverSmbHosts()
+        advanceUntilIdle()
+        assertEquals(listOf("Synology"), vm.uiState.value.discoveredHosts.map { it.name })
+
+        vm.pickDiscoveredHost(vm.uiState.value.discoveredHosts.single())
+        assertEquals("192.168.0.10", vm.uiState.value.endpoint)
+        assertEquals("Synology", vm.uiState.value.displayName)
+        vm.pickDiscoveredHost(DiscoveredHost("x", "10.0.0.2", 4455))
+        assertEquals("10.0.0.2:4455", vm.uiState.value.endpoint)
+        assertEquals("Synology", vm.uiState.value.displayName) // 이미 있는 이름은 덮어쓰지 않음
+    }
 
     @Test
     fun `naver preset fills endpoint and region, submit needs bucket for s3`() {

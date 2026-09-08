@@ -9,17 +9,22 @@ import com.jjw.easygallery.core.data.remote.RemoteStorageFactory
 import com.jjw.easygallery.core.data.remote.fetchServerCertificateSha256
 import com.jjw.easygallery.core.data.remote.isTlsFailure
 import com.jjw.easygallery.core.data.remote.s3.PlainHttpClient
+import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
+import com.jjw.easygallery.core.data.remote.smb.HostDiscovery
+import com.jjw.easygallery.core.data.remote.smb.NsdHostDiscovery
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import javax.inject.Inject
@@ -49,6 +54,9 @@ data class AddRemoteAccountUiState(
     val certSha256: String? = null,
     /** TLS 실패 후 서버에서 읽어 온 지문 — 신뢰 여부 다이얼로그용 */
     val pendingCertSha256: String? = null,
+    /** SMB "네트워크에서 찾기" 결과(mDNS `_smb._tcp`) */
+    val discoveredHosts: List<DiscoveredHost> = emptyList(),
+    val isDiscovering: Boolean = false,
 ) {
     val canSubmit: Boolean
         get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() && secret.isNotBlank() &&
@@ -67,7 +75,10 @@ class AddRemoteAccountViewModel @Inject constructor(
     private val factories: Map<RemoteAccountKind, @JvmSuppressWildcards RemoteStorageFactory>,
     @PlainHttpClient private val httpClient: OkHttpClient,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
+    private val hostDiscovery: HostDiscovery,
 ) : ViewModel() {
+
+    private var discoveryJob: Job? = null
 
     private val _uiState = MutableStateFlow(AddRemoteAccountUiState())
     val uiState: StateFlow<AddRemoteAccountUiState> = _uiState.asStateFlow()
@@ -137,6 +148,40 @@ class AddRemoteAccountViewModel @Inject constructor(
 
     fun dismissPendingCertificate() = _uiState.update { it.copy(pendingCertSha256 = null) }
 
+    /** SMB 서버를 mDNS 로 [DISCOVERY_MILLIS] 동안 찾는다. 다시 누르면 처음부터 */
+    fun discoverSmbHosts() {
+        discoveryJob?.cancel()
+        discoveryJob = viewModelScope.launch {
+            _uiState.update { it.copy(isDiscovering = true, discoveredHosts = emptyList()) }
+            try {
+                withTimeoutOrNull(DISCOVERY_MILLIS) {
+                    hostDiscovery.discover(NsdHostDiscovery.SMB_SERVICE).collect { hosts ->
+                        _uiState.update { it.copy(discoveredHosts = hosts) }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "smb discovery failed")
+            } finally {
+                _uiState.update { it.copy(isDiscovering = false) }
+            }
+        }
+    }
+
+    /** 찾은 서버를 주소 칸에 넣는다(표시 이름이 비어 있으면 서비스 이름으로 채움) */
+    fun pickDiscoveredHost(host: DiscoveredHost) {
+        discoveryJob?.cancel()
+        _uiState.update {
+            it.copy(
+                endpoint = if (host.port == SMB_DEFAULT_PORT) host.host else "${host.host}:${host.port}",
+                displayName = it.displayName.ifBlank { host.name },
+                isDiscovering = false,
+                testResult = null,
+            )
+        }
+    }
+
     fun save() {
         val state = _uiState.value
         if (!state.canSubmit) return
@@ -154,6 +199,11 @@ class AddRemoteAccountViewModel @Inject constructor(
                 _uiState.update { it.copy(isBusy = false) }
             }
         }
+    }
+
+    private companion object {
+        const val DISCOVERY_MILLIS = 8_000L
+        const val SMB_DEFAULT_PORT = 445
     }
 
     private fun AddRemoteAccountUiState.toAccount(id: String) = RemoteAccount(

@@ -34,7 +34,7 @@
 ## 5. SMB (W2) — `SmbStorage`
 
 - 라이브러리 `com.hierynomus:smbj` 0.15.0(Apache 2.0; 의존 bcprov-jdk18on·asn-one·mbassador·slf4j-api). SMB2/3, 서명·암호화 협상은 smbj 기본값. slf4j 바인딩은 넣지 않는다(첫 호출에 "No SLF4J providers" 한 줄만 나온다).
-- 계정: `RemoteAccountEntity(kind = SMB, endpoint = "host[:port]"(기본 445), bucketOrRoot = 공유 이름, region = 도메인/작업 그룹(선택), username, secretRef)`. 호스트 발견(mDNS/NetBIOS)은 하지 않는다 — 주소·공유·계정 직접 입력.
+- 계정: `RemoteAccountEntity(kind = SMB, endpoint = "host[:port]"(기본 445), bucketOrRoot = 공유 이름, region = 도메인/작업 그룹(선택), username, secretRef)`. 호스트 발견은 Android `NsdManager`(mDNS `_smb._tcp.`, 라이브러리 없음)로 **편의 기능**만 제공 — 폼의 "네트워크에서 찾기"(8초, 발견 서비스는 순서대로 resolve) 결과 칩을 누르면 주소·표시 이름이 채워진다. NAS 마다 광고 여부가 달라 직접 입력이 기본이고, 공유 이름은 항상 직접 입력(SMB 공유 열거는 RPC 라 smbj 범위 밖).
 - **연결은 작업마다 열고 닫는다**(`withShare`: connect → authenticate → connectShare → 작업 → close). 소켓을 워커 밖에서 들고 있지 않아 절전·Wi-Fi 전환에 강하고, 목록 한 번에 왕복 3~4회가 늘지만 LAN 이라 체감 없다. 타임아웃 30초.
 - `entryId` 는 다른 제공자와 같은 `/` 구분 상대 경로(폴더는 `/` 끝), smbj 로 넘길 때만 `\\` 로 바꾼다(`SmbPaths`). 루트는 빈 문자열.
 - 목록: `DiskShare.list(path)` → `FileIdBothDirectoryInformation`(`.`/`..` 제외, `FILE_ATTRIBUTE_DIRECTORY` 로 폴더 판정, `endOfFile`, `changeTime`). 페이징 없음. 폴더 생성 `mkdir`, 이름 변경·이동은 `openFile/openDirectory(DELETE)` 후 `rename(새 전체 경로)`(SMB2 `FileRenameInformation`, 같은 공유 안에서만), 삭제는 `rm` / `rmdir(recursive)`. 휴지통 없음 → 능력 `RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD`.
@@ -49,4 +49,5 @@
 - 2026-09-09 자체 서명 인증서 지문 고정: 연결 테스트가 TLS 오류로 실패하면 서버 리프 인증서의 SHA-256 을 읽어 "이 인증서 신뢰" 다이얼로그를 띄우고, 수락 시 `RemoteAccount.certSha256`(Room v7)에 저장. `WebDavStorage` 는 그 인증서와 **정확히 같은** 경우만 연결(`pinCertificate`, 호스트 이름 검사는 생략 — 인증서 자체를 고정). 전체 신뢰 옵션은 두지 않았다. `PinnedTlsTest`(okhttp-tls 자체 서명 서버).
 - 2026-09-09 W2 SMB 구현: `SmbStorage`/`SmbModule`(`@RemoteKindKey(SMB)`), 계정 추가 폼에 SMB 종류(주소·공유 이름·도메인·사용자·비밀번호), 오프셋 재개 업로드, R8 규칙. `SmbPathsTest`.
 - 2026-09-09 WebDAV Digest 인증(`DigestAuth`/`DigestCalculator`, `DigestAuthTest` RFC 7616 벡터·MockWebServer 흐름).
-- 남은 것: SMB 서버 검색(mDNS), SFTP.
+- 2026-09-09 SMB 서버 mDNS 검색(`HostDiscovery`/`NsdHostDiscovery`, 폼 `SmbDiscoveryRow`).
+- 남은 것: SFTP.

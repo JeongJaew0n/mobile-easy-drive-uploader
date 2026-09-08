@@ -27,4 +27,7 @@ object SmbModule {
     ): RemoteStorageFactory = RemoteStorageFactory { account, secret ->
         SmbStorage(context, account, secret, ioDispatcher)
     }
+
+    @Provides
+    fun providesHostDiscovery(@ApplicationContext context: Context): HostDiscovery = NsdHostDiscovery(context)
 }

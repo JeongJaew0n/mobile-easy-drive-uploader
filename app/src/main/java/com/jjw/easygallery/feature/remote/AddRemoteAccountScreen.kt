@@ -3,16 +3,21 @@ package com.jjw.easygallery.feature.remote
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -37,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -45,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
 import com.jjw.easygallery.core.data.remote.toFingerprintDisplay
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 
@@ -91,6 +98,8 @@ fun AddRemoteAccountRoute(
         onUpdate = viewModel::update,
         onTest = viewModel::testConnection,
         onSave = viewModel::save,
+        onDiscover = viewModel::discoverSmbHosts,
+        onPickHost = viewModel::pickDiscoveredHost,
     )
     uiState.pendingCertSha256?.let { fingerprint ->
         AlertDialog(
@@ -127,6 +136,8 @@ internal fun AddRemoteAccountScreen(
     onUpdate: (AddRemoteAccountUiState.() -> AddRemoteAccountUiState) -> Unit,
     onTest: () -> Unit,
     onSave: () -> Unit,
+    onDiscover: () -> Unit = {},
+    onPickHost: (DiscoveredHost) -> Unit = {},
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -163,6 +174,7 @@ internal fun AddRemoteAccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             EndpointField(uiState, onUpdate)
+            if (uiState.kind == RemoteAccountKind.SMB) SmbDiscoveryRow(uiState, onDiscover, onPickHost)
             KindSpecificFields(uiState, onUpdate)
             OutlinedTextField(
                 value = uiState.username,
@@ -325,4 +337,36 @@ private fun SimpleField(value: String, @StringRes label: Int, onValueChange: (St
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** SMB: "네트워크에서 찾기" 버튼과 mDNS 로 찾은 서버 칩 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SmbDiscoveryRow(
+    uiState: AddRemoteAccountUiState,
+    onDiscover: () -> Unit,
+    onPickHost: (DiscoveredHost) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDiscover, enabled = !uiState.isDiscovering) {
+                Text(stringResource(R.string.remote_smb_discover))
+            }
+            if (uiState.isDiscovering) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+        }
+        if (uiState.discoveredHosts.isEmpty()) {
+            if (!uiState.isDiscovering) return
+            Text(
+                stringResource(R.string.remote_smb_discovering),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            uiState.discoveredHosts.forEach { host ->
+                AssistChip(onClick = { onPickHost(host) }, label = { Text("${host.name} · ${host.host}") })
+            }
+        }
+    }
 }

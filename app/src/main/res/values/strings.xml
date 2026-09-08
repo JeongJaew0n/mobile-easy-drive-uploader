@@ -206,6 +206,8 @@
     <string name="remote_smb_hint">예: 192.168.0.10 또는 nas.local. 같은 Wi-Fi에서만 연결됩니다(외부망은 VPN 필요).</string>
     <string name="remote_smb_share">공유 폴더 이름</string>
     <string name="remote_smb_domain">도메인/작업 그룹 (선택)</string>
+    <string name="remote_smb_discover">네트워크에서 찾기</string>
+    <string name="remote_smb_discovering">같은 Wi-Fi의 SMB 서버를 찾는 중… (최대 8초)</string>
     <string name="remote_preset">서비스</string>
     <string name="remote_preset_naver">Naver Cloud Object Storage</string>
     <string name="remote_preset_kt">KT Cloud Object Storage</string>
