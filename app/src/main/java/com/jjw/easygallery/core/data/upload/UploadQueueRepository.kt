@@ -55,6 +55,10 @@ class UploadQueueRepository @Inject constructor(
 
     suspend fun nextUnfinished(): UploadTask? = dao.nextUnfinished()?.toDomain()
 
+    /** 상태 무관하게 큐에 있는 ID */
+    suspend fun queuedAmong(mediaIds: Collection<Long>): Set<Long> =
+        mediaIds.chunked(QUERY_CHUNK).flatMapTo(HashSet()) { dao.queuedAmong(it) }
+
     suspend fun countUnfinished(): Int = dao.countUnfinished()
 
     suspend fun markRunning(id: Long, attemptCount: Int) =
@@ -80,6 +84,10 @@ class UploadQueueRepository @Inject constructor(
     suspend fun deleteUnfinished(): Int = dao.deleteUnfinished()
 
     suspend fun delete(id: Long) = dao.deleteById(id)
+
+    private companion object {
+        const val QUERY_CHUNK = 900
+    }
 
     private fun UploadTaskEntity.toDomain() = UploadTask(
         id = id,

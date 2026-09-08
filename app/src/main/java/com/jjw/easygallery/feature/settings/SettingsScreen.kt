@@ -64,6 +64,7 @@ fun SettingsRoute(
     onUploadFolderClick: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onDriveClick: () -> Unit,
+    onAutoBackupClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -105,6 +106,7 @@ fun SettingsRoute(
         onUploadFolderClick = onUploadFolderClick,
         onUploadQueueClick = onUploadQueueClick,
         onDriveClick = onDriveClick,
+        onAutoBackupClick = onAutoBackupClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
         manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
@@ -130,6 +132,7 @@ internal fun SettingsScreen(
     onChargingOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onDriveClick: () -> Unit = {},
+    onAutoBackupClick: () -> Unit = {},
     /** null = 이 기기에서 지원 안 함(Android 11 이하) */
     manageMedia: Boolean? = null,
     onManageMediaClick: () -> Unit = {},
@@ -177,6 +180,11 @@ internal fun SettingsScreen(
                     icon = painterResource(R.drawable.ic_insert_drive_file),
                     title = stringResource(R.string.settings_browse_drive),
                     onClick = onDriveClick,
+                )
+                NavigationRow(
+                    icon = painterResource(R.drawable.ic_cloud_upload),
+                    title = stringResource(R.string.settings_auto_backup),
+                    onClick = onAutoBackupClick,
                 )
                 NavigationRow(
                     icon = painterResource(R.drawable.ic_cloud_upload),

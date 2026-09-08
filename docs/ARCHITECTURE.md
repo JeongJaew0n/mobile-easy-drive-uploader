@@ -13,11 +13,12 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
 │   │                          # MediaActions(MediaAction, MediaActionRunner), MediaActionController(동의 흐름 상태)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
-│   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody, UploadQueueRepository
-│   │   ├── db/                # Room: AppDatabase, UploadTaskEntity, UploadTaskDao (schemas/ 에 내보냄)
-│   │   └── work/              # UploadWorker(@HiltWorker), UploadScheduler, UploadNotifications
+│   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody,
+│   │   │                      # UploadQueueRepository(큐), UploadLedgerRepository(영구 원장)
+│   │   ├── db/                # Room v2: AppDatabase, UploadTaskEntity/Dao, UploadedMediaEntity/Dao (schemas/ 에 내보냄, AutoMigration 1→2)
+│   │   └── work/              # UploadWorker, UploadScheduler, UploadNotifications, AutoBackupWorker, AutoBackupScheduler
 │   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount
-│   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, EnqueueUploadsUseCase, ManageUploadQueueUseCase
+│   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, EnqueueUploadsUseCase, ManageUploadQueueUseCase, AutoBackupUseCase
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
 │   └── ui/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
@@ -31,7 +32,8 @@ app/src/main/java/com/jjw/easygallery/
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)
-    └── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
+    ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
+    └── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
 ```
 
 ## 갤러리 데이터 흐름
@@ -92,6 +94,24 @@ GalleryViewModel.uploadSelected ─▶ EnqueueUploadsUseCase ─▶ Room upload_
 - **예외**: `AuthException`(IOException) 계열 — `NotSignedIn`/`AuthorizationRequired`/`SignInCancelled`. 갤러리는 이를 받으면 "로그인 필요" 스낵바 → 설정으로 유도.
 - **업로드는 큐에 넣기만**: UI 는 Room 에 행을 추가하고 워커를 예약한 뒤 즉시 반환. 진행 상황은 `UploadQueueRepository.observeSummary()` 로 관찰.
 - **Drive 탐색**: `files.list` 를 `'<parent>' in parents and trashed = false`, `orderBy=folder,name_natural` 로 100개씩 페이징(리스트 끝 5개 전에 다음 페이지). 파일 탭은 `webViewLink` 를 ACTION_VIEW 로 열어 Drive 앱/브라우저에 위임. 기본 업로드 폴더는 여전히 앱 루트 "Easy Gallery"(appProperties `easyGalleryRoot=true`) 이며, 사용자가 Drive 탐색에서 임의 폴더를 업로드 폴더로 지정할 수 있다.
+
+## 자동 백업
+
+```
+새 사진 저장 ─▶ WorkManager 콘텐츠 URI 트리거(Images/Video, 30s 모아서·최대 5분) ─▶ AutoBackupWorker
+                6시간 주기 폴백 ──────────────────────────────────────────────────▶      │
+AutoBackupUseCase.scanAndEnqueue():                                                       ▼
+   prefs(켜짐·로그인·앨범) 확인 → MediaStore DATE_ADDED ≥ since AND RELATIVE_PATH IN (앨범) 조회
+   → 원장(uploaded_media)·큐(upload_tasks, 상태 무관)에 있는 것 제외 → enqueue → UploadScheduler.schedule()
+   → since = max(DATE_ADDED) 로 전진, 마지막 실행 시각 저장
+워커는 끝나면 트리거를 다시 건다(1회성). 스위치 OFF → 두 워크 취소·since 초기화.
+```
+
+- **기준 시점**: 켠 시각(초). 켜기 전 사진은 대상이 아니며, 원하면 "기존 항목 모두 백업"(개수 확인 다이얼로그 → `backfill()`)으로 명시적으로 넣는다.
+- **영구 원장** `uploaded_media`: `UploadWorker` 가 완료 시 기록. 큐는 새 배치마다 완료 행을 지우므로 "이미 올라감" 판단은 이 표로만 한다. 이후 "업로드됨 배지"도 여기서 읽는다.
+- `>=` 조회 + 원장·큐 중복 제거 조합이라 같은 초에 여러 장이 들어와도 놓치지 않고, 실패해 큐에 남은 항목을 매 스캔마다 다시 넣지도 않는다.
+- 스캔은 로컬 쿼리라 네트워크 제약이 없다. 실제 업로드 제약(Wi-Fi·충전)은 `UploadScheduler` 가 그대로 적용.
+- `ContentObserver` 는 프로세스가 살아 있을 때만 동작하므로 감지에는 쓰지 않는다.
 
 ## 갤러리 편집 (MediaStore CRUD)
 

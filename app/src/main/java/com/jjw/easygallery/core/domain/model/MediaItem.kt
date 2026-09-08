@@ -14,6 +14,8 @@ data class MediaItem(
     val sizeBytes: Long,
     /** 촬영 시각(ms). DATE_TAKEN 이 없으면 DATE_ADDED 로 대체된 값. */
     val dateTakenMillis: Long,
+    /** MediaStore 에 추가된 시각(초). 자동 백업의 "이 시점 이후" 기준 */
+    val dateAddedSeconds: Long = 0,
     val bucketId: Long,
     val bucketName: String,
     /** 예: "DCIM/Camera/" — 앨범 이동의 대상 경로 단위 */

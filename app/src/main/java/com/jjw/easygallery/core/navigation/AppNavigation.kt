@@ -12,6 +12,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
@@ -72,7 +73,11 @@ fun AppNavigation() {
                     onUploadFolderClick = { backStack.add(DriveBrowserKey()) },
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
+                    onAutoBackupClick = { backStack.add(AutoBackupKey) },
                 )
+            }
+            entry<AutoBackupKey> {
+                AutoBackupRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<UploadQueueKey> {
                 UploadQueueRoute(onBackClick = { backStack.removeLastOrNull() })

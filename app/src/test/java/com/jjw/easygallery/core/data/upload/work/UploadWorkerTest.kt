@@ -12,6 +12,7 @@ import com.jjw.easygallery.core.data.upload.DriveUploadException
 import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.data.upload.db.AppDatabase
@@ -41,6 +42,7 @@ class UploadWorkerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var db: AppDatabase
     private lateinit var queue: UploadQueueRepository
+    private lateinit var ledger: UploadLedgerRepository
     private val uploader: DriveUploader = mockk()
     private val getUploadFolder: GetUploadFolderUseCase = mockk()
     private val notifications = UploadNotifications(context)
@@ -49,6 +51,7 @@ class UploadWorkerTest {
     fun setUp() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         queue = UploadQueueRepository(db.uploadTaskDao())
+        ledger = UploadLedgerRepository(db.uploadedMediaDao())
         coEvery { uploader.resolveLength(any()) } answers { firstArg<UploadSource>().sizeBytes }
     }
 
@@ -79,6 +82,8 @@ class UploadWorkerTest {
         assertEquals(UploadState.COMPLETED, row.state)
         assertEquals("drive-1", row.driveFileId)
         assertEquals("https://session/1", row.sessionUri)
+        // 완료는 영구 원장에도 남는다 (자동 백업 중복 방지)
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L, 2L)))
     }
 
     @Test
@@ -193,6 +198,7 @@ class UploadWorkerTest {
                         appContext,
                         workerParameters,
                         queue,
+                        ledger,
                         uploader,
                         getUploadFolder,
                         notifications,

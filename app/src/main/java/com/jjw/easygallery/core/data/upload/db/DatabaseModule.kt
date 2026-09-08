@@ -20,4 +20,7 @@ object DatabaseModule {
 
     @Provides
     fun providesUploadTaskDao(db: AppDatabase): UploadTaskDao = db.uploadTaskDao()
+
+    @Provides
+    fun providesUploadedMediaDao(db: AppDatabase): UploadedMediaDao = db.uploadedMediaDao()
 }

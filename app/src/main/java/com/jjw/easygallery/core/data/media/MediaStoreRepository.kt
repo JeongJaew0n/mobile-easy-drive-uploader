@@ -64,6 +64,35 @@ class MediaStoreRepository @Inject constructor(
             .mapLatest { queryAll(filter) }
             .flowOn(ioDispatcher)
 
+    // ---------- 자동 백업 스캔 ----------
+
+    override suspend fun queryAddedSince(
+        sinceSeconds: Long,
+        relativePaths: Set<String>,
+        includeVideos: Boolean,
+    ): List<MediaItem> = withContext(ioDispatcher) {
+        if (relativePaths.isEmpty()) return@withContext emptyList()
+        val types = buildList {
+            add(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE)
+            if (includeVideos) add(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO)
+        }
+        val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (${types.joinToString { "?" }})" +
+            " AND ${MediaStore.MediaColumns.DATE_ADDED} >= ?" +
+            " AND ${MediaStore.MediaColumns.RELATIVE_PATH} IN (${relativePaths.joinToString { "?" }})"
+        val args = (types.map { it.toString() } + sinceSeconds.toString() + relativePaths.toList()).toTypedArray()
+        val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} ASC"
+        val items = ArrayList<MediaItem>()
+        resolver.query(collectionUri, projection, selection, args, sortOrder)?.use { cursor ->
+            val reader = CursorReader(cursor, isApi30)
+            while (cursor.moveToNext()) {
+                currentCoroutineContext().ensureActive()
+                reader.read()?.let(items::add)
+            }
+        }
+        Timber.d("auto-backup scan since=%d paths=%d → %d items", sinceSeconds, relativePaths.size, items.size)
+        items
+    }
+
     // ---------- 상세 정보 ----------
 
     override suspend fun readDetails(item: MediaItem): MediaDetails = withContext(ioDispatcher) {
@@ -269,8 +298,8 @@ class MediaStoreRepository @Inject constructor(
             } else {
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI
             }
-            val dateTaken = cursor.getLong(takenCol).takeIf { it > 0 }
-                ?: cursor.getLong(addedCol) * MILLIS_PER_SECOND
+            val dateAdded = cursor.getLong(addedCol)
+            val dateTaken = cursor.getLong(takenCol).takeIf { it > 0 } ?: dateAdded * MILLIS_PER_SECOND
 
             return MediaItem(
                 id = id,
@@ -280,6 +309,7 @@ class MediaStoreRepository @Inject constructor(
                 mimeType = cursor.getString(mimeCol) ?: "",
                 sizeBytes = cursor.getLong(sizeCol),
                 dateTakenMillis = dateTaken,
+                dateAddedSeconds = dateAdded,
                 bucketId = cursor.getLong(bucketIdCol),
                 bucketName = cursor.getString(bucketNameCol) ?: "",
                 relativePath = cursor.getString(relativePathCol) ?: "",

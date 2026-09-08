@@ -5,7 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +26,13 @@ data class UserPreferences(
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
+    val autoBackupEnabled: Boolean = false,
+    /** 자동 백업 대상 앨범의 RELATIVE_PATH 집합 (예: "DCIM/Camera/") */
+    val autoBackupPaths: Set<String> = emptySet(),
+    val autoBackupIncludeVideos: Boolean = true,
+    /** 이 시각(초, DATE_ADDED 기준) 이후 추가된 항목만 자동 백업. 0 = 미설정 */
+    val autoBackupSinceSeconds: Long = 0,
+    val autoBackupLastRunMillis: Long = 0,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 }
@@ -42,6 +51,11 @@ class UserPreferencesRepository @Inject constructor(
             uploadFolderName = prefs[KEY_UPLOAD_FOLDER_NAME],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
+            autoBackupEnabled = prefs[KEY_AUTO_BACKUP_ENABLED] ?: false,
+            autoBackupPaths = prefs[KEY_AUTO_BACKUP_PATHS] ?: emptySet(),
+            autoBackupIncludeVideos = prefs[KEY_AUTO_BACKUP_VIDEOS] ?: true,
+            autoBackupSinceSeconds = prefs[KEY_AUTO_BACKUP_SINCE] ?: 0L,
+            autoBackupLastRunMillis = prefs[KEY_AUTO_BACKUP_LAST_RUN] ?: 0L,
         )
     }
 
@@ -71,6 +85,30 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    /** 켤 때 기준 시점을 지금으로 잡아 기존 사진이 한꺼번에 큐에 들어가지 않게 한다 */
+    suspend fun setAutoBackupEnabled(enabled: Boolean, nowSeconds: Long) {
+        store.edit {
+            it[KEY_AUTO_BACKUP_ENABLED] = enabled
+            if (enabled && (it[KEY_AUTO_BACKUP_SINCE] ?: 0L) == 0L) it[KEY_AUTO_BACKUP_SINCE] = nowSeconds
+            if (!enabled) it.remove(KEY_AUTO_BACKUP_SINCE)
+        }
+    }
+
+    suspend fun setAutoBackupPaths(paths: Set<String>) {
+        store.edit { it[KEY_AUTO_BACKUP_PATHS] = paths }
+    }
+
+    suspend fun setAutoBackupIncludeVideos(enabled: Boolean) {
+        store.edit { it[KEY_AUTO_BACKUP_VIDEOS] = enabled }
+    }
+
+    suspend fun markAutoBackupRun(sinceSeconds: Long, nowMillis: Long) {
+        store.edit {
+            it[KEY_AUTO_BACKUP_SINCE] = sinceSeconds
+            it[KEY_AUTO_BACKUP_LAST_RUN] = nowMillis
+        }
+    }
+
     suspend fun setUploadWifiOnly(enabled: Boolean) {
         store.edit { it[KEY_UPLOAD_WIFI_ONLY] = enabled }
     }
@@ -80,6 +118,11 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     private companion object {
+        val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
+        val KEY_AUTO_BACKUP_PATHS = stringSetPreferencesKey("auto_backup_paths")
+        val KEY_AUTO_BACKUP_VIDEOS = booleanPreferencesKey("auto_backup_videos")
+        val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")
+        val KEY_AUTO_BACKUP_LAST_RUN = longPreferencesKey("auto_backup_last_run")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")

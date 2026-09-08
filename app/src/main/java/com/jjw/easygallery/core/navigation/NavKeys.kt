@@ -19,6 +19,9 @@ data object UploadQueueKey : AppNavKey
 @Serializable
 data object TrashKey : AppNavKey
 
+@Serializable
+data object AutoBackupKey : AppNavKey
+
 /** 사진·영상 상세보기. 갤러리에서 보던 필터(즐겨찾기·기간)를 이어받아 좌우 스와이프 범위를 맞춘다. */
 @Serializable
 data class MediaViewerKey(

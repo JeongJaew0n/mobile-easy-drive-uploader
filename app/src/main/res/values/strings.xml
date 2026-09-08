@@ -115,6 +115,7 @@
     <string name="settings_upload_folder">업로드 폴더</string>
     <string name="settings_upload_queue">업로드 목록</string>
     <string name="settings_browse_drive">Google Drive 파일 보기</string>
+    <string name="settings_auto_backup">자동 백업</string>
     <string name="settings_upload_wifi_only">Wi-Fi에서만 업로드</string>
     <string name="settings_upload_wifi_only_description">모바일 데이터에서는 대기하고 Wi-Fi에 연결되면 이어서 올립니다</string>
     <string name="settings_upload_charging_only">충전 중에만 업로드</string>
@@ -153,6 +154,31 @@
     <string name="notification_sign_in_required_title">업로드가 중단되었습니다</string>
     <string name="notification_sign_in_required_text">Google 계정을 다시 연결해야 업로드를 계속할 수 있습니다</string>
 
+    <!-- 자동 백업 -->
+    <string name="auto_backup_title">자동 백업</string>
+    <string name="auto_backup_enable">새 사진·영상 자동 백업</string>
+    <string name="auto_backup_enable_description">선택한 앨범에 새로 추가되는 항목을 업로드 대기열에 자동으로 넣습니다. 켠 이후 항목부터 대상이며 Wi-Fi·충전 설정을 따릅니다.</string>
+    <string name="auto_backup_requires_sign_in">먼저 Google 계정을 연결하세요</string>
+    <string name="auto_backup_include_videos">영상 포함</string>
+    <string name="auto_backup_include_videos_description">끄면 사진만 백업합니다</string>
+    <string name="auto_backup_albums">백업할 앨범</string>
+    <string name="auto_backup_no_albums">앨범 정보를 불러오는 중이거나 사진이 없습니다</string>
+    <plurals name="auto_backup_selected_albums">
+        <item quantity="other">앨범 %1$d개 선택됨</item>
+    </plurals>
+    <string name="auto_backup_last_run">마지막 검사: %1$s</string>
+    <string name="auto_backup_never_run">아직 검사하지 않았습니다</string>
+    <string name="auto_backup_scan_now">지금 검사</string>
+    <string name="auto_backup_scan_nothing">새로 백업할 항목이 없습니다</string>
+    <plurals name="auto_backup_scan_enqueued">
+        <item quantity="other">%1$d개 항목을 업로드 대기열에 추가했습니다</item>
+    </plurals>
+    <string name="auto_backup_backfill">기존 항목 모두 백업</string>
+    <string name="auto_backup_backfill_nothing">선택한 앨범의 항목은 모두 이미 백업되었거나 대기 중입니다.</string>
+    <plurals name="auto_backup_backfill_confirm">
+        <item quantity="other">선택한 앨범에서 아직 백업되지 않은 %1$d개 항목을 업로드 대기열에 넣습니다. 용량이 클 수 있으니 Wi-Fi 설정을 확인하세요.</item>
+    </plurals>
+
     <!-- 공통 액션 -->
     <string name="action_settings">설정</string>
     <string name="action_back">뒤로</string>
@@ -173,5 +199,6 @@
     <string name="action_save">저장</string>
     <string name="action_refresh">새로 고침</string>
     <string name="action_apply">적용</string>
+    <string name="action_ok">확인</string>
     <string name="action_remove">삭제</string>
 </resources>

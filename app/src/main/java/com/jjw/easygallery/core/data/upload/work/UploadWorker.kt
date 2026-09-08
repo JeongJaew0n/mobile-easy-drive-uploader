@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionExpiredException
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.domain.model.UploadTask
@@ -32,6 +33,7 @@ class UploadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val queue: UploadQueueRepository,
+    private val ledger: UploadLedgerRepository,
     private val uploader: DriveUploader,
     private val getUploadFolder: GetUploadFolderUseCase,
     private val notifications: UploadNotifications,
@@ -94,7 +96,8 @@ class UploadWorker @AssistedInject constructor(
                 is UploadEvent.Completed -> driveFileId = event.driveFileId
             }
         }
-        queue.complete(task.id, requireNotNull(driveFileId) { "업로드가 파일 ID 없이 끝났습니다" })
+        val fileId = requireNotNull(driveFileId) { "업로드가 파일 ID 없이 끝났습니다" }
+        markUploaded(task, fileId)
         return Outcome.Success
     }
 
@@ -112,7 +115,7 @@ class UploadWorker @AssistedInject constructor(
         if (existing != null) {
             when (val status = uploader.queryStatus(existing, length)) {
                 is SessionStatus.Complete -> {
-                    queue.complete(task.id, status.driveFileId)
+                    markUploaded(task, status.driveFileId)
                     return null
                 }
                 is SessionStatus.Incomplete -> return existing to status.nextByte
@@ -142,6 +145,12 @@ class UploadWorker @AssistedInject constructor(
         }
         is IOException -> retryTransient(task, e)
         else -> failPermanently(task, e)
+    }
+
+    /** 큐 완료 처리 + 영구 원장 기록(자동 백업 중복 방지·업로드됨 표시의 근거) */
+    private suspend fun markUploaded(task: UploadTask, driveFileId: String) {
+        queue.complete(task.id, driveFileId)
+        ledger.record(task.mediaId, driveFileId, task.folderId)
     }
 
     private suspend fun failPermanently(task: UploadTask, e: Exception): Outcome {

@@ -34,6 +34,12 @@ interface MediaRepository {
     /** 기기 갤러리의 사진·영상을 최신순으로 관찰한다. MediaStore 변경 시 재발행. */
     fun observeMedia(filter: MediaFilter = MediaFilter.All): Flow<List<MediaItem>>
 
+    /**
+     * [relativePaths] 앨범에서 DATE_ADDED ≥ [sinceSeconds] 인 항목(1회 조회). 자동 백업 스캔용.
+     * [relativePaths] 가 비어 있으면 빈 목록.
+     */
+    suspend fun queryAddedSince(sinceSeconds: Long, relativePaths: Set<String>, includeVideos: Boolean): List<MediaItem>
+
     /** EXIF 기반 상세 정보. 읽을 수 없으면 빈 [MediaDetails]. */
     suspend fun readDetails(item: MediaItem): MediaDetails
 

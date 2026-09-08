@@ -21,6 +21,10 @@ interface UploadTaskDao {
     @Query("SELECT mediaId FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")
     suspend fun unfinishedMediaIds(): List<Long>
 
+    /** 상태 무관하게 큐에 있는 것 — 자동 백업이 실패한 항목을 매 스캔마다 다시 넣지 않도록 */
+    @Query("SELECT mediaId FROM upload_tasks WHERE mediaId IN (:mediaIds)")
+    suspend fun queuedAmong(mediaIds: List<Long>): List<Long>
+
     @Insert
     suspend fun insertAll(tasks: List<UploadTaskEntity>): List<Long>
 
