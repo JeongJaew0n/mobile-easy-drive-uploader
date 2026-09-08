@@ -16,6 +16,11 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 
 코드 변경 후에는 최소 `detekt` + `testDebugUnitTest` 를 통과시킨다.
 
+## 수동 테스트 대기 목록
+
+기기·계정·네트워크가 필요해 확인하지 못한 동작은 **같은 커밋에서** `docs/manual-tests/<영역>.md` 에 항목(ID·시나리오·기대 결과·`⬜`)을 추가한다.
+테스트하면 그 줄의 상태만 `✅ 날짜` / `❌ 날짜 + 메모` 로 고친다. 별도 보고서를 만들지 않는다. 규칙은 `docs/manual-tests/README.md`.
+
 ## 규칙
 
 - 패키지: `com.jjw.easygallery`. feature-first (`feature/<name>`), 공용은 `core/*`.
