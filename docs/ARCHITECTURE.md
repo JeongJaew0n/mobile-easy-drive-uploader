@@ -16,6 +16,7 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
 │   │                          # MediaActions(MediaAction, MediaActionRunner), MediaActionController(동의 흐름 상태)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
+│   ├── data/download/         # DownloadWorker(원격 파일 → MediaStore, 파일당 워크), DownloadScheduler, MediaStoreSaver(IS_PENDING)
 │   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody,
 │   │   │                      # UploadQueueRepository(큐), UploadLedgerRepository(영구 원장), VideoCompressor(Media3 Transformer)
 │   │   ├── db/                # Room v4: AppDatabase, UploadTaskEntity/Dao(+width/height), UploadedMediaEntity/Dao, MediaHashEntity/Dao (schemas/, AutoMigration 1→…→4)
@@ -37,6 +38,7 @@ app/src/main/java/com/jjw/easygallery/
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── remote/                # AddRemoteAccount(S3 호환·WebDAV·SMB 계정 추가, 프리셋, 연결 테스트)
     ├── drive/                 # 원격 저장소 탐색(계정별 RemoteStorage, 능력 기반 메뉴): 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push),
+    │                          #   다중 선택(DriveSelectionBar: 일괄 이동·휴지통·다운로드), 검색/로컬 필터(DriveSearchBar), 스낵바 이벤트(DriveBrowserEvents), 기기에 저장
     │                          # 행 ⋮ 이름 변경·이동(DriveFolderPickerSheet)·휴지통(실행 취소) — 낙관적 갱신, DRIVE_FILE_CRUD.md
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
     ├── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
@@ -89,10 +91,12 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 
 ## 다중 클라우드 / NAS (core/data/remote)
 
-- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS)·SMB(NAS·Windows 공유, smbj) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK)으로 화면 메뉴가 달라진다.
+- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS)·SMB(NAS·Windows 공유, smbj) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK·SEARCH·DOWNLOAD)으로 화면 메뉴가 달라진다. 선택적 `ReportsMutationProgress`(S3 폴더 이동 진행)도 여기.
 - 계정은 Room `remote_account`(비밀 제외) + `KeystoreSecretStore`(AES-GCM, Android Keystore). `StorageRegistry` 가 `accountId`(null = Drive) → 제공자 인스턴스를 만들고 캐시한다. 종류별 구현은 Hilt `@IntoMap @RemoteKindKey` 팩토리로 등록.
 - 업로드 대상은 `UserPreferences.uploadAccountId` + 폴더. 큐·원장에 `accountId` 가 있고 `UploadWorker` 는 태스크의 계정으로 `RemoteUploader` 를 고른다. Drive 만 로그인이 필요하고(`canUpload`), S3(단일 PUT)·WebDAV 는 재개가 없어 상태 조회가 `Expired` 를 돌려 처음부터 다시 올리며, SMB 는 원격 파일 크기에서 이어 쓴다.
-- S3 는 AWS SDK 없이 `S3Signer`(SigV4, UNSIGNED-PAYLOAD) 로 서명하고 XML 은 `XmlPullParser` 로 읽는다. 폴더 = 접두어, 폴더 이름 변경·이동은 미지원(FOLDER_MUTATION 없음), 삭제는 영구.
+- S3 는 AWS SDK 없이 `S3Signer`(SigV4, UNSIGNED-PAYLOAD) 로 서명하고 XML 은 `XmlPullParser` 로 읽는다. 폴더 = 접두어, 폴더 이름 변경·이동은 오브젝트 복사 후 삭제(진행 표시), 삭제는 영구.
+- WebDAV 는 Basic 기본에 Digest(RFC 7616, `DigestAuth`: 챌린지 캐시로 스트리밍 PUT 도 선제 인증), 자체 서명 인증서는 지문 고정(`PinnedTls`). SMB 는 smbj — 작업마다 연결을 열고 닫고(`withShare`), 업로드는 원격 파일 크기에서 이어 쓰며, 폼의 "네트워크에서 찾기"는 `NsdManager`(mDNS `_smb._tcp`).
+- 다운로드(`core/data/download`)는 `RemoteStorage.openDownload` 스트림을 `MediaStoreSaver` 가 `IS_PENDING` 으로 저장한다. 파일당 WorkManager 워크 하나, 알림은 업로드 채널 공유.
 
 ## 인증 / Drive / 업로드 흐름
 
