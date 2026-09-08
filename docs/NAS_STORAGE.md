@@ -13,7 +13,7 @@
 
 ## 2. WebDAV 제공자 (`WebDavStorage`)
 
-- 계정: `RemoteAccountEntity(kind = WEBDAV, endpoint = "https://nas.example.com:5006/photos", username, secretRef)`. Basic 인증(Digest 는 OkHttp `Authenticator` 로 후속). 자체 서명 인증서는 **기본 거부**, 계정 추가 화면에 "이 서버의 인증서 신뢰(지문 표시)" 옵션 → 지문을 계정에 저장해 `CertificatePinner` 로 고정(전체 신뢰는 하지 않는다).
+- 계정: `RemoteAccountEntity(kind = WEBDAV, endpoint = "https://nas.example.com:5006/photos", username, secretRef)`. Basic 기본 + **Digest**(RFC 7616, MD5·SHA-256, qop=auth) — `DigestAuth`: 첫 요청은 Basic, 서버가 `401 Digest` 챌린지를 주면 `Authenticator` 가 응답을 계산해 재시도하고 챌린지를 기억, 이후 요청은 인터셉터가 선제적으로 Digest 헤더를 붙인다(스트리밍 PUT 은 재전송이 안 되므로 필수). `stale=true` 면 새 nonce 로 한 번 더, 같은 nonce 로 다시 401 이면 포기. 자체 서명 인증서는 **기본 거부**, 계정 추가 화면에 "이 서버의 인증서 신뢰(지문 표시)" 옵션 → 지문을 계정에 저장해 `CertificatePinner` 로 고정(전체 신뢰는 하지 않는다).
 - `entryId` = endpoint 기준 상대 경로(`/2026/09/IMG.jpg`, 폴더는 `/2026/09/`).
 - **목록**: `PROPFIND` Depth 1, 본문 `<propfind><prop><displayname/><getcontentlength/><getlastmodified/><getcontenttype/><resourcetype/></prop></propfind>` → 207 Multi-Status XML(`XmlPullParser`). 자기 자신(첫 response)은 제외, `resourcetype/collection` 이면 폴더. 페이징 없음(한 번에).
 - **폴더 생성**: `MKCOL`. **이름 변경·이동**: `MOVE` + `Destination` 헤더(`Overwrite: F`). **삭제**: `DELETE`(휴지통 없음 → 확인 다이얼로그; Nextcloud 는 서버 쪽 휴지통이 있지만 표준이 아니라 기대하지 않는다).
@@ -48,4 +48,5 @@
 - 2026-09-09 W1 구현(`0a2c34d`): `WebDavStorage`(PROPFIND/MKCOL/MOVE/DELETE/PUT), 계정 추가 폼, 탐색·CRUD·업로드 대상 지정.
 - 2026-09-09 자체 서명 인증서 지문 고정: 연결 테스트가 TLS 오류로 실패하면 서버 리프 인증서의 SHA-256 을 읽어 "이 인증서 신뢰" 다이얼로그를 띄우고, 수락 시 `RemoteAccount.certSha256`(Room v7)에 저장. `WebDavStorage` 는 그 인증서와 **정확히 같은** 경우만 연결(`pinCertificate`, 호스트 이름 검사는 생략 — 인증서 자체를 고정). 전체 신뢰 옵션은 두지 않았다. `PinnedTlsTest`(okhttp-tls 자체 서명 서버).
 - 2026-09-09 W2 SMB 구현: `SmbStorage`/`SmbModule`(`@RemoteKindKey(SMB)`), 계정 추가 폼에 SMB 종류(주소·공유 이름·도메인·사용자·비밀번호), 오프셋 재개 업로드, R8 규칙. `SmbPathsTest`.
-- 남은 것: Digest 인증(WebDAV), SMB 서버 검색(mDNS), SFTP.
+- 2026-09-09 WebDAV Digest 인증(`DigestAuth`/`DigestCalculator`, `DigestAuthTest` RFC 7616 벡터·MockWebServer 흐름).
+- 남은 것: SMB 서버 검색(mDNS), SFTP.

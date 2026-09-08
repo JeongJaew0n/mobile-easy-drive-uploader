@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
-import okhttp3.Credentials
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -49,16 +48,13 @@ class WebDavStorage(
 ) : RemoteStorage {
 
     private val baseUrl: HttpUrl = account.endpoint.trimEnd('/').toHttpUrl()
+    private val auth = DigestAuth(account.username.orEmpty(), password)
     private val client: OkHttpClient = baseClient.newBuilder()
         // 자체 서명 인증서: 저장된 지문과 정확히 같은 인증서만 신뢰(전체 신뢰는 하지 않는다)
         .apply { account.certSha256?.let { pinCertificate(it) } }
-        .addInterceptor { chain ->
-            chain.proceed(
-                chain.request().newBuilder()
-                    .header("Authorization", Credentials.basic(account.username.orEmpty(), password))
-                    .build(),
-            )
-        }
+        // Basic 기본, 서버가 Digest 를 요구하면 챌린지에 답하고 이후 요청에 선제 적용
+        .addInterceptor(auth.interceptor)
+        .authenticator(auth.authenticator)
         .build()
 
     override val capabilities: Set<Capability> =
