@@ -30,6 +30,7 @@ internal fun GalleryTopBar(
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
+    onDuplicatesClick: () -> Unit,
     onPickDateRange: () -> Unit,
 ) {
     TopAppBar(
@@ -69,6 +70,7 @@ internal fun GalleryTopBar(
                 onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
                 onOpenTrash = onTrashClick,
                 onOpenDrive = onDriveClick,
+                onOpenDuplicates = onDuplicatesClick,
                 onPickDateRange = onPickDateRange,
             )
         },

@@ -65,6 +65,7 @@ fun SettingsRoute(
     onUploadQueueClick: () -> Unit,
     onDriveClick: () -> Unit,
     onAutoBackupClick: () -> Unit,
+    onDuplicatesClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -107,6 +108,7 @@ fun SettingsRoute(
         onUploadQueueClick = onUploadQueueClick,
         onDriveClick = onDriveClick,
         onAutoBackupClick = onAutoBackupClick,
+        onDuplicatesClick = onDuplicatesClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
         manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
@@ -133,6 +135,7 @@ internal fun SettingsScreen(
     modifier: Modifier = Modifier,
     onDriveClick: () -> Unit = {},
     onAutoBackupClick: () -> Unit = {},
+    onDuplicatesClick: () -> Unit = {},
     /** null = 이 기기에서 지원 안 함(Android 11 이하) */
     manageMedia: Boolean? = null,
     onManageMediaClick: () -> Unit = {},
@@ -204,11 +207,16 @@ internal fun SettingsScreen(
                     onCheckedChange = onChargingOnlyChange,
                 )
             }
+            Text(
+                text = stringResource(R.string.settings_gallery_section),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            NavigationRow(
+                icon = painterResource(R.drawable.ic_content_copy),
+                title = stringResource(R.string.duplicates_title),
+                onClick = onDuplicatesClick,
+            )
             if (manageMedia != null) {
-                Text(
-                    text = stringResource(R.string.settings_gallery_section),
-                    style = MaterialTheme.typography.titleMedium,
-                )
                 Column {
                     Row(
                         modifier = Modifier

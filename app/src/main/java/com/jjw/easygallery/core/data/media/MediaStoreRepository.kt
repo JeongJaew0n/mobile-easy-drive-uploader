@@ -254,6 +254,7 @@ class MediaStoreRepository @Inject constructor(
         add(MediaStore.MediaColumns.SIZE)
         add(MediaStore.MediaColumns.DATE_TAKEN)
         add(MediaStore.MediaColumns.DATE_ADDED)
+        add(MediaStore.MediaColumns.DATE_MODIFIED)
         add(MediaStore.MediaColumns.BUCKET_ID)
         add(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
         add(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -274,6 +275,7 @@ class MediaStoreRepository @Inject constructor(
         private val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
         private val takenCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
         private val addedCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+        private val modifiedCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
         private val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_ID)
         private val bucketNameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
         private val relativePathCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -310,6 +312,7 @@ class MediaStoreRepository @Inject constructor(
                 sizeBytes = cursor.getLong(sizeCol),
                 dateTakenMillis = dateTaken,
                 dateAddedSeconds = dateAdded,
+                dateModifiedSeconds = cursor.getLong(modifiedCol),
                 bucketId = cursor.getLong(bucketIdCol),
                 bucketName = cursor.getString(bucketNameCol) ?: "",
                 relativePath = cursor.getString(relativePathCol) ?: "",

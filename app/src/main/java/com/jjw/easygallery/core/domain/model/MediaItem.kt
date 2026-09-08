@@ -16,6 +16,8 @@ data class MediaItem(
     val dateTakenMillis: Long,
     /** MediaStore 에 추가된 시각(초). 자동 백업의 "이 시점 이후" 기준 */
     val dateAddedSeconds: Long = 0,
+    /** 파일 수정 시각(초). 크기와 함께 중복 해시 캐시의 유효성 판단에 쓴다 */
+    val dateModifiedSeconds: Long = 0,
     val bucketId: Long,
     val bucketName: String,
     /** 예: "DCIM/Camera/" — 앨범 이동의 대상 경로 단위 */

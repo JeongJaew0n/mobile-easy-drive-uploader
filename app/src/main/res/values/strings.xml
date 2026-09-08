@@ -156,6 +156,8 @@
         <item quantity="other">%1$d개 항목을 업로드했습니다</item>
     </plurals>
     <string name="notification_upload_done_with_failures">%1$d개 성공, %2$d개 실패</string>
+    <string name="notification_scan_title">중복 사진 검사 중</string>
+    <string name="notification_scan_text">파일 내용 비교 %1$d/%2$d</string>
     <string name="notification_sign_in_required_title">업로드가 중단되었습니다</string>
     <string name="notification_sign_in_required_text">Google 계정을 다시 연결해야 업로드를 계속할 수 있습니다</string>
 
@@ -183,6 +185,21 @@
     <plurals name="auto_backup_backfill_confirm">
         <item quantity="other">선택한 앨범에서 아직 백업되지 않은 %1$d개 항목을 업로드 대기열에 넣습니다. 용량이 클 수 있으니 Wi-Fi 설정을 확인하세요.</item>
     </plurals>
+
+    <!-- 중복 사진 -->
+    <string name="duplicates_title">중복 사진</string>
+    <string name="duplicates_summary">%1$d그룹 · 중복 %2$d개 · %3$s 절약 가능</string>
+    <string name="duplicates_scan">검사</string>
+    <string name="duplicates_scanning">중복 파일을 검사하는 중…</string>
+    <string name="duplicates_scanning_progress">파일 내용 비교 중 (%1$d/%2$d)</string>
+    <string name="duplicates_empty">완전히 같은 파일이 없습니다</string>
+    <string name="duplicates_explain">바이트 단위로 동일한 파일만 찾습니다. 비슷하게 보이는 사진(연속 촬영 등)은 다른 사진이 지워질 수 있어 다루지 않습니다.</string>
+    <string name="duplicates_group_title">같은 파일 %1$d개 · 각 %2$s</string>
+    <string name="duplicates_keep">유지</string>
+    <string name="duplicates_marked">제거 대상</string>
+    <string name="duplicates_reset">기본 선택</string>
+    <string name="duplicates_trash_selected">%1$d개 휴지통으로 (%2$s)</string>
+    <string name="duplicates_delete_selected">%1$d개 삭제 (%2$s)</string>
 
     <!-- 공통 액션 -->
     <string name="action_settings">설정</string>

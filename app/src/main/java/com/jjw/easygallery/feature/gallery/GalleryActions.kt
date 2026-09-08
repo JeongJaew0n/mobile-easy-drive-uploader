@@ -94,6 +94,7 @@ internal fun GalleryOverflowMenu(
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
     onOpenTrash: () -> Unit,
     onOpenDrive: () -> Unit,
+    onOpenDuplicates: () -> Unit,
     onPickDateRange: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -125,6 +126,14 @@ internal fun GalleryOverflowMenu(
             onClick = {
                 expanded = false
                 onNotBackedUpOnlyChange(!notBackedUpOnly)
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.duplicates_title)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_content_copy), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onOpenDuplicates()
             },
         )
         DropdownMenuItem(

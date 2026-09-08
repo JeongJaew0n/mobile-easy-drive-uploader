@@ -49,6 +49,24 @@ class UploadNotifications @Inject constructor(
         }
     }
 
+    /** 중복 검사(해시 계산) 진행 알림 — 업로드와 같은 채널, 다른 ID */
+    fun scanForegroundInfo(done: Int, total: Int): ForegroundInfo {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle(context.getString(R.string.notification_scan_title))
+            .setContentText(context.getString(R.string.notification_scan_text, done, total))
+            .setProgress(total.coerceAtLeast(1), done, false)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openAppIntent())
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(SCAN_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(SCAN_ID, notification)
+        }
+    }
+
     fun showSummary(succeeded: Int, failed: Int) {
         val text = if (failed == 0) {
             context.resources.getQuantityString(R.plurals.notification_upload_done, succeeded, succeeded)
@@ -90,6 +108,7 @@ class UploadNotifications @Inject constructor(
         const val CHANNEL_ID = "upload"
         const val PROGRESS_ID = 1001
         const val SUMMARY_ID = 1002
+        const val SCAN_ID = 1003
         private const val PROGRESS_MAX = 100
     }
 }

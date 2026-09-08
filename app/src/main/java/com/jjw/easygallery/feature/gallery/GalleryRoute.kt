@@ -32,6 +32,7 @@ fun GalleryRoute(
     onUploadQueueClick: () -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
+    onDuplicatesClick: () -> Unit,
     onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
@@ -119,6 +120,7 @@ fun GalleryRoute(
         onDateRangeChange = viewModel::setDateRange,
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
+        onDuplicatesClick = onDuplicatesClick,
         onOpenItem = onOpenItem,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,

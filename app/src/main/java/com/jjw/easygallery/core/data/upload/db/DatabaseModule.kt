@@ -23,4 +23,7 @@ object DatabaseModule {
 
     @Provides
     fun providesUploadedMediaDao(db: AppDatabase): UploadedMediaDao = db.uploadedMediaDao()
+
+    @Provides
+    fun providesMediaHashDao(db: AppDatabase): MediaHashDao = db.mediaHashDao()
 }

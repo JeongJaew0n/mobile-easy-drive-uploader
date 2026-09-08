@@ -53,6 +53,7 @@ internal fun GalleryScreen(
     onDateRangeChange: (DateRange?) -> Unit = {},
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
+    onDuplicatesClick: () -> Unit = {},
     onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -95,6 +96,7 @@ internal fun GalleryScreen(
                         onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
                         onTrashClick = onTrashClick,
                         onDriveClick = onDriveClick,
+                        onDuplicatesClick = onDuplicatesClick,
                         onPickDateRange = { showDateRange = true },
                     )
                 }

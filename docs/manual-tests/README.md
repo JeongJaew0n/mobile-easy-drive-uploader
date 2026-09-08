@@ -26,6 +26,7 @@
 | `05-animation-performance.md` | 애니메이션 체감 확인, 프레임·전력 측정 절차 |
 | `06-release-build.md` | 릴리스(R8) APK 런타임 확인 |
 | `07-auto-backup.md` | 자동 백업: 트리거·중복 방지·기존 항목 백업·마이그레이션 |
+| `08-duplicates.md` | 완전 중복 탐지: 검사·그룹·기본 선택·휴지통 |
 
 ## 실기기 연결
 

@@ -14,6 +14,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
+import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
@@ -55,6 +56,7 @@ fun AppNavigation() {
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onTrashClick = { backStack.add(TrashKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
+                    onDuplicatesClick = { backStack.add(DuplicatesKey) },
                     onOpenItem = { mediaId, favoritesOnly, range ->
                         backStack.add(
                             MediaViewerKey(
@@ -74,7 +76,11 @@ fun AppNavigation() {
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
+                    onDuplicatesClick = { backStack.add(DuplicatesKey) },
                 )
+            }
+            entry<DuplicatesKey> {
+                DuplicatesRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<AutoBackupKey> {
                 AutoBackupRoute(onBackClick = { backStack.removeLastOrNull() })

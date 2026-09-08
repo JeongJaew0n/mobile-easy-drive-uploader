@@ -10,14 +10,15 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
 │   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
+│   ├── data/duplicates/       # MediaHasher(SHA-256), DuplicateRepository(크기 충돌만 해시·캐시·그룹), DuplicateScanWorker/Scheduler
 │   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
 │   │                          # MediaActions(MediaAction, MediaActionRunner), MediaActionController(동의 흐름 상태)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
 │   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody,
 │   │   │                      # UploadQueueRepository(큐), UploadLedgerRepository(영구 원장)
-│   │   ├── db/                # Room v2: AppDatabase, UploadTaskEntity/Dao, UploadedMediaEntity/Dao (schemas/ 에 내보냄, AutoMigration 1→2)
+│   │   ├── db/                # Room v3: AppDatabase, UploadTaskEntity/Dao, UploadedMediaEntity/Dao, MediaHashEntity/Dao (schemas/, AutoMigration 1→2→3)
 │   │   └── work/              # UploadWorker, UploadScheduler, UploadNotifications, AutoBackupWorker, AutoBackupScheduler
-│   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount
+│   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount, DuplicateGroup(findDuplicateGroups)
 │   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, EnqueueUploadsUseCase, ManageUploadQueueUseCase, AutoBackupUseCase
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
 │   └── ui/
@@ -33,7 +34,8 @@ app/src/main/java/com/jjw/easygallery/
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
-    └── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
+    ├── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
+    └── duplicates/            # 완전 중복: 검사 진행률, 그룹 카드, 유지/제거 선택, 휴지통 이동
 ```
 
 ## 갤러리 데이터 흐름
@@ -112,6 +114,14 @@ AutoBackupUseCase.scanAndEnqueue():                                             
 - `>=` 조회 + 원장·큐 중복 제거 조합이라 같은 초에 여러 장이 들어와도 놓치지 않고, 실패해 큐에 남은 항목을 매 스캔마다 다시 넣지도 않는다.
 - 스캔은 로컬 쿼리라 네트워크 제약이 없다. 실제 업로드 제약(Wi-Fi·충전)은 `UploadScheduler` 가 그대로 적용.
 - `ContentObserver` 는 프로세스가 살아 있을 때만 동작하므로 감지에는 쓰지 않는다.
+
+## 완전 중복 탐지
+
+- **유사 사진은 다루지 않는다.** 퍼셉추얼 해시는 연속 촬영·다른 순간의 사진을 묶어 다른 사진이 지워질 위험이 있다. 바이트 단위 SHA-256 이 같은 파일만 "중복".
+- 비용 절감: `sizeBytes` 가 겹치는 파일만 해시 후보(대부분 크기가 유일). 결과는 `media_hash` 에 캐시하고 크기·`DATE_MODIFIED` 가 같으면 재계산하지 않는다. 사라진 항목의 해시는 스캔 때 정리.
+- 스캔은 `DuplicateScanWorker`(유니크·KEEP, 배터리 부족 아님)가 돌려 화면을 떠나도 이어지며, 진행률은 `setProgress` + 20개 이상이면 포그라운드 알림. 화면은 `getWorkInfosForUniqueWorkFlow` 로 관찰.
+- 그룹은 `findDuplicateGroups(items, hashById, uploadedIds)` 순수 함수: 유지 항목 = 백업된 것 → 가장 먼저 저장된 것 → 최소 id. 그룹 정렬은 낭비 용량 큰 순.
+- 정리는 **휴지통(API 30+)** 으로만, 사용자가 선택을 확인하고 시스템 동의를 거친다. 자동 삭제·완전 삭제 없음.
 
 ## 갤러리 편집 (MediaStore CRUD)
 
