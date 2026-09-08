@@ -8,6 +8,7 @@ import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.ReportsMutationProgress
 import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -33,6 +34,7 @@ class DriveBrowserViewModel @Inject constructor(
     private val storages: StorageRegistry,
     private val prefs: UserPreferencesRepository,
     private val downloads: DownloadScheduler,
+    private val ledger: UploadLedgerRepository,
 ) : ViewModel() {
 
     private lateinit var drive: RemoteStorage
@@ -46,6 +48,7 @@ class DriveBrowserViewModel @Inject constructor(
 
     private var loaded = false
     private var searchJob: Job? = null
+    private var unfilteredEntries: List<DriveEntry>? = null
 
     /**
      * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
@@ -69,12 +72,22 @@ class DriveBrowserViewModel @Inject constructor(
                     )
                 }
                 observeMutationProgress()
+                observeUploadedFromDevice()
                 fetchPage(reset = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "storage unavailable")
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
+            }
+        }
+    }
+
+    /** 이 기기에서 이 계정으로 올린 파일 ID — 행에 "이 기기에서 올림" 표시 */
+    private fun observeUploadedFromDevice() {
+        viewModelScope.launch {
+            ledger.observeRemoteIds(accountId).collect { ids ->
+                _uiState.update { it.copy(uploadedFromDeviceIds = ids) }
             }
         }
     }
@@ -94,12 +107,25 @@ class DriveBrowserViewModel @Inject constructor(
 
     // ---- 검색(`docs/DRIVE_FILE_CRUD.md` §8) ----
 
-    fun startSearch() = _uiState.update { it.copy(searchQuery = "", selectedIds = emptySet()) }
+    private val remoteSearch: Boolean get() = Capability.SEARCH in _uiState.value.capabilities
 
-    /** 입력마다 호출 — [SEARCH_DEBOUNCE_MILLIS] 뒤 조회. 빈 문자열은 결과를 비운다 */
+    /** 검색 모드. SEARCH 능력이 없는 저장소는 현재 폴더 목록을 로컬에서 거른다(`unfilteredEntries` 보관) */
+    fun startSearch() {
+        if (!remoteSearch) unfilteredEntries = _uiState.value.entries
+        _uiState.update { it.copy(searchQuery = "", selectedIds = emptySet()) }
+    }
+
+    /** 입력마다 호출 — 원격 검색은 [SEARCH_DEBOUNCE_MILLIS] 뒤 조회, 로컬 필터는 즉시. 빈 문자열은 결과를 비운다 */
     fun search(query: String) {
         _uiState.update { it.copy(searchQuery = query, selectedIds = emptySet()) }
         searchJob?.cancel()
+        if (!remoteSearch) {
+            val source = unfilteredEntries ?: emptyList()
+            _uiState.update {
+                it.copy(entries = if (query.isBlank()) source else source.filter { e -> e.name.contains(query, true) })
+            }
+            return
+        }
         if (query.isBlank()) {
             _uiState.update { it.copy(entries = emptyList(), nextPageToken = null, isLoading = false, error = null) }
             return
@@ -111,9 +137,15 @@ class DriveBrowserViewModel @Inject constructor(
         }
     }
 
-    /** 검색 종료 → 원래 폴더 목록으로 */
+    /** 검색 종료 → 원래 폴더 목록으로(로컬 필터였으면 보관한 목록 그대로, 원격이면 다시 읽음) */
     fun exitSearch() {
         searchJob?.cancel()
+        val kept = unfilteredEntries
+        unfilteredEntries = null
+        if (kept != null) {
+            _uiState.update { it.copy(searchQuery = null, entries = kept) }
+            return
+        }
         _uiState.update { it.copy(searchQuery = null, entries = emptyList(), nextPageToken = null, isLoading = true) }
         fetchPage(reset = true)
     }
@@ -408,8 +440,10 @@ data class DriveBrowserUiState(
     val isMutating: Boolean = false,
     /** 길게 눌러 고른 항목. 비어 있지 않으면 선택 모드 */
     val selectedIds: Set<String> = emptySet(),
-    /** null 이면 폴더 탐색, 아니면 검색 모드(빈 문자열 = 입력 대기). 검색 결과는 부모를 모르므로 이동 불가 */
+    /** null 이면 폴더 탐색, 아니면 검색 모드(빈 문자열 = 입력 대기). 원격 검색 결과는 부모를 모르므로 이동 불가 */
     val searchQuery: String? = null,
+    /** 이 기기에서 이 계정으로 올린 원격 파일 ID(업로드 원장) */
+    val uploadedFromDeviceIds: Set<String> = emptySet(),
     /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
     val mutationProgress: MutationProgress? = null,
     val error: String? = null,
@@ -420,6 +454,9 @@ data class DriveBrowserUiState(
 ) {
     val isSelecting: Boolean get() = selectedIds.isNotEmpty()
     val isSearching: Boolean get() = searchQuery != null
+
+    /** 원격 검색 결과(부모 미상)에서만 이동을 막는다. 로컬 필터는 같은 폴더라 이동 가능 */
+    val isRemoteSearchResult: Boolean get() = isSearching && Capability.SEARCH in capabilities
 }
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */

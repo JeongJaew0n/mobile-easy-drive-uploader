@@ -256,6 +256,8 @@
     <string name="drive_search_hint">Drive에서 파일 검색</string>
     <string name="drive_search_prompt">파일 이름을 입력하세요. 휴지통을 제외한 전체 Drive에서 찾습니다.</string>
     <string name="drive_search_empty">일치하는 파일이 없습니다</string>
+    <string name="drive_filter_hint">이 폴더에서 이름으로 찾기</string>
+    <string name="drive_uploaded_from_device">이 기기에서 올림</string>
     <string name="drive_menu_download">기기에 저장</string>
     <string name="drive_download_started">%1$d개 다운로드를 시작했습니다. 진행은 알림에서 확인하세요.</string>
     <string name="notification_download_title">기기에 저장 중</string>

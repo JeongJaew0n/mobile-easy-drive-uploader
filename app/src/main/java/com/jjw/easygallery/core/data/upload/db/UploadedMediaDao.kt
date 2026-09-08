@@ -32,6 +32,13 @@ interface UploadedMediaDao {
     )
     fun observeUploadedIdsForAccount(accountId: String?): Flow<List<Long>>
 
+    /** 이 기기에서 그 계정으로 올린 원격 파일 ID(Drive fileId / S3 키 / 경로) — 브라우저 "이 기기에서 올림" 표시 */
+    @Query(
+        """SELECT driveFileId FROM uploaded_media
+           WHERE (:accountId IS NULL AND accountId IS NULL) OR accountId = :accountId""",
+    )
+    fun observeRemoteIdsForAccount(accountId: String?): Flow<List<String>>
+
     @Query("SELECT COUNT(*) FROM uploaded_media")
     suspend fun count(): Int
 

@@ -5,6 +5,7 @@ import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -12,11 +13,13 @@ import com.jjw.easygallery.core.domain.model.DrivePage
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -45,6 +48,7 @@ class DriveBrowserViewModelTest {
     private val storages: StorageRegistry = mockk { coEvery { storage(null) } returns drive }
     private val prefs: UserPreferencesRepository = mockk()
     private val downloads: DownloadScheduler = mockk(relaxed = true)
+    private val ledger: UploadLedgerRepository = mockk { every { observeRemoteIds(null) } returns flowOf(setOf("f2")) }
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -54,7 +58,7 @@ class DriveBrowserViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(storages, prefs, downloads)
+        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger)
         viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
@@ -142,6 +146,7 @@ class DriveBrowserViewModelTest {
     @Test
     fun `search debounces, lists results across the drive and exit restores the folder`() = runTest(testDispatcher) {
         coEvery { drive.search("a", null) } returns DrivePage(listOf(fileA), null)
+        every { drive.capabilities } returns setOf(Capability.SEARCH, Capability.TRASH, Capability.MOVE)
         val viewModel = loadedViewModel()
 
         viewModel.startSearch()
@@ -158,6 +163,23 @@ class DriveBrowserViewModelTest {
         advanceUntilIdle()
         assertTrue(!viewModel.uiState.value.isSearching)
         assertEquals(listOf("Album", "a.jpg", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
+    }
+
+    @Test
+    fun `storages without SEARCH filter the loaded folder locally and keep it on exit`() = runTest(testDispatcher) {
+        every { drive.capabilities } returns setOf(Capability.RENAME, Capability.MOVE)
+        val viewModel = loadedViewModel()
+        assertEquals(setOf("f2"), viewModel.uiState.value.uploadedFromDeviceIds)
+
+        viewModel.startSearch()
+        viewModel.search("B.")
+        assertEquals(listOf("b.jpg"), viewModel.uiState.value.entries.map { it.name }) // 즉시, 대소문자 무시
+        assertTrue(!viewModel.uiState.value.isRemoteSearchResult)
+        coVerify(exactly = 0) { drive.search(any(), any()) }
+
+        viewModel.exitSearch()
+        assertEquals(listOf("Album", "a.jpg", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
+        coVerify(exactly = 1) { drive.listChildren("root", null, false) } // 다시 읽지 않음
     }
 
     @Test

@@ -27,6 +27,10 @@ class UploadLedgerRepository @Inject constructor(
     fun observeUploadedIds(accountId: String?): Flow<Set<Long>> =
         dao.observeUploadedIdsForAccount(accountId).map { it.toSet() }
 
+    /** 계정별 원격 파일 ID 집합(`DRIVE_FILE_CRUD.md` §6 "이 기기에서 올림") */
+    fun observeRemoteIds(accountId: String?): Flow<Set<String>> =
+        dao.observeRemoteIdsForAccount(accountId).map { it.toSet() }
+
     suspend fun uploadedAmong(mediaIds: Collection<Long>, accountId: String?): Set<Long> =
         mediaIds.chunked(QUERY_CHUNK).flatMapTo(HashSet()) { dao.uploadedAmongForAccount(it, accountId) }
 

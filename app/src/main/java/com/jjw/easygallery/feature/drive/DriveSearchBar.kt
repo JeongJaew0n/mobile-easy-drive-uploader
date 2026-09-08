@@ -1,5 +1,6 @@
 package com.jjw.easygallery.feature.drive
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,7 +30,12 @@ import com.jjw.easygallery.R
 /** 검색 모드 상단바 — 텍스트 필드가 제목 자리, 뒤로 가기가 검색 종료 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DriveSearchTopBar(query: String, onQueryChange: (String) -> Unit, onExit: () -> Unit) {
+internal fun DriveSearchTopBar(
+    query: String,
+    @StringRes hintRes: Int,
+    onQueryChange: (String) -> Unit,
+    onExit: () -> Unit,
+) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -38,7 +44,7 @@ internal fun DriveSearchTopBar(query: String, onQueryChange: (String) -> Unit, o
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text(stringResource(R.string.drive_search_hint)) },
+                placeholder = { Text(stringResource(hintRes)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),

@@ -57,8 +57,7 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 
 ## 6. 후보
 
-- 원장에 `driveFileId` 가 있으면 브라우저에서 "이미 기기에 있음" 표시.
-- S3·WebDAV·SMB 폴더 내 이름 필터(서버 검색이 없어 클라이언트에서).
+- (2026-09-09 구현) 원장 기반 "이 기기에서 올림" 표시, S3·WebDAV·SMB 폴더 내 로컬 이름 필터 — §8.
 
 ## 7. 다중 선택 (2026-09-09 추가)
 
@@ -74,7 +73,9 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 - 검색은 **Drive 전체**(현재 폴더 한정 아님) — Drive 의 `contains` 는 접두어 토큰 매칭이라 "IMG_2026" 같은 앞부분 검색에 강하고 중간 문자열은 놓칠 수 있다(Drive 제약).
 - 검색 결과에는 부모 폴더 정보가 없어(`fields` 에 parents 를 넣어도 다중 부모·공유 항목이 있어 `removeParents` 가 애매) **이동은 숨긴다**(행 ⋮·다중 선택 상단바 모두). 이름 변경·휴지통·열기는 그대로. 하단 "업로드 폴더로 지정"도 숨김.
 - 뒤로 가기는 검색만 종료하고 원래 폴더를 다시 읽는다. S3·WebDAV·SMB 는 아이콘이 나오지 않는다(접두어 목록만 있음 — 폴더 내 필터는 후보).
-- 테스트: `DriveRestRepositoryTest` 검색 쿼리(공백 trim·따옴표 이스케이프), `DriveBrowserViewModelTest` 디바운스·결과·종료 복귀.
+- **SEARCH 가 없는 저장소(S3·WebDAV·SMB)** 도 같은 아이콘이 보이고, 현재 폴더 목록을 **로컬에서 이름으로 거른다**(대소문자 무시, 즉시). 원격 호출 없음, 힌트 "이 폴더에서 이름으로 찾기". 같은 폴더라 이동도 그대로 가능(`isRemoteSearchResult` 로 구분). 종료하면 보관한 목록으로 복귀(다시 읽지 않음).
+- 행 세부에 **"이 기기에서 올림"** — 업로드 원장(`uploaded_media.driveFileId`, 계정별)에 있는 원격 ID 면 표시. 기기에서 지웠는지는 모르니 "기기에 있음"이라 하지 않았다.
+- 테스트: `DriveRestRepositoryTest` 검색 쿼리(공백 trim·따옴표 이스케이프), `DriveBrowserViewModelTest` 디바운스·결과·종료 복귀, 로컬 필터·원장 표시.
 
 ## 9. 기기에 저장(다운로드) (2026-09-09 추가)
 

@@ -252,7 +252,8 @@ internal fun DriveBrowserScreen(
                             selected = entry.id in uiState.selectedIds,
                             selecting = uiState.isSelecting,
                             enabled = !uiState.isMutating,
-                            menu = entryMenu(entry, uiState.capabilities, allowMove = !uiState.isSearching),
+                            menu = entryMenu(entry, uiState.capabilities, allowMove = !uiState.isRemoteSearchResult),
+                            uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
                             onOpen = { entryActions.onOpen(entry) },
                             onDownload = { entryActions.onDownload(entry) },
                             onRename = { renaming = entry },
@@ -344,9 +345,14 @@ private fun UploadFolderButton(uiState: DriveBrowserUiState, onClick: () -> Unit
     }
 }
 
+/** Drive 는 전체 검색, 나머지는 현재 폴더 필터 — 힌트 문구가 다르다 */
+@StringRes
+private fun searchHintRes(uiState: DriveBrowserUiState): Int =
+    if (Capability.SEARCH in uiState.capabilities) R.string.drive_search_hint else R.string.drive_filter_hint
+
 @StringRes
 private fun emptyMessageRes(uiState: DriveBrowserUiState): Int = when {
-    uiState.searchQuery?.isBlank() == true -> R.string.drive_search_prompt
+    uiState.searchQuery?.isBlank() == true && Capability.SEARCH in uiState.capabilities -> R.string.drive_search_prompt
     uiState.isSearching -> R.string.drive_search_empty
     else -> R.string.drive_folder_empty
 }
@@ -366,7 +372,7 @@ private fun BrowserTopBar(
     if (uiState.isSelecting) {
         DriveSelectionTopBar(
             count = uiState.selectedIds.size,
-            canMove = Capability.MOVE in uiState.capabilities && !uiState.isSearching,
+            canMove = Capability.MOVE in uiState.capabilities && !uiState.isRemoteSearchResult,
             canDownload = Capability.DOWNLOAD in uiState.capabilities,
             onDownload = entryActions.onDownloadSelected,
             enabled = !uiState.isMutating,
@@ -380,6 +386,7 @@ private fun BrowserTopBar(
     if (uiState.searchQuery != null) {
         DriveSearchTopBar(
             query = uiState.searchQuery,
+            hintRes = searchHintRes(uiState),
             onQueryChange = entryActions.onSearch,
             onExit = entryActions.onExitSearch,
         )
@@ -396,10 +403,8 @@ private fun BrowserTopBar(
             }
         },
         actions = {
-            if (Capability.SEARCH in uiState.capabilities) {
-                IconButton(onClick = entryActions.onStartSearch, enabled = !uiState.isMutating) {
-                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.drive_search_hint))
-                }
+            IconButton(onClick = entryActions.onStartSearch, enabled = !uiState.isMutating && !uiState.isLoading) {
+                Icon(Icons.Filled.Search, contentDescription = stringResource(searchHintRes(uiState)))
             }
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
@@ -508,6 +513,7 @@ private fun DriveEntryRow(
     selected: Boolean,
     selecting: Boolean,
     enabled: Boolean,
+    uploadedFromDevice: Boolean,
     menu: EntryMenu,
     onOpen: () -> Unit,
     onDownload: () -> Unit,
@@ -535,12 +541,14 @@ private fun DriveEntryRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val uploadedLabel = stringResource(R.string.drive_uploaded_from_device)
             val details = buildList {
                 entry.sizeBytes?.let { add(Formatter.formatShortFileSize(context, it)) }
                 entry.modifiedTimeMillis?.let {
                     val now = System.currentTimeMillis()
                     add(DateUtils.getRelativeTimeSpanString(it, now, DateUtils.DAY_IN_MILLIS).toString())
                 }
+                if (uploadedFromDevice) add(uploadedLabel)
             }
             if (details.isNotEmpty()) {
                 Text(
