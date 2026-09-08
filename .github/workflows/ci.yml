@@ -37,6 +37,16 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon
 
+      # keystore.properties 가 없으므로 디버그 키로 폴백 — R8 규칙 회귀를 잡는 용도
+      - name: Assemble release APK (R8)
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Fail if R8 needs missing rules
+        run: |
+          if [ -f app/build/outputs/mapping/release/missing_rules.txt ]; then
+            echo "::error::R8 missing rules:"; cat app/build/outputs/mapping/release/missing_rules.txt; exit 1
+          fi
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,8 +58,11 @@ jobs:
             app/build/test-results
           if-no-files-found: ignore
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt

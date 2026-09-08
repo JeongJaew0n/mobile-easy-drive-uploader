@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 릴리스 서명 키 — 절대 커밋하지 않음
+keystore.properties
+*.jks
+*.keystore

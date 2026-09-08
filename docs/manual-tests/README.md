@@ -24,6 +24,7 @@
 | `03-gallery-crud.md` | 삭제·휴지통·즐겨찾기·이름 변경·이동, MANAGE_MEDIA |
 | `04-viewer.md` | 상세보기: 확대, 영상 재생, 음량·배속·회전, 정보 패널 |
 | `05-animation-performance.md` | 애니메이션 체감 확인, 프레임·전력 측정 절차 |
+| `06-release-build.md` | 릴리스(R8) APK 런타임 확인 |
 
 ## 실기기 연결
 

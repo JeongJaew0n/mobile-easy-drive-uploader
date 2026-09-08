@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -5,6 +7,12 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
+}
+
+// 릴리스 서명: 저장소 밖의 keystore.properties 가 있으면 그 키로, 없으면 디버그 키로 폴백해 빌드가 항상 통과한다.
+// 형식: storeFile=/absolute/path.jks, storePassword=…, keyAlias=…, keyPassword=…
+val keystoreProperties: Properties? = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use { load(it) } }
 }
 
 android {
@@ -21,6 +29,20 @@ android {
         testInstrumentationRunner = "com.jjw.easygallery.HiltTestRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties != null) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            } else {
+                logger.warn("keystore.properties 없음 — 릴리스 빌드를 디버그 키로 서명합니다 (스토어 배포 불가)")
+                initWith(getByName("debug"))
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -30,6 +52,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

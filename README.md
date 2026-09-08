@@ -10,6 +10,7 @@ Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retr
 - [코드 구조](docs/ARCHITECTURE.md)
 - [애니메이션 개선 분석](docs/ANIMATION_IMPROVEMENT.md)
 - [수동 테스트 대기 목록](docs/manual-tests/README.md)
+- [릴리스 빌드·서명](docs/RELEASE.md)
 
 ## 시작하기
 
