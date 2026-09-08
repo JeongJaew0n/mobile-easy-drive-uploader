@@ -36,6 +36,7 @@ app/src/main/java/com/jjw/easygallery/
     ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
+    │                          #   조각: SettingsAccountCard(Drive 계정 카드·업로드 폴더 행), RemoteAccountsSection(연결된 저장소 목록·행·수정/해제 메뉴)
     ├── remote/                # AddRemoteAccount(S3 호환·WebDAV·SMB 계정 추가, 프리셋, 연결 테스트)
     ├── drive/                 # 원격 저장소 탐색(계정별 RemoteStorage, 능력 기반 메뉴): 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push),
     │                          #   조각: DriveEntryRow(행·아이콘)·EntryMenu(능력 기반 메뉴 판정)·DriveBrowserDialogs(새 폴더·이름 변경·이동)·DriveSelectionBar(다중 선택 일괄 이동·휴지통·다운로드)·
