@@ -27,3 +27,19 @@ class SmbPathsTest {
         assertEquals("192.168.0.10" to 4455, SmbPaths.hostPort("smb://192.168.0.10:4455/"))
     }
 }
+
+class RemoteAccountLocationTest {
+    @Test
+    fun `location shows share for smb and bucket for s3`() {
+        val smb = com.jjw.easygallery.core.domain.model.RemoteAccount(
+            id = "a",
+            kind = com.jjw.easygallery.core.domain.model.RemoteAccountKind.SMB,
+            displayName = "NAS",
+            endpoint = "nas.local",
+            bucketOrRoot = "photo",
+        )
+        assertEquals("smb://nas.local/photo", smb.location)
+        val s3 = smb.copy(kind = com.jjw.easygallery.core.domain.model.RemoteAccountKind.S3, endpoint = "https://s3")
+        assertEquals("https://s3 · photo", s3.location)
+    }
+}

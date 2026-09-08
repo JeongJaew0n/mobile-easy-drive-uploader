@@ -83,7 +83,7 @@ data class RemoteAccountEntity(
 ## 5. 화면
 
 - 설정 → **"연결된 저장소"** 섹션: Google Drive 카드(기존) 아래에 계정 목록 + "저장소 추가". 각 행: 종류 아이콘·이름·endpoint, 탭하면 탐색(`RemoteBrowserKey(accountId, folderId)`), ⋮ → 이름 변경·연결 해제(확인).
-- **저장소 추가** 화면: 종류 선택(S3 호환 / WebDAV) → 폼(프리셋, endpoint, region, 버킷/루트, Access Key/사용자, Secret/비밀번호, 표시 이름) → **"연결 테스트"**(S3: `ListObjectsV2 max-keys=1`, WebDAV: `PROPFIND depth 0`) 성공 시 저장.
+- **저장소 추가** 화면: 종류 선택(S3 호환 / WebDAV / SMB) → 폼(프리셋, endpoint 또는 host, region 또는 도메인, 버킷/공유 이름, Access Key/사용자, Secret/비밀번호, 표시 이름) → **"연결 테스트"**(루트 폴더 목록 1회: S3 `ListObjectsV2`, WebDAV `PROPFIND depth 1`, SMB `list`) 성공 시 저장.
 - 탐색 화면: 기존 `DriveBrowser` 를 `RemoteBrowser` 로 일반화 — ViewModel 이 `RemoteStorage` 를 `accountId` 로 받는다. 능력에 따라 메뉴가 달라진다(TRASH 없으면 "삭제" + 확인, MOVE 없으면 이동 숨김). "이 폴더를 업로드 폴더로 지정"은 `uploadAccountId` 도 함께 저장.
 - 갤러리 업로드 배지·"백업 안 됨" 필터: 원장에 `accountId` 를 추가하고 **현재 업로드 대상 계정 기준**으로 판단(다른 계정에 올린 건 그 계정을 골랐을 때 배지). 1단계에서는 원장에 컬럼만 추가하고 판단은 전체 계정 합집합 유지.
 

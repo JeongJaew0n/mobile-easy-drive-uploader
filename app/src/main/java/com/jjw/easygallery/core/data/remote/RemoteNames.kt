@@ -7,14 +7,30 @@ package com.jjw.easygallery.core.data.remote
 object RemoteNames {
     suspend fun unique(displayName: String, exists: suspend (String) -> Boolean): String {
         if (!exists(displayName)) return displayName
-        val dot = displayName.lastIndexOf('.')
-        val stem = if (dot > 0) displayName.substring(0, dot) else displayName
-        val ext = if (dot > 0) displayName.substring(dot) else ""
-        for (n in 1..MAX_ATTEMPTS) {
-            val candidate = "$stem ($n)$ext"
-            if (!exists(candidate)) return candidate
-        }
+        for (candidate in candidates(displayName)) if (!exists(candidate)) return candidate
+        return fallback(displayName)
+    }
+
+    /** 블로킹 I/O(SMB 등) 안에서 쓰는 동기 판 — 코루틴 밖에서 `runBlocking` 을 피한다 */
+    fun uniqueBlocking(displayName: String, exists: (String) -> Boolean): String {
+        if (!exists(displayName)) return displayName
+        for (candidate in candidates(displayName)) if (!exists(candidate)) return candidate
+        return fallback(displayName)
+    }
+
+    private fun candidates(displayName: String): Sequence<String> {
+        val (stem, ext) = split(displayName)
+        return (1..MAX_ATTEMPTS).asSequence().map { n -> "$stem ($n)$ext" }
+    }
+
+    private fun fallback(displayName: String): String {
+        val (stem, ext) = split(displayName)
         return "$stem (${System.currentTimeMillis()})$ext"
+    }
+
+    private fun split(displayName: String): Pair<String, String> {
+        val dot = displayName.lastIndexOf('.')
+        return if (dot > 0) displayName.substring(0, dot) to displayName.substring(dot) else displayName to ""
     }
 
     private const val MAX_ATTEMPTS = 99

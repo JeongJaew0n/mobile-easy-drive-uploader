@@ -663,7 +663,7 @@ private fun RemoteAccountRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val icon = when (account.kind) {
-                RemoteAccountKind.WEBDAV -> R.drawable.ic_folder
+                RemoteAccountKind.WEBDAV, RemoteAccountKind.SMB -> R.drawable.ic_folder
                 RemoteAccountKind.GOOGLE_DRIVE -> R.drawable.ic_insert_drive_file
                 else -> R.drawable.ic_cloud_upload
             }
@@ -672,7 +672,7 @@ private fun RemoteAccountRow(
             Column(Modifier.weight(1f)) {
                 Text(account.displayName, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = account.endpoint,
+                    text = account.location,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

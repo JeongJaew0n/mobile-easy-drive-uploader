@@ -28,6 +28,14 @@ data class RemoteAccount(
     val certSha256: String? = null,
     val createdAt: Long = 0,
 ) {
+    /** 목록 행 부제용 위치 문자열 — SMB `smb://host/share`, S3 `endpoint · bucket`, 그 외 endpoint */
+    val location: String
+        get() = when (kind) {
+            RemoteAccountKind.SMB -> "smb://$endpoint/${bucketOrRoot.orEmpty()}"
+            RemoteAccountKind.S3 -> listOfNotNull(endpoint, bucketOrRoot).joinToString(" · ")
+            else -> endpoint
+        }
+
     companion object {
         /** Google Drive 는 Play 서비스가 토큰을 관리하므로 계정 행이 없다. null accountId 가 이 값을 뜻한다 */
         const val GOOGLE_DRIVE_ID = "google-drive"

@@ -125,7 +125,12 @@ class SmbStorage(
         val (host, port) = SmbPaths.hostPort(account.endpoint)
         try {
             client.connect(host, port).use { connection ->
-                val auth = AuthenticationContext(account.username.orEmpty(), password.toCharArray(), account.region)
+                // 도메인 null 은 smbj NTLM 경로에서 NPE 가 날 수 있어 빈 문자열(작업 그룹 없음)로
+                val auth = AuthenticationContext(
+                    account.username.orEmpty(),
+                    password.toCharArray(),
+                    account.region.orEmpty(),
+                )
                 connection.authenticate(auth).use { session ->
                     (session.connectShare(shareName) as DiskShare).use(block)
                 }
@@ -162,10 +167,8 @@ class SmbStorage(
 
         override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String =
             withShare { share ->
-                val name = kotlinx.coroutines.runBlocking {
-                    RemoteNames.unique(source.displayName) { candidate ->
-                        share.fileExists(SmbPaths.toSmb(SmbPaths.child(folderId, candidate, isFolder = false)))
-                    }
+                val name = RemoteNames.uniqueBlocking(source.displayName) { candidate ->
+                    share.fileExists(SmbPaths.toSmb(SmbPaths.child(folderId, candidate, isFolder = false)))
                 }
                 SmbPaths.child(folderId, name, isFolder = false)
             }
