@@ -88,8 +88,10 @@ internal fun SelectionBottomBar(
 @Composable
 internal fun GalleryOverflowMenu(
     favoritesOnly: Boolean,
+    notBackedUpOnly: Boolean,
     supportsTrashAndFavorites: Boolean,
     onFavoritesOnlyChange: (Boolean) -> Unit,
+    onNotBackedUpOnlyChange: (Boolean) -> Unit,
     onOpenTrash: () -> Unit,
     onOpenDrive: () -> Unit,
     onPickDateRange: () -> Unit,
@@ -105,6 +107,24 @@ internal fun GalleryOverflowMenu(
             onClick = {
                 expanded = false
                 onPickDateRange()
+            },
+        )
+        DropdownMenuItem(
+            text = {
+                Text(
+                    stringResource(
+                        if (notBackedUpOnly) {
+                            R.string.gallery_menu_show_all
+                        } else {
+                            R.string.gallery_menu_not_backed_up_only
+                        },
+                    ),
+                )
+            },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_cloud_done), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onNotBackedUpOnlyChange(!notBackedUpOnly)
             },
         )
         DropdownMenuItem(

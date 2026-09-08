@@ -49,6 +49,7 @@ internal fun GalleryScreen(
     modifier: Modifier = Modifier,
     onSelectionChange: (Set<Long>) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
+    onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
@@ -85,10 +86,13 @@ internal fun GalleryScreen(
                 } else {
                     GalleryTopBar(
                         itemCount = content?.itemCount,
+                        uploadedCount = content?.uploadedCount ?: 0,
                         favoritesOnly = content?.favoritesOnly == true,
+                        notBackedUpOnly = content?.notBackedUpOnly == true,
                         supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true,
                         onSettingsClick = onSettingsClick,
                         onFavoritesOnlyChange = onFavoritesOnlyChange,
+                        onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
                         onTrashClick = onTrashClick,
                         onDriveClick = onDriveClick,
                         onPickDateRange = { showDateRange = true },
@@ -264,6 +268,7 @@ private fun GalleryContent(
                 Text(
                     stringResource(
                         when {
+                            uiState.notBackedUpOnly -> R.string.gallery_not_backed_up_empty
                             uiState.dateRange != null -> R.string.gallery_date_empty
                             uiState.favoritesOnly -> R.string.gallery_favorites_empty
                             else -> R.string.gallery_empty
@@ -279,6 +284,7 @@ private fun GalleryContent(
                 onSelectionChange = onSelectionChange,
                 onOpenItem = onOpenItem,
                 animateChanges = uiState.animateItemChanges,
+                uploadedIds = uiState.uploadedIds,
                 modifier = Modifier.fillMaxSize(),
             )
         }

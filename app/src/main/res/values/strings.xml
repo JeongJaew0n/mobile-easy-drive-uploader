@@ -4,6 +4,11 @@
     <!-- 갤러리 -->
     <string name="gallery_title">갤러리</string>
     <string name="gallery_title_favorites">즐겨찾기</string>
+    <string name="gallery_title_not_backed_up">백업 안 됨</string>
+    <string name="gallery_media_count_with_backup">%1$d개 · Drive 백업 %2$d개</string>
+    <string name="gallery_uploaded_badge">Drive에 백업됨</string>
+    <string name="gallery_not_backed_up_empty">모든 항목이 Drive에 백업되어 있습니다</string>
+    <string name="gallery_menu_not_backed_up_only">백업 안 된 항목만 보기</string>
     <string name="gallery_empty">표시할 사진이나 영상이 없습니다</string>
     <string name="gallery_favorites_empty">즐겨찾기한 항목이 없습니다</string>
     <string name="gallery_menu_favorites_only">즐겨찾기만 보기</string>

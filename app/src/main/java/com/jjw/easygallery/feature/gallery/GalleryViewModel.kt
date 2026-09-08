@@ -7,6 +7,7 @@ import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.domain.model.DateRange
@@ -40,6 +41,7 @@ import javax.inject.Inject
 class GalleryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     uploadQueue: UploadQueueRepository,
+    uploadLedger: UploadLedgerRepository,
     private val enqueueUploads: EnqueueUploadsUseCase,
     private val manageQueue: ManageUploadQueueUseCase,
     private val actionController: MediaActionController,
@@ -49,6 +51,8 @@ class GalleryViewModel @Inject constructor(
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
     private val filter = MutableStateFlow(MediaFilter.All)
     private val dateRange = MutableStateFlow<DateRange?>(null)
+    private val notBackedUpOnly = MutableStateFlow(false)
+    private val uploadedIds: Flow<Set<Long>> = uploadLedger.observeUploadedIds()
 
     /** 필터·기간이 바뀔 때마다 증가. 이 값이 바뀐 직후 첫 목록 갱신은 항목 이동 애니메이션을 끈다(수백 개 동시 이동 방지) */
     private var filterVersion = 0
@@ -80,6 +84,13 @@ class GalleryViewModel @Inject constructor(
         clearSelection()
         filterVersion++
         filter.value = if (enabled) MediaFilter.Favorites else MediaFilter.All
+    }
+
+    /** Drive 에 아직 올라가지 않은 항목만 보기 */
+    fun setNotBackedUpOnly(enabled: Boolean) {
+        clearSelection()
+        filterVersion++
+        notBackedUpOnly.value = enabled
     }
 
     /** null 이면 기간 제한 없음 */
@@ -170,15 +181,35 @@ class GalleryViewModel @Inject constructor(
         val albums: List<Album>,
         val byId: Map<Long, MediaItem>,
         val range: DateRange?,
+        val uploadedIds: Set<Long>,
+        val uploadedCount: Int,
+        val notBackedUpOnly: Boolean,
         val version: Int,
     )
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
-        // 기간 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다
-        val catalog = combine(mediaRepository.observeMedia(filter), dateRange) { all, range ->
-            val items = all.filterByDate(range)
+        // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
+        // 원장(uploadedIds)은 업로드가 끝날 때만 바뀌므로 여기서 결합해도 선택 토글과 무관하다.
+        val catalog = combine(
+            mediaRepository.observeMedia(filter),
+            dateRange,
+            uploadedIds,
+            notBackedUpOnly,
+        ) { all, range, uploaded, onlyPending ->
+            val inRange = all.filterByDate(range)
+            val items = if (onlyPending) inRange.filter { it.id !in uploaded } else inRange
             latestItems = items
-            Catalog(items, groupByDate(items), albumsFrom(items), items.associateBy { it.id }, range, filterVersion)
+            Catalog(
+                items = items,
+                sections = groupByDate(items),
+                albums = albumsFrom(items),
+                byId = items.associateBy { it.id },
+                range = range,
+                uploadedIds = uploaded,
+                uploadedCount = inRange.count { it.id in uploaded },
+                notBackedUpOnly = onlyPending,
+                version = filterVersion,
+            )
         }
 
         return combine(catalog, selectedIds, uploadSummary, actionController.isMutating) {
@@ -194,6 +225,9 @@ class GalleryViewModel @Inject constructor(
                 upload = summary,
                 favoritesOnly = filter == MediaFilter.Favorites,
                 dateRange = c.range,
+                uploadedIds = c.uploadedIds,
+                uploadedCount = c.uploadedCount,
+                notBackedUpOnly = c.notBackedUpOnly,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -228,6 +262,11 @@ sealed interface GalleryUiState {
         val upload: UploadSummary = UploadSummary(),
         val favoritesOnly: Boolean = false,
         val dateRange: DateRange? = null,
+        /** Drive 에 올라간 항목 ID (배지 표시용) */
+        val uploadedIds: Set<Long> = emptySet(),
+        /** 현재 기간·즐겨찾기 조건 안에서 백업된 개수 */
+        val uploadedCount: Int = 0,
+        val notBackedUpOnly: Boolean = false,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,

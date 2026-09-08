@@ -119,6 +119,7 @@ internal fun MediaViewerScreen(
                     position = uiState.currentIndex + 1,
                     total = uiState.items.size,
                     supportsFavorites = uiState.supportsTrashAndFavorites,
+                    isUploaded = uiState.isUploaded,
                     enabled = !uiState.isMutating,
                     onBackClick = onBackClick,
                     onToggleFavorite = onToggleFavorite,

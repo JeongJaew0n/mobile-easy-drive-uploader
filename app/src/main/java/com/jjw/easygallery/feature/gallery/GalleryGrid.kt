@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,6 +68,8 @@ internal fun GalleryGrid(
     onOpenItem: (Long) -> Unit = {},
     /** false 면 항목 이동·등장 애니메이션 생략(필터 전환처럼 목록이 통째로 바뀔 때) */
     animateChanges: Boolean = true,
+    /** Drive 에 올라간 항목 — 썸네일에 클라우드 체크 배지 */
+    uploadedIds: Set<Long> = emptySet(),
 ) {
     val selectionMode = selectedIds.isNotEmpty()
     val gridState = rememberLazyGridState()
@@ -130,6 +133,7 @@ internal fun GalleryGrid(
                 MediaThumbnail(
                     item = item,
                     selected = item.id in selectedIds,
+                    uploaded = item.id in uploadedIds,
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
                     onOpen = { onOpenItem(item.id) },
@@ -216,6 +220,7 @@ private fun SectionSelectButton(
 private fun MediaThumbnail(
     item: MediaItem,
     selected: Boolean,
+    uploaded: Boolean,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
     onOpen: () -> Unit,
@@ -279,6 +284,19 @@ private fun MediaThumbnail(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(4.dp),
+            )
+        }
+        if (uploaded) {
+            Icon(
+                painter = painterResource(R.drawable.ic_cloud_done),
+                contentDescription = stringResource(R.string.gallery_uploaded_badge),
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .background(Color.Black.copy(alpha = BADGE_ALPHA), CircleShape)
+                    .padding(2.dp)
+                    .size(12.dp),
             )
         }
     }

@@ -49,6 +49,7 @@ internal fun ViewerTopBar(
     position: Int,
     total: Int,
     supportsFavorites: Boolean,
+    isUploaded: Boolean,
     enabled: Boolean,
     onBackClick: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -96,10 +97,14 @@ internal fun ViewerTopBar(
                     )
                 }
             }
+            // 이미 올라간 항목은 체크 아이콘·강조색 — 다시 누르면 재업로드(다른 폴더로 올릴 수 있으므로 막지 않음)
             IconButton(onClick = onUpload, enabled = enabled) {
                 Icon(
-                    painterResource(R.drawable.ic_cloud_upload),
-                    contentDescription = stringResource(R.string.action_upload_to_drive),
+                    painter = painterResource(if (isUploaded) R.drawable.ic_cloud_done else R.drawable.ic_cloud_upload),
+                    contentDescription = stringResource(
+                        if (isUploaded) R.string.gallery_uploaded_badge else R.string.action_upload_to_drive,
+                    ),
+                    tint = if (isUploaded) MaterialTheme.colorScheme.primary else Color.White,
                 )
             }
             IconButton(onClick = { menuExpanded = true }) {

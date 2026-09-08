@@ -5,6 +5,7 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
@@ -35,6 +36,9 @@ class MediaViewerViewModelTest {
         coEvery { readDetails(any()) } returns MediaDetails()
     }
     private val enqueueUploads: EnqueueUploadsUseCase = mockk()
+    private val uploadLedger: UploadLedgerRepository = mockk {
+        every { observeUploadedIds() } returns MutableStateFlow(setOf(2L))
+    }
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -71,6 +75,20 @@ class MediaViewerViewModelTest {
         advanceUntilIdle()
 
         verify { repository.observeMedia(MediaFilter.Favorites) }
+    }
+
+    @Test
+    fun `isUploaded follows the ledger for the current item`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        collectState(viewModel)
+
+        viewModel.load(mediaId = 2, favoritesOnly = false)
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.isUploaded)
+
+        viewModel.onPageChanged(0)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.isUploaded)
     }
 
     @Test
@@ -126,6 +144,7 @@ class MediaViewerViewModelTest {
         mediaRepository = repository,
         actionController = MediaActionController(mockk<MediaActionRunner>()),
         enqueueUploads = enqueueUploads,
+        uploadLedger = uploadLedger,
     )
 
     private companion object {

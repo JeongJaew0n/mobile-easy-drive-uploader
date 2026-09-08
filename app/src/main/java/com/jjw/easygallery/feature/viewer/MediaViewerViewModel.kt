@@ -7,6 +7,7 @@ import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaDetails
@@ -38,7 +39,10 @@ class MediaViewerViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val actionController: MediaActionController,
     private val enqueueUploads: EnqueueUploadsUseCase,
+    uploadLedger: UploadLedgerRepository,
 ) : ViewModel() {
+
+    private val uploadedIds = uploadLedger.observeUploadedIds()
 
     private val filter = MutableStateFlow<MediaFilter?>(null)
     private var dateRange: DateRange? = null
@@ -131,9 +135,9 @@ class MediaViewerViewModel @Inject constructor(
         mediaRepository.observeMedia(mediaFilter).map { it.filterByDate(dateRange) },
         currentId,
         details,
-        showInfo,
+        combine(showInfo, uploadedIds) { info, uploaded -> info to uploaded },
         actionController.isMutating,
-    ) { list, id, detailMap, info, mutating ->
+    ) { list, id, detailMap, (info, uploaded), mutating ->
         items = list
         val index = list.indexOfFirst { it.id == id }.takeIf { it >= 0 }
         val current = index?.let(list::get)
@@ -147,6 +151,7 @@ class MediaViewerViewModel @Inject constructor(
             albums = albumsFrom(list),
             supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
             showInfo = info,
+            isUploaded = current != null && current.id in uploaded,
             isMutating = mutating,
             isLoading = false,
         )
@@ -180,6 +185,8 @@ data class MediaViewerUiState(
     val albums: List<Album> = emptyList(),
     val supportsTrashAndFavorites: Boolean = true,
     val showInfo: Boolean = false,
+    /** 현재 항목이 Drive 에 올라가 있음 */
+    val isUploaded: Boolean = false,
     val isMutating: Boolean = false,
     val isLoading: Boolean = true,
 )

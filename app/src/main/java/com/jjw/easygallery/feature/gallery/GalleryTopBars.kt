@@ -21,10 +21,13 @@ import com.jjw.easygallery.R
 @Composable
 internal fun GalleryTopBar(
     itemCount: Int?,
+    uploadedCount: Int,
     favoritesOnly: Boolean,
+    notBackedUpOnly: Boolean,
     supportsTrashAndFavorites: Boolean,
     onSettingsClick: () -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
+    onNotBackedUpOnlyChange: (Boolean) -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
     onPickDateRange: () -> Unit,
@@ -32,10 +35,22 @@ internal fun GalleryTopBar(
     TopAppBar(
         title = {
             Column {
-                Text(stringResource(if (favoritesOnly) R.string.gallery_title_favorites else R.string.gallery_title))
+                Text(
+                    stringResource(
+                        when {
+                            notBackedUpOnly -> R.string.gallery_title_not_backed_up
+                            favoritesOnly -> R.string.gallery_title_favorites
+                            else -> R.string.gallery_title
+                        },
+                    ),
+                )
                 if (itemCount != null) {
                     Text(
-                        text = pluralStringResource(R.plurals.gallery_media_count, itemCount, itemCount),
+                        text = if (uploadedCount > 0 && !notBackedUpOnly) {
+                            stringResource(R.string.gallery_media_count_with_backup, itemCount, uploadedCount)
+                        } else {
+                            pluralStringResource(R.plurals.gallery_media_count, itemCount, itemCount)
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -48,8 +63,10 @@ internal fun GalleryTopBar(
             }
             GalleryOverflowMenu(
                 favoritesOnly = favoritesOnly,
+                notBackedUpOnly = notBackedUpOnly,
                 supportsTrashAndFavorites = supportsTrashAndFavorites,
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
+                onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
                 onOpenTrash = onTrashClick,
                 onOpenDrive = onDriveClick,
                 onPickDateRange = onPickDateRange,

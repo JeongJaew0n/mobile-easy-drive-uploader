@@ -115,6 +115,7 @@ fun GalleryRoute(
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
+        onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
