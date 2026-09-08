@@ -38,7 +38,8 @@ app/src/main/java/com/jjw/easygallery/
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── remote/                # AddRemoteAccount(S3 호환·WebDAV·SMB 계정 추가, 프리셋, 연결 테스트)
     ├── drive/                 # 원격 저장소 탐색(계정별 RemoteStorage, 능력 기반 메뉴): 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push),
-    │                          #   다중 선택(DriveSelectionBar: 일괄 이동·휴지통·다운로드), 검색/로컬 필터(DriveSearchBar), 스낵바 이벤트(DriveBrowserEvents), 기기에 저장
+    │                          #   조각: DriveEntryRow(행·아이콘)·EntryMenu(능력 기반 메뉴 판정)·DriveBrowserDialogs(새 폴더·이름 변경·이동)·DriveSelectionBar(다중 선택 일괄 이동·휴지통·다운로드)·
+    │                          #   DriveSearchBar(검색/로컬 필터)·DriveBrowserEvents(스낵바 이벤트)
     │                          # 행 ⋮ 이름 변경·이동(DriveFolderPickerSheet)·휴지통(실행 취소) — 낙관적 갱신, DRIVE_FILE_CRUD.md
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
     ├── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업

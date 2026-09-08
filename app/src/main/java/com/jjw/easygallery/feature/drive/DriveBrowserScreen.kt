@@ -2,46 +2,30 @@ package com.jjw.easygallery.feature.drive
 
 import android.content.Intent
 import android.net.Uri
-import android.text.format.DateUtils
-import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,12 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -434,256 +416,6 @@ private fun BrowserTitle(folderName: String?, accountName: String?) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-/** 행 ⋮ 메뉴에 무엇을 보일지 — 저장소 능력과 항목 종류로 결정 */
-internal data class EntryMenu(
-    val open: Boolean,
-    val download: Boolean,
-    val rename: Boolean,
-    val move: Boolean,
-    val delete: Boolean,
-    val deleteIsTrash: Boolean,
-)
-
-internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>, allowMove: Boolean = true): EntryMenu {
-    val folderOk = !entry.isFolder || Capability.FOLDER_MUTATION in capabilities
-    return EntryMenu(
-        open = !entry.isFolder && Capability.WEB_LINK in capabilities && entry.webViewLink != null,
-        download = !entry.isFolder && Capability.DOWNLOAD in capabilities,
-        rename = Capability.RENAME in capabilities && folderOk,
-        move = allowMove && Capability.MOVE in capabilities && folderOk,
-        delete = true,
-        deleteIsTrash = Capability.TRASH in capabilities,
-    )
-}
-
-@Composable
-private fun DriveBrowserDialogs(
-    uiState: DriveBrowserUiState,
-    showCreateDialog: Boolean,
-    renaming: DriveEntry?,
-    moving: DriveEntry?,
-    onDismissCreate: () -> Unit,
-    onDismissRename: () -> Unit,
-    onDismissMove: () -> Unit,
-    onCreateFolder: (String) -> Unit,
-    entryActions: DriveEntryActions,
-) {
-    if (showCreateDialog) {
-        CreateFolderDialog(
-            onDismiss = onDismissCreate,
-            onConfirm = { name ->
-                onDismissCreate()
-                onCreateFolder(name)
-            },
-        )
-    }
-    if (renaming != null) {
-        DriveRenameDialog(
-            currentName = renaming.name,
-            onDismiss = onDismissRename,
-            onConfirm = { name ->
-                onDismissRename()
-                entryActions.onRename(renaming, name)
-            },
-        )
-    }
-    val current = uiState.current
-    if (moving != null && current != null) {
-        DriveFolderPickerSheet(
-            start = current,
-            excludeFolderId = moving.takeIf { it.isFolder }?.id,
-            currentParentId = current.id,
-            loadFolders = entryActions.loadFolders,
-            onDismiss = onDismissMove,
-            onPick = { target ->
-                onDismissMove()
-                entryActions.onMove(moving, target)
-            },
-        )
-    }
-}
-
-@Composable
-private fun DriveEntryRow(
-    entry: DriveEntry,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    selected: Boolean,
-    selecting: Boolean,
-    enabled: Boolean,
-    uploadedFromDevice: Boolean,
-    menu: EntryMenu,
-    onOpen: () -> Unit,
-    onDownload: () -> Unit,
-    onRename: () -> Unit,
-    onMove: () -> Unit,
-    onTrash: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    var menuExpanded by remember { mutableStateOf(false) }
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (selecting) Checkbox(checked = selected, onCheckedChange = { onLongClick() }) else EntryIcon(entry)
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = entry.name,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val uploadedLabel = stringResource(R.string.drive_uploaded_from_device)
-            val details = buildList {
-                entry.sizeBytes?.let { add(Formatter.formatShortFileSize(context, it)) }
-                entry.modifiedTimeMillis?.let {
-                    val now = System.currentTimeMillis()
-                    add(DateUtils.getRelativeTimeSpanString(it, now, DateUtils.DAY_IN_MILLIS).toString())
-                }
-                if (uploadedFromDevice) add(uploadedLabel)
-            }
-            if (details.isNotEmpty()) {
-                Text(
-                    text = details.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (entry.isFolder) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-        if (selecting) return@Row
-        Box {
-            IconButton(onClick = { menuExpanded = true }, enabled = enabled) {
-                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                if (menu.open) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_open)) },
-                        onClick = {
-                            menuExpanded = false
-                            onOpen()
-                        },
-                    )
-                }
-                if (menu.download) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_download)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_file_download), contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDownload()
-                        },
-                    )
-                }
-                if (menu.rename) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_rename)) },
-                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onRename()
-                        },
-                    )
-                }
-                if (menu.move) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_move)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null)
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onMove()
-                        },
-                    )
-                }
-                DropdownMenuItem(
-                    text = {
-                        val label = if (menu.deleteIsTrash) R.string.action_trash else R.string.action_delete_forever
-                        Text(stringResource(label))
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onTrash()
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DriveRenameDialog(
-    currentName: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by rememberSaveable { mutableStateOf(currentName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.action_rename)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.drive_rename_label)) },
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank() && name.trim() != currentName) {
-                Text(stringResource(R.string.action_save))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
-}
-
-@Composable
-private fun EntryIcon(entry: DriveEntry) {
-    val tint = MaterialTheme.colorScheme.onSurfaceVariant
-    when {
-        entry.isFolder -> Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = tint)
-        entry.isVideo -> Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = tint)
-        entry.isImage -> Icon(painterResource(R.drawable.ic_image), contentDescription = null, tint = tint)
-        else -> Icon(painterResource(R.drawable.ic_insert_drive_file), contentDescription = null, tint = tint)
-    }
-}
-
-@Composable
-private fun CreateFolderDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.folder_picker_new_folder)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.folder_picker_folder_name)) },
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.action_create))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
 }
 
 private const val LOAD_MORE_THRESHOLD = 5
