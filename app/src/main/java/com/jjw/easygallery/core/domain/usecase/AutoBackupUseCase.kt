@@ -57,7 +57,7 @@ class AutoBackupUseCase internal constructor(
         val p = prefs.current()
         if (p.autoBackupPaths.isEmpty()) return 0
         val all = media.queryAddedSince(0, p.autoBackupPaths, p.autoBackupIncludeVideos)
-        return filterNew(all).size
+        return filterNew(all, p.uploadAccountId).size
     }
 
     /** 선택한 앨범의 기존 항목을 전부 큐에 넣는다 (사용자가 명시적으로 눌렀을 때만) */
@@ -70,16 +70,16 @@ class AutoBackupUseCase internal constructor(
 
     private suspend fun enqueueNew(candidates: List<MediaItem>, folder: DriveFolder?, accountId: String?): Result {
         if (candidates.isEmpty()) return Result(0, 0, 0)
-        val fresh = filterNew(candidates)
+        val fresh = filterNew(candidates, accountId)
         val added = if (fresh.isEmpty()) 0 else queue.enqueue(fresh, folder, accountId)
         if (added > 0) scheduler.schedule()
         return Result(scanned = candidates.size, enqueued = added, skipped = candidates.size - added)
     }
 
-    private suspend fun filterNew(items: List<MediaItem>): List<MediaItem> {
+    private suspend fun filterNew(items: List<MediaItem>, accountId: String?): List<MediaItem> {
         if (items.isEmpty()) return items
         val ids = items.map { it.id }
-        val done = ledger.uploadedAmong(ids)
+        val done = ledger.uploadedAmong(ids, accountId)
         val queued = queue.queuedAmong(ids)
         return items.filter { it.id !in done && it.id !in queued }
     }

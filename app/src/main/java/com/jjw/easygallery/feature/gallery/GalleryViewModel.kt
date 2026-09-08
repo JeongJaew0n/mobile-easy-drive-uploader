@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -62,7 +63,7 @@ class GalleryViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
     orphanCleaner: OrphanAssignmentCleaner,
-    prefs: UserPreferencesRepository,
+    private val prefs: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val showCategoryBadges: Flow<Boolean> = prefs.preferences.map { it.showCategoryBadges }
@@ -73,7 +74,12 @@ class GalleryViewModel @Inject constructor(
     private val dateRange = MutableStateFlow<DateRange?>(null)
     private val notBackedUpOnly = MutableStateFlow(false)
     private val categoryFilter = MutableStateFlow<CategoryFilter?>(null)
-    private val uploadedIds: Flow<Set<Long>> = uploadLedger.observeUploadedIds()
+
+    // 배지·"백업 안 됨" 필터는 현재 업로드 대상 계정 기준(다른 계정에 올린 건 그 계정을 골랐을 때 보인다)
+    private val uploadedIds: Flow<Set<Long>> = prefs.preferences
+        .map { it.uploadAccountId }
+        .distinctUntilChanged()
+        .flatMapLatest { uploadLedger.observeUploadedIds(it) }
 
     /** 필터·기간이 바뀔 때마다 증가. 이 값이 바뀐 직후 첫 목록 갱신은 항목 이동 애니메이션을 끈다(수백 개 동시 이동 방지) */
     private var filterVersion = 0

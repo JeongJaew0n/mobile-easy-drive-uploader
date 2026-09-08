@@ -20,7 +20,15 @@ class UploadLedgerRepository @Inject constructor(
     suspend fun uploadedAmong(mediaIds: Collection<Long>): Set<Long> =
         mediaIds.chunked(QUERY_CHUNK).flatMapTo(HashSet()) { dao.uploadedAmong(it) }
 
+    /** 모든 계정 합집합(중복 정리처럼 "어디든 백업됨"이 기준일 때) */
     fun observeUploadedIds(): Flow<Set<Long>> = dao.observeUploadedIds().map { it.toSet() }
+
+    /** 특정 계정 기준(갤러리 배지·자동 백업 — `docs/MULTI_CLOUD.md` §5). null = Google Drive */
+    fun observeUploadedIds(accountId: String?): Flow<Set<Long>> =
+        dao.observeUploadedIdsForAccount(accountId).map { it.toSet() }
+
+    suspend fun uploadedAmong(mediaIds: Collection<Long>, accountId: String?): Set<Long> =
+        mediaIds.chunked(QUERY_CHUNK).flatMapTo(HashSet()) { dao.uploadedAmongForAccount(it, accountId) }
 
     suspend fun count(): Int = dao.count()
 

@@ -49,7 +49,7 @@ class GalleryViewModelTest {
     }
     private val uploadedIds = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
     private val uploadLedger: UploadLedgerRepository = mockk {
-        every { observeUploadedIds() } returns uploadedIds
+        every { observeUploadedIds(any()) } returns uploadedIds
     }
     private val enqueueUploads: EnqueueUploadsUseCase = mockk()
     private val manageQueue: ManageUploadQueueUseCase = mockk()

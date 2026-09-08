@@ -119,4 +119,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 M4·M5: 설정 "연결된 저장소" 섹션(추가·탐색·연결 해제), `AddRemoteAccount` 폼(프리셋·연결 테스트·Keystore 저장), 탐색 화면을 `StorageRegistry`·능력 기반으로 일반화(`DriveBrowserKey.accountId`, 휴지통 없는 저장소는 확인 후 영구 삭제), `uploadAccountId` 업로드 대상, 큐·원장 `accountId`, `UploadWorker` 가 계정별 `RemoteUploader` 사용. Drive 없이 다른 저장소만 연결해도 업로드 가능(`canUpload`).
 - 2026-09-09 S3 멀티파트 재개(8MB 파트, ListParts 로 이어 올리기) 구현, 탐색 화면 부제에 계정 이름.
 - 2026-09-09 S3 폴더 이름 변경/이동(접두어 아래 오브젝트 복사 후 삭제, `FOLDER_MUTATION`), 자동 백업·알림이 Drive 전제를 벗어남(`canUpload`, 문구 중립화).
-- 남은 것: 갤러리 배지·필터의 계정 기준(M6 — 지금은 모든 계정 합집합), WebDAV 자체 서명 인증서 지문 고정, 미완료 멀티파트 정리(Abort), S3 폴더 이동 진행 표시, SMB(W2).
+- 2026-09-09 M6: 갤러리 배지·"백업 안 됨"·상세보기 업로드 아이콘·자동 백업 중복 판단이 **현재 업로드 대상 계정** 기준(`observeUploadedIds(accountId)`, `uploadedAmong(ids, accountId)`; 중복 정리는 여전히 전체 합집합). 영구 실패 시 `RemoteUploader.abort()` 로 S3 미완료 멀티파트 삭제.
+- 남은 것: WebDAV 자체 서명 인증서 지문 고정, S3 폴더 이동 진행 표시, SMB(W2), Dropbox/OneDrive.

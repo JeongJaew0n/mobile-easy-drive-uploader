@@ -335,6 +335,14 @@ class S3Storage(
             return bytes
         }
 
+        /** 미완료 멀티파트는 스토리지 요금이 계속 붙으므로 영구 실패 시 지운다 */
+        override suspend fun abort(sessionUri: String) {
+            val mpu = parseMpu(sessionUri) ?: return
+            withContext(ioDispatcher) {
+                client.newCall(Request.Builder().url(mpu.listPartsUrl()).delete().build()).awaitResponse().close()
+            }
+        }
+
         private fun Mpu.listPartsUrl(): HttpUrl =
             keyUrl(key).newBuilder().addQueryParameter("uploadId", uploadId).build()
     }

@@ -50,7 +50,7 @@ class AutoBackupUseCaseTest {
         coEvery { prefs.current() } returns enabledPrefs
         val items = listOf(item(1, added = 600), item(2, added = 700), item(3, added = 800), item(4, added = 900))
         coEvery { media.queryAddedSince(500, setOf("DCIM/Camera/"), true) } returns items
-        coEvery { ledger.uploadedAmong(any()) } returns setOf(1L)
+        coEvery { ledger.uploadedAmong(any(), any()) } returns setOf(1L)
         coEvery { queue.queuedAmong(any()) } returns setOf(2L)
         val enqueued = slot<List<MediaItem>>()
         coEvery { queue.enqueue(capture(enqueued), any()) } returns 2
@@ -89,7 +89,7 @@ class AutoBackupUseCaseTest {
     fun `backfill scans from zero and honours the video toggle`() = runTest {
         coEvery { prefs.current() } returns enabledPrefs.copy(autoBackupIncludeVideos = false)
         coEvery { media.queryAddedSince(0, setOf("DCIM/Camera/"), false) } returns listOf(item(1, 10), item(2, 20))
-        coEvery { ledger.uploadedAmong(any()) } returns emptySet()
+        coEvery { ledger.uploadedAmong(any(), any()) } returns emptySet()
         coEvery { queue.queuedAmong(any()) } returns emptySet()
         coEvery { queue.enqueue(any(), any()) } returns 2
 

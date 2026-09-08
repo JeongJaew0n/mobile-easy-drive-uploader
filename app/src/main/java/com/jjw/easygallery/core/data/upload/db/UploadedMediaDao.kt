@@ -16,8 +16,21 @@ interface UploadedMediaDao {
     @Query("SELECT mediaId FROM uploaded_media WHERE mediaId IN (:mediaIds)")
     suspend fun uploadedAmong(mediaIds: List<Long>): List<Long>
 
+    /** 특정 계정에 올라간 것만. [accountId] null 은 Google Drive(기존 행 포함) */
+    @Query(
+        """SELECT mediaId FROM uploaded_media WHERE mediaId IN (:mediaIds)
+           AND ((:accountId IS NULL AND accountId IS NULL) OR accountId = :accountId)""",
+    )
+    suspend fun uploadedAmongForAccount(mediaIds: List<Long>, accountId: String?): List<Long>
+
     @Query("SELECT mediaId FROM uploaded_media")
     fun observeUploadedIds(): Flow<List<Long>>
+
+    @Query(
+        """SELECT mediaId FROM uploaded_media
+           WHERE (:accountId IS NULL AND accountId IS NULL) OR accountId = :accountId""",
+    )
+    fun observeUploadedIdsForAccount(accountId: String?): Flow<List<Long>>
 
     @Query("SELECT COUNT(*) FROM uploaded_media")
     suspend fun count(): Int

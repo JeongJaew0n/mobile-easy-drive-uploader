@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
@@ -39,7 +40,7 @@ class MediaViewerViewModelTest {
     }
     private val enqueueUploads: EnqueueUploadsUseCase = mockk()
     private val uploadLedger: UploadLedgerRepository = mockk {
-        every { observeUploadedIds() } returns MutableStateFlow(setOf(2L))
+        every { observeUploadedIds(any()) } returns MutableStateFlow(setOf(2L))
     }
     private val testDispatcher = StandardTestDispatcher()
 
@@ -149,6 +150,7 @@ class MediaViewerViewModelTest {
         uploadLedger = uploadLedger,
         categoryRepository = categoryRepository,
         assignCategories = AssignCategoriesUseCase(categoryRepository),
+        prefs = mockk { every { preferences } returns MutableStateFlow(UserPreferences()) },
     )
 
     private val categoryRepository: CategoryRepository = mockk {

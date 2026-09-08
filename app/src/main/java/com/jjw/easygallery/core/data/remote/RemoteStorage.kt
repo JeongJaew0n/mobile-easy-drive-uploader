@@ -59,4 +59,7 @@ interface RemoteUploader {
     suspend fun queryStatus(sessionUri: String, length: Long): SessionStatus
 
     fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent>
+
+    /** 영구 실패로 버리는 세션의 서버 쪽 잔재 정리(S3 미완료 멀티파트 등). 기본은 할 일 없음 */
+    suspend fun abort(sessionUri: String) = Unit
 }

@@ -177,6 +177,10 @@ class UploadWorker @AssistedInject constructor(
 
     private suspend fun failPermanently(task: UploadTask, e: Exception): Outcome {
         Timber.e(e, "upload failed permanently: %s", task.displayName)
+        task.sessionUri?.let { session ->
+            runCatching { storages.storage(task.accountId).uploader().abort(session) }
+                .onFailure { Timber.w(it, "abort session failed") }
+        }
         queue.fail(task.id, e.message ?: e.toString())
         compressor.cleanup(task.toSource())
         return Outcome.Failed

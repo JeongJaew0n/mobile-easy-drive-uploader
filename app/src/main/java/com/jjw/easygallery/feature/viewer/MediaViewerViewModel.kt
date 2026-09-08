@@ -8,6 +8,7 @@ import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.domain.model.Category
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -47,9 +49,13 @@ class MediaViewerViewModel @Inject constructor(
     uploadLedger: UploadLedgerRepository,
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
+    prefs: UserPreferencesRepository,
 ) : ViewModel() {
 
-    private val uploadedIds = uploadLedger.observeUploadedIds()
+    private val uploadedIds = prefs.preferences
+        .map { it.uploadAccountId }
+        .distinctUntilChanged()
+        .flatMapLatest { uploadLedger.observeUploadedIds(it) }
 
     private val filter = MutableStateFlow<MediaFilter?>(null)
     private var dateRange: DateRange? = null
