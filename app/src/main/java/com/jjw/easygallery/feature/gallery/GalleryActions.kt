@@ -1,7 +1,9 @@
 package com.jjw.easygallery.feature.gallery
 
 import android.content.res.Resources
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -17,14 +19,17 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -206,7 +211,11 @@ internal fun RenameDialog(
     )
 }
 
-/** 기존 앨범 중 선택하거나 새 앨범 이름을 입력 → RELATIVE_PATH 로 변환 */
+/**
+ * 기존 앨범 중 선택하거나 새 앨범 이름을 입력 → RELATIVE_PATH 로 변환.
+ * 목록이 있는 입력이라 다이얼로그 대신 바텀시트(M3 스프링 슬라이드) 를 쓴다.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MoveDialog(
     albums: List<Album>,
@@ -217,12 +226,15 @@ internal fun MoveDialog(
     var newAlbum by rememberSaveable { mutableStateOf("") }
     val target = if (newAlbum.isNotBlank()) newAlbumPath(newAlbum) else selectedPath
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.action_move)) },
-        text = {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            Text(
+                text = stringResource(R.string.action_move),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             Column {
-                LazyColumn(Modifier.heightIn(max = 240.dp)) {
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(albums, key = { it.relativePath }) { album ->
                         ListItem(
                             headlineContent = { Text(album.name) },
@@ -260,14 +272,19 @@ internal fun MoveDialog(
                         .padding(top = 8.dp),
                 )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(target) }, enabled = target.isNotBlank()) {
-                Text(stringResource(R.string.action_move))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { onConfirm(target) }, enabled = target.isNotBlank()) {
+                    Text(stringResource(R.string.action_move))
+                }
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
+        }
+    }
 }
 
 /** 새 앨범은 Pictures/ 아래에 만든다 (사진·영상 모두 허용되는 경로). */

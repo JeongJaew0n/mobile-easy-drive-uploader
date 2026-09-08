@@ -91,7 +91,19 @@ fun AppNavigation() {
             entry<TrashKey> {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
             }
-            entry<MediaViewerKey> { key ->
+            // 상세보기는 썸네일에서 "커지며" 열리고 닫힐 때 작아진다 (공유 요소 전환의 저비용 대안)
+            entry<MediaViewerKey>(
+                metadata = NavDisplay.transitionSpec {
+                    val grow = scaleIn(motion.standard(), initialScale = VIEWER_ENTER_SCALE)
+                    (fadeIn(motion.standard()) + grow) togetherWith fadeOut(motion.quick())
+                } + NavDisplay.popTransitionSpec {
+                    fadeIn(motion.standard()) togetherWith
+                        (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = VIEWER_ENTER_SCALE))
+                } + NavDisplay.predictivePopTransitionSpec { _ ->
+                    fadeIn(motion.standard()) togetherWith
+                        (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = VIEWER_ENTER_SCALE))
+                },
+            ) { key ->
                 MediaViewerRoute(
                     key = key,
                     onBackClick = { backStack.removeLastOrNull() },
@@ -112,3 +124,4 @@ fun AppNavigation() {
 }
 
 private const val ENTER_SCALE = 0.96f
+private const val VIEWER_ENTER_SCALE = 0.92f

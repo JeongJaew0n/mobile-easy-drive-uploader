@@ -75,6 +75,7 @@ internal fun UploadQueueScreen(
     onRemove: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motion = LocalMotion.current
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -112,7 +113,15 @@ internal fun UploadQueueScreen(
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(uiState.tasks, key = { it.id }) { task ->
-                        UploadTaskRow(task = task, onRemove = { onRemove(task.id) })
+                        UploadTaskRow(
+                            task = task,
+                            onRemove = { onRemove(task.id) },
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = motion.quick(),
+                                placementSpec = motion.settle(),
+                                fadeOutSpec = motion.quick(),
+                            ),
+                        )
                     }
                 }
             }

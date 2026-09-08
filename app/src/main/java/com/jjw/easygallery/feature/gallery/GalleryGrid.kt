@@ -49,9 +49,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -242,7 +245,11 @@ private fun MediaThumbnail(
             .clickable { if (selectionMode) onToggleSelection() else onOpen() },
     ) {
         AsyncImage(
-            model = item.uri,
+            // 상세보기가 같은 키로 플레이스홀더를 꺼내 쓴다(썸네일 → 원본 2단계 로드)
+            model = ImageRequest.Builder(LocalPlatformContext.current)
+                .data(item.uri)
+                .memoryCacheKey(thumbnailCacheKey(item))
+                .build(),
             contentDescription = item.displayName,
             contentScale = ContentScale.Crop,
             modifier = Modifier

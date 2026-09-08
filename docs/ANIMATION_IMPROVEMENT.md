@@ -211,8 +211,10 @@ G1 모션 토큰 → **D7 숨겨진 컨트롤 폴링 중단** → **§4.4 파생
 *"즉시 교체" 느낌이 대부분 사라지고, CPU 시간은 오히려 줄어야 한다.*
 구현 메모: D7 은 폴링 대신 `Player.Listener.onIsPlayingChanged` 로 재생 상태를 받고 위치 폴링은 컨트롤이 보일 때만(250ms). L4 는 `GalleryUiState.Content.animateItemChanges` 로 필터 전환 직후 1회 생략. 실기기 프레임·전력 측정(§5·§8)은 기기 재연결 후 수행 예정.
 
-### 2단계 — 상세보기 다듬기 (2~3일)
-§4.3 파일 분할 ✅(2026-09-08, 651+789줄 → 9파일, 최대 327줄) → D1 확대 스프링·경계 보정(+디코딩 상한) → V2 상세보기 진입 전환 → V3 아래로 스와이프 닫기 → D6 썸네일→원본 2단계 → R1 리스트 `animateItem` → R4 바텀시트.
+### 2단계 — 상세보기 다듬기 ✅ (2026-09-08 완료)
+§4.3 파일 분할 ✅(651+789줄 → 9파일, 최대 327줄) → D1 확대 스프링·경계 보정(+디코딩 상한) → V2 상세보기 진입 전환 → V3 아래로 스와이프 닫기 → D6 썸네일→원본 2단계 → R1 리스트 `animateItem` → R4 바텀시트.
+
+구현 메모: D1 은 `ZoomState` 를 `Animatable` 로 바꾸고 순수 함수 `focalZoomOffset/clampOffset`(테스트 4건)로 탭 지점 확대·경계 보정, `size(4096)` 디코딩 상한. V2 는 `entry<MediaViewerKey>(metadata = NavDisplay.transitionSpec{…} + popTransitionSpec + predictivePopTransitionSpec)`. V3 는 `Modifier.swipeToDismiss`(확대 중 비활성, 220px 임계값). D6 은 그리드 `memoryCacheKey("thumb-<id>")` ↔ 상세보기 `placeholderMemoryCacheKey`. R1 은 Drive·업로드 목록 `animateItem`. R4 는 앨범 이동만 `ModalBottomSheet`(이름 변경은 짧은 입력이라 다이얼로그 유지, 기간 선택은 Material 달력 다이얼로그 유지). 실기기 확인은 `manual-tests/05` ANI-13~18.
 
 ### 3단계 — 시그니처 모션 (측정 후 결정)
 V1 자체 히어로 오버레이 → G2 standard 모션 스킴 → Macrobenchmark·Baseline Profile 모듈.

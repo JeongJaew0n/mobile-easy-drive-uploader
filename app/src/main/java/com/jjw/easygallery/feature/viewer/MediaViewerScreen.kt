@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -150,7 +152,20 @@ internal fun MediaViewerScreen(
             }
         },
     ) { innerPadding ->
-        Box(Modifier.fillMaxSize()) {
+        // 아래로 끌어 닫기. 확대 중엔 팬 제스처가 우선이라 비활성
+        val dismissOffset = remember { Animatable(0f) }
+        val dismissScope = rememberCoroutineScope()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .swipeToDismiss(
+                    offset = dismissOffset,
+                    scope = dismissScope,
+                    enabled = !zoomState.isZoomed,
+                    settleSpec = motion.settle(),
+                    onDismiss = onBackClick,
+                ),
+        ) {
             HorizontalPager(
                 state = pagerState,
                 // 확대 상태에서는 스와이프 대신 팬 제스처를 쓴다

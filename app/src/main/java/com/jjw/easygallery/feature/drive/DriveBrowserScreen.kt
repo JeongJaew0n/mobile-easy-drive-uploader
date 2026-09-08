@@ -60,6 +60,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.navigation.DriveBrowserKey
+import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -129,6 +130,7 @@ internal fun DriveBrowserScreen(
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val motion = LocalMotion.current
 
     // 마지막 항목 근처에 오면 다음 페이지 요청
     LaunchedEffect(listState, uiState.entries.size) {
@@ -217,7 +219,15 @@ internal fun DriveBrowserScreen(
 
                 else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(uiState.entries, key = { it.id }) { entry ->
-                        DriveEntryRow(entry = entry, onClick = { onEntryClick(entry) })
+                        DriveEntryRow(
+                            entry = entry,
+                            onClick = { onEntryClick(entry) },
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = motion.quick(),
+                                placementSpec = motion.settle(),
+                                fadeOutSpec = motion.quick(),
+                            ),
+                        )
                     }
                     if (uiState.isLoadingMore) {
                         item(key = "loading-more") {
