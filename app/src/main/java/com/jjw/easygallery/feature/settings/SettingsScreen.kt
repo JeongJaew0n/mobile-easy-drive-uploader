@@ -201,6 +201,8 @@ internal fun SettingsScreen(
             RemoteAccountsSection(
                 accounts = uiState.remoteAccounts,
                 uploadAccountId = uiState.uploadAccountId,
+                driveEmail = uiState.accountEmail,
+                onOpenDrive = onDriveClick,
                 onAdd = onAddRemoteAccountClick,
                 onOpen = onOpenRemoteAccount,
                 onRemove = onRemoveRemoteAccount,
@@ -578,6 +580,8 @@ private fun SettingsScreenSignedInPreview() {
 private fun RemoteAccountsSection(
     accounts: List<RemoteAccount>,
     uploadAccountId: String?,
+    driveEmail: String?,
+    onOpenDrive: () -> Unit,
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onRemove: (String) -> Unit,
@@ -591,6 +595,20 @@ private fun RemoteAccountsSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
         )
+        // Google Drive 는 Play 서비스가 토큰을 관리하므로 계정 행이 없다 — 목록 첫 줄에 고정으로 보여 준다
+        if (driveEmail != null) {
+            RemoteAccountRow(
+                account = RemoteAccount(
+                    id = RemoteAccount.GOOGLE_DRIVE_ID,
+                    kind = RemoteAccountKind.GOOGLE_DRIVE,
+                    displayName = stringResource(R.string.remote_kind_google),
+                    endpoint = driveEmail,
+                ),
+                isUploadTarget = uploadAccountId == null,
+                onOpen = onOpenDrive,
+                onRemove = null,
+            )
+        }
         accounts.forEach { account ->
             RemoteAccountRow(
                 account = account,
@@ -627,12 +645,13 @@ private fun RemoteAccountsSection(
     }
 }
 
+/** [onRemove] null 이면 ⋮ 메뉴 없음(Google Drive 행 — 연결 해제는 계정 카드에서) */
 @Composable
 private fun RemoteAccountRow(
     account: RemoteAccount,
     isUploadTarget: Boolean,
     onOpen: () -> Unit,
-    onRemove: () -> Unit,
+    onRemove: (() -> Unit)?,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Column {
@@ -645,6 +664,7 @@ private fun RemoteAccountRow(
         ) {
             val icon = when (account.kind) {
                 RemoteAccountKind.WEBDAV -> R.drawable.ic_folder
+                RemoteAccountKind.GOOGLE_DRIVE -> R.drawable.ic_insert_drive_file
                 else -> R.drawable.ic_cloud_upload
             }
             Icon(painterResource(icon), contentDescription = null)
@@ -665,18 +685,20 @@ private fun RemoteAccountRow(
                     )
                 }
             }
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.remote_remove)) },
-                        onClick = {
-                            menuExpanded = false
-                            onRemove()
-                        },
-                    )
+            if (onRemove != null) {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remote_remove)) },
+                            onClick = {
+                                menuExpanded = false
+                                onRemove()
+                            },
+                        )
+                    }
                 }
             }
         }
