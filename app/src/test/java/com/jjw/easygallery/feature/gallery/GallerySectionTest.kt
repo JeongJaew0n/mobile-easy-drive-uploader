@@ -59,6 +59,30 @@ class GallerySectionTest {
     }
 
     @Test
+    fun `toggleSection selects the whole day when it is not fully selected`() {
+        val day = listOf(1L, 2L, 3L)
+
+        assertEquals(setOf(1L, 2L, 3L), emptySet<Long>().toggleSection(day))
+        // 일부만 선택된 상태에서는 나머지를 마저 채운다
+        assertEquals(setOf(1L, 2L, 3L), setOf(2L).toggleSection(day))
+        // 다른 날짜의 선택은 건드리지 않는다
+        assertEquals(setOf(9L, 1L, 2L, 3L), setOf(9L).toggleSection(day))
+    }
+
+    @Test
+    fun `toggleSection clears the day when every item is selected`() {
+        val day = listOf(1L, 2L, 3L)
+
+        assertEquals(emptySet<Long>(), setOf(1L, 2L, 3L).toggleSection(day))
+        assertEquals(setOf(9L), setOf(9L, 1L, 2L, 3L).toggleSection(day))
+    }
+
+    @Test
+    fun `toggleSection on an empty day keeps the selection`() {
+        assertEquals(setOf(9L), setOf(9L).toggleSection(emptyList()))
+    }
+
+    @Test
     fun `formatDuration renders minutes and hours`() {
         assertEquals("0:05", formatDuration(5_000))
         assertEquals("1:02", formatDuration(62_000))

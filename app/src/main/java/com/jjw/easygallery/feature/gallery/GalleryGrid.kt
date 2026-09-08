@@ -6,10 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,9 +36,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import coil3.compose.AsyncImage
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -88,7 +96,14 @@ internal fun GalleryGrid(
                 span = { GridItemSpan(maxLineSpan) },
                 contentType = "header",
             ) {
-                DateHeader(date = section.date, formatter = dateFormatter)
+                val sectionIds = section.items.map { it.id }
+                DateHeader(
+                    date = section.date,
+                    formatter = dateFormatter,
+                    allSelected = sectionIds.isNotEmpty() && sectionIds.all { it in selectedIds },
+                    anySelected = sectionIds.any { it in selectedIds },
+                    onToggleSection = { onSelectionChange(selectedIds.toggleSection(sectionIds)) },
+                )
             }
             items(
                 items = section.items,
@@ -111,13 +126,67 @@ internal fun GalleryGrid(
 private fun DateHeader(
     date: LocalDate,
     formatter: DateTimeFormatter,
+    allSelected: Boolean,
+    anySelected: Boolean,
+    onToggleSection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = remember(date, formatter) { formatter.format(date) },
-        style = MaterialTheme.typography.titleSmall,
-        modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = remember(date, formatter) { formatter.format(date) },
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 8.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        SectionSelectButton(
+            allSelected = allSelected,
+            anySelected = anySelected,
+            onClick = onToggleSection,
+        )
+    }
+}
+
+/** 날짜별 전체 선택 토글. 일부만 선택된 상태는 테두리를 굵게 해서 구분한다. */
+@Composable
+private fun SectionSelectButton(
+    allSelected: Boolean,
+    anySelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectAllLabel = stringResource(R.string.gallery_section_select_all)
+    IconButton(onClick = onClick, modifier = modifier) {
+        if (allSelected) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.gallery_section_deselect_all),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(SECTION_CIRCLE_SIZE_DP.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = if (anySelected) SELECTED_BORDER_DP.dp else UNSELECTED_BORDER_DP.dp,
+                        color = if (anySelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        },
+                        shape = CircleShape,
+                    )
+                    .semantics { contentDescription = selectAllLabel },
+            )
+        }
+    }
 }
 
 @Composable
@@ -240,6 +309,9 @@ internal fun formatDuration(millis: Long): String {
 private const val MIN_CELL_SIZE_DP = 100
 private const val CELL_SPACING_DP = 2
 private const val BADGE_ALPHA = 0.6f
+private const val SECTION_CIRCLE_SIZE_DP = 22
+private const val SELECTED_BORDER_DP = 3
+private const val UNSELECTED_BORDER_DP = 2
 private const val SELECTED_INSET_DP = 10
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L

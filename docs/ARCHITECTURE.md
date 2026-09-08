@@ -45,7 +45,8 @@ GalleryViewModel: permissionStatus.flatMapLatest ─▶ groupByDate() ─▶ Gal
 - **전체 로드 (Paging 미사용)**: 수천~수만 장은 항목당 수백 바이트라 메모리 리스트로 충분하고(6천 장 ≈ 수 MB), 날짜 헤더·다중 선택·"이 날 전체 선택" 같은 기능이 훨씬 단순해진다. 수십만 장 규모 이슈가 실측되면 Paging 3 도입을 재검토한다.
 - **권한**: `MediaPermission` 이 SDK 별 권한 집합과 상태(Full/Partial/Denied)를 계산. `GalleryRoute` 가 `LifecycleResumeEffect` 마다 상태를 ViewModel 에 알려 설정 앱에서 돌아온 경우도 반영. ViewModel 은 상태를 모르는 동안(`null`) 쿼리하지 않는다.
 - **썸네일**: `MediaStoreThumbnailFetcher` 가 `content://media/...` URI 를 가로채 `ContentResolver.loadThumbnail` (시스템 썸네일 캐시) 사용. 실패 시 원본 스트림으로 폴백해 Coil 기본 디코더/`VideoFrameDecoder` 가 처리.
-- **그리드**: `LazyVerticalGrid(Adaptive 100dp)`, 날짜 헤더는 `GridItemSpan(maxLineSpan)`. key 는 URI 문자열.
+- **그리드**: `LazyVerticalGrid(Adaptive 100dp)`, 날짜 헤더는 `GridItemSpan(maxLineSpan)`. key 는 항목 id.
+- **선택**: 길게 눌러 시작 후 드래그하면 범위 선택(`Modifier.dragSelect`), 날짜 헤더 오른쪽 원형 버튼으로 그날 전체 선택/해제(`Set<Long>.toggleSection`). 둘 다 `onSelectionChange(Set<Long>)` 하나로 모여 ViewModel 의 `setSelection` 을 호출한다.
 
 ## 레이어 흐름 (UDF)
 

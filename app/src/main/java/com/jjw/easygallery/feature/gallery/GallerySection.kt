@@ -11,6 +11,12 @@ data class GallerySection(
     val items: List<MediaItem>,
 )
 
+/**
+ * 날짜 묶음 전체를 선택/해제한다. 이미 전부 선택돼 있으면 해제, 아니면(일부·없음) 전부 선택.
+ */
+internal fun Set<Long>.toggleSection(sectionIds: List<Long>): Set<Long> =
+    if (sectionIds.isNotEmpty() && sectionIds.all { it in this }) this - sectionIds.toSet() else this + sectionIds
+
 /** [items] 는 최신순으로 정렬되어 있다고 가정한다. 섹션 내 순서는 입력 순서를 유지한다. */
 fun groupByDate(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): List<GallerySection> {
     if (items.isEmpty()) return emptyList()
