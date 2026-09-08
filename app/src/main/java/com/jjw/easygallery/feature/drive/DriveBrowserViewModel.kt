@@ -2,6 +2,7 @@ package com.jjw.easygallery.feature.drive
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteStorage
@@ -31,6 +32,7 @@ import javax.inject.Inject
 class DriveBrowserViewModel @Inject constructor(
     private val storages: StorageRegistry,
     private val prefs: UserPreferencesRepository,
+    private val downloads: DownloadScheduler,
 ) : ViewModel() {
 
     private lateinit var drive: RemoteStorage
@@ -203,6 +205,23 @@ class DriveBrowserViewModel @Inject constructor(
             action = { drive.restore(entry.id) },
             onSuccess = { DriveBrowserEvent.Restored },
         )
+    }
+
+    // ---- 다운로드(`docs/DRIVE_FILE_CRUD.md` §9) ----
+
+    fun download(entry: DriveEntry) = downloadAll(listOf(entry))
+
+    fun downloadSelected() {
+        downloadAll(selectedEntries())
+        clearSelection()
+    }
+
+    /** 폴더는 건너뛰고 파일마다 워크 하나. 실제 진행은 알림에서 */
+    private fun downloadAll(entries: List<DriveEntry>) {
+        val files = entries.filterNot { it.isFolder }
+        if (files.isEmpty()) return
+        files.forEach { downloads.enqueue(accountId, it) }
+        viewModelScope.launch { events.send(DriveBrowserEvent.DownloadStarted(files.size)) }
     }
 
     // ---- 다중 선택(`docs/DRIVE_FILE_CRUD.md` §7) ----
@@ -420,6 +439,7 @@ sealed interface DriveBrowserEvent {
     data class BatchTrashed(val entries: List<DriveEntry>, val isTrash: Boolean) : DriveBrowserEvent
     data class BatchMoved(val count: Int, val target: DriveFolder) : DriveBrowserEvent
     data class BatchFailed(val count: Int) : DriveBrowserEvent
+    data class DownloadStarted(val count: Int) : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent
 }

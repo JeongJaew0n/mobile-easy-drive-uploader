@@ -1,5 +1,6 @@
 package com.jjw.easygallery.core.data.drive
 
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -8,6 +9,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 /** Google Drive REST v3. 공식 Java 클라이언트 대신 필요한 엔드포인트만 직접 정의한다. */
 interface DriveApi {
@@ -16,6 +18,11 @@ interface DriveApi {
     suspend fun about(
         @Query("fields") fields: String = "user,storageQuota",
     ): DriveAboutDto
+
+    /** 파일 내용. `alt=media`. 스트리밍 — 호출자가 body 를 닫는다 */
+    @Streaming
+    @GET("drive/v3/files/{fileId}")
+    suspend fun download(@Path("fileId") fileId: String, @Query("alt") alt: String = "media"): ResponseBody
 
     @GET("drive/v3/files")
     suspend fun listFiles(

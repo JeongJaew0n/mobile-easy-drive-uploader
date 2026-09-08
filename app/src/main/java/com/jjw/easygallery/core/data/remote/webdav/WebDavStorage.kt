@@ -32,6 +32,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
+import java.io.InputStream
 import java.net.URLConnection
 
 /**
@@ -58,7 +59,7 @@ class WebDavStorage(
         .build()
 
     override val capabilities: Set<Capability> =
-        setOf(Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.QUOTA)
+        setOf(Capability.DOWNLOAD, Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.QUOTA)
 
     override val rootId: String get() = "/"
 
@@ -109,6 +110,11 @@ class WebDavStorage(
     }
 
     override suspend fun restore(entryId: String) = throw UnsupportedOperationException("WebDAV 에는 휴지통이 없습니다")
+
+    override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
+        client.newCall(Request.Builder().url(url(entryId)).get().build())
+            .awaitResponse().requireSuccess("다운로드").body.byteStream()
+    }
 
     override fun uploader(): RemoteUploader = WebDavUploader()
 

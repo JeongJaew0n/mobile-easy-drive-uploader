@@ -130,6 +130,8 @@ fun DriveBrowserRoute(
             onMove = viewModel::move,
             onTrash = viewModel::trash,
             loadFolders = viewModel::listFolders,
+            onDownload = viewModel::download,
+            onDownloadSelected = viewModel::downloadSelected,
             onStartSearch = viewModel::startSearch,
             onSearch = viewModel::search,
             onExitSearch = viewModel::exitSearch,
@@ -149,6 +151,9 @@ internal data class DriveEntryActions(
     val onMove: (DriveEntry, DriveFolder) -> Unit = { _, _ -> },
     val onTrash: (DriveEntry) -> Unit = {},
     val loadFolders: suspend (parentId: String) -> List<DriveFolder> = { emptyList() },
+    // 다운로드
+    val onDownload: (DriveEntry) -> Unit = {},
+    val onDownloadSelected: () -> Unit = {},
     // 검색
     val onStartSearch: () -> Unit = {},
     val onSearch: (String) -> Unit = {},
@@ -249,6 +254,7 @@ internal fun DriveBrowserScreen(
                             enabled = !uiState.isMutating,
                             menu = entryMenu(entry, uiState.capabilities, allowMove = !uiState.isSearching),
                             onOpen = { entryActions.onOpen(entry) },
+                            onDownload = { entryActions.onDownload(entry) },
                             onRename = { renaming = entry },
                             onMove = { moving = entry },
                             onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
@@ -361,6 +367,8 @@ private fun BrowserTopBar(
         DriveSelectionTopBar(
             count = uiState.selectedIds.size,
             canMove = Capability.MOVE in uiState.capabilities && !uiState.isSearching,
+            canDownload = Capability.DOWNLOAD in uiState.capabilities,
+            onDownload = entryActions.onDownloadSelected,
             enabled = !uiState.isMutating,
             onClose = entryActions.onClearSelection,
             onSelectAll = entryActions.onSelectAll,
@@ -426,6 +434,7 @@ private fun BrowserTitle(folderName: String?, accountName: String?) {
 /** 행 ⋮ 메뉴에 무엇을 보일지 — 저장소 능력과 항목 종류로 결정 */
 internal data class EntryMenu(
     val open: Boolean,
+    val download: Boolean,
     val rename: Boolean,
     val move: Boolean,
     val delete: Boolean,
@@ -436,6 +445,7 @@ internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>, allowMo
     val folderOk = !entry.isFolder || Capability.FOLDER_MUTATION in capabilities
     return EntryMenu(
         open = !entry.isFolder && Capability.WEB_LINK in capabilities && entry.webViewLink != null,
+        download = !entry.isFolder && Capability.DOWNLOAD in capabilities,
         rename = Capability.RENAME in capabilities && folderOk,
         move = allowMove && Capability.MOVE in capabilities && folderOk,
         delete = true,
@@ -500,6 +510,7 @@ private fun DriveEntryRow(
     enabled: Boolean,
     menu: EntryMenu,
     onOpen: () -> Unit,
+    onDownload: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onTrash: () -> Unit,
@@ -552,6 +563,16 @@ private fun DriveEntryRow(
                         onClick = {
                             menuExpanded = false
                             onOpen()
+                        },
+                    )
+                }
+                if (menu.download) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.drive_menu_download)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_file_download), contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onDownload()
                         },
                     )
                 }

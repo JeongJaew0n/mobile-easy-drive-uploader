@@ -74,6 +74,33 @@ class UploadNotifications @Inject constructor(
         }
     }
 
+    /** 다운로드 진행 — 업로드와 같은 채널, 파일당 알림 하나가 아니라 워커 포그라운드 하나 */
+    fun downloadForegroundInfo(name: String, fraction: Float): ForegroundInfo {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_file_download)
+            .setContentTitle(context.getString(R.string.notification_download_title))
+            .setContentText(name)
+            .setProgress(PROGRESS_MAX, (fraction * PROGRESS_MAX).toInt(), fraction <= 0f)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openAppIntent())
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(DOWNLOAD_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(DOWNLOAD_ID, notification)
+        }
+    }
+
+    fun showDownloadResult(name: String, success: Boolean) {
+        val textRes = if (success) R.string.notification_download_done else R.string.notification_download_failed
+        notify(
+            DOWNLOAD_RESULT_ID,
+            context.getString(textRes, name),
+            context.getString(R.string.notification_download_title),
+        )
+    }
+
     fun showSummary(succeeded: Int, failed: Int) {
         val text = if (failed == 0) {
             context.resources.getQuantityString(R.plurals.notification_upload_done, succeeded, succeeded)
@@ -116,6 +143,8 @@ class UploadNotifications @Inject constructor(
         const val PROGRESS_ID = 1001
         const val SUMMARY_ID = 1002
         const val SCAN_ID = 1003
+        const val DOWNLOAD_ID = 1004
+        const val DOWNLOAD_RESULT_ID = 1005
         private const val PROGRESS_MAX = 100
     }
 }

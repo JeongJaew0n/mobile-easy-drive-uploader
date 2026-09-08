@@ -28,6 +28,9 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 | DRV-19 | 선택 모드에서 뒤로 가기 | 화면을 나가지 않고 선택만 해제 | ⬜ | `BackHandler` |
 | DRV-21 | Drive 브라우저 상단 🔍 → "IMG" 입력 | 0.35초 뒤 전체 Drive 에서 이름이 IMG 로 시작하는 파일·폴더 목록(휴지통 제외). 행 ⋮ 에 "이동" 없음, 하단 버튼 없음. 뒤로 가기 → 원래 폴더 | ⬜ | `DRIVE_FILE_CRUD.md` §8 |
 | DRV-22 | S3/WebDAV/SMB 브라우저 | 검색 아이콘 없음 | ⬜ | `Capability.SEARCH` 는 Drive 만 |
+| DRV-23 | 파일 행 ⋮ → "기기에 저장" | 스낵바 "1개 다운로드를 시작했습니다", 알림 "기기에 저장 중 · 이름" 진행 → "저장 완료". 갤러리 Pictures/Easy Gallery(영상은 Movies)에 원본 화질로 나타남 | ⬜ | `DRIVE_FILE_CRUD.md` §9 |
+| DRV-24 | 전체 선택(폴더 포함) → ⬇ | 폴더는 건너뛰고 파일 수만큼 "n개 다운로드", 각 파일이 순차/병렬로 저장. 같은 파일을 다시 누르면 진행 중 워크 유지 | ⬜ | `ExistingWorkPolicy.KEEP` |
+| DRV-25 | S3/WebDAV/SMB 브라우저에서 "기기에 저장" | 동일 동작(SMB 는 Wi-Fi 필요) | ⬜ | 네 제공자 모두 DOWNLOAD |
 | DRV-20 | S3/WebDAV/SMB 브라우저에서 다중 선택 → 삭제 | "n개 항목 삭제" 확인 다이얼로그(휴지통 없음) 후 영구 삭제, 실행 취소 없음 | ⬜ | |
 | UPL-01 | 사진 3장 선택 → 업로드 버튼 (Android 13+) | 알림 권한 요청 → 거부해도 큐 등록 → 스낵바 "3개 항목을 대기열에 추가" | ⬜ | |
 | UPL-02 | 업로드 진행 | 갤러리 상단 진행 배너(n/total·파일명), 상태바에 진행 알림(dataSync FGS) | ⬜ | |

@@ -89,6 +89,18 @@ class DriveRestRepositoryTest {
     }
 
     @Test
+    fun `download streams alt=media`() = runTest {
+        server.enqueue(MockResponse(body = "bytes"))
+
+        val text = repository.download("f1").use { it.readBytes().decodeToString() }
+
+        assertEquals("bytes", text)
+        val request = server.takeRequest()
+        assertTrue(request.url.encodedPath.endsWith("/drive/v3/files/f1"))
+        assertEquals("media", request.url.queryParameter("alt"))
+    }
+
+    @Test
     fun `search uses name contains across the drive and escapes quotes`() = runTest {
         server.enqueue(json("""{"files":[{"id":"i1","name":"a'b.jpg","mimeType":"image/jpeg"}]}"""))
 

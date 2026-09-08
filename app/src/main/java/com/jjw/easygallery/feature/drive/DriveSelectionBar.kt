@@ -26,6 +26,8 @@ internal fun DriveSelectionTopBar(
     onSelectAll: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
+    canDownload: Boolean = false,
+    onDownload: () -> Unit = {},
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.gallery_selected_count, count)) },
@@ -40,6 +42,14 @@ internal fun DriveSelectionTopBar(
                     painterResource(R.drawable.ic_select_all),
                     contentDescription = stringResource(R.string.action_select_all),
                 )
+            }
+            if (canDownload) {
+                IconButton(onClick = onDownload, enabled = enabled) {
+                    Icon(
+                        painterResource(R.drawable.ic_file_download),
+                        contentDescription = stringResource(R.string.drive_menu_download),
+                    )
+                }
             }
             if (canMove) {
                 IconButton(onClick = onMove, enabled = enabled) {

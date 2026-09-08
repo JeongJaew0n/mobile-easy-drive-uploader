@@ -36,6 +36,8 @@ internal suspend fun showBrowserEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_deleted, event.entry.name))
         DriveBrowserEvent.Restored ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
+        is DriveBrowserEvent.DownloadStarted ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.drive_download_started, event.count))
         is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
     }
 }

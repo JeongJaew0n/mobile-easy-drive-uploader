@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.InputStream
 
 /** 여러 오브젝트를 순차 처리하는 변경(S3 폴더 이름 변경·이동·삭제)의 진행 — 화면이 "n / total" 로 보인다 */
 data class MutationProgress(val done: Int, val total: Int)
@@ -41,6 +42,13 @@ interface RemoteStorage {
     suspend fun createFolder(name: String, parentId: String): RemoteFolder
 
     suspend fun rename(entryId: String, name: String): RemoteEntry
+
+    /**
+     * [Capability.DOWNLOAD]. 파일 내용 스트림 — 호출자가 반드시 닫는다(닫을 때 연결도 정리된다).
+     * 워커(`DownloadWorker`)가 MediaStore 로 복사한다
+     */
+    suspend fun openDownload(entryId: String): InputStream =
+        throw UnsupportedOperationException("이 저장소는 다운로드를 지원하지 않습니다")
 
     /** [Capability.SEARCH] 가 있을 때만. 저장소 전체에서 이름 부분 일치 */
     suspend fun search(query: String, pageToken: String? = null): RemotePage =

@@ -35,6 +35,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
+import java.io.InputStream
 import java.net.URLConnection
 
 /**
@@ -65,7 +66,13 @@ class S3Storage(
         account.endpoint.trimEnd('/').toHttpUrl().newBuilder().addPathSegment(bucket).build()
 
     override val capabilities: Set<Capability> =
-        setOf(Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.RESUMABLE_UPLOAD)
+        setOf(
+            Capability.DOWNLOAD,
+            Capability.RENAME,
+            Capability.MOVE,
+            Capability.FOLDER_MUTATION,
+            Capability.RESUMABLE_UPLOAD,
+        )
 
     /** 루트는 빈 접두어 */
     override val rootId: String get() = ""
@@ -197,6 +204,11 @@ class S3Storage(
     }
 
     override suspend fun restore(entryId: String) = throw UnsupportedOperationException("S3 에는 휴지통이 없습니다")
+
+    override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
+        client.newCall(Request.Builder().url(keyUrl(entryId)).get().build())
+            .awaitResponse().requireSuccess("다운로드").body.byteStream()
+    }
 
     override fun uploader(): RemoteUploader = S3Uploader()
 

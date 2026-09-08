@@ -57,7 +57,8 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 
 ## 6. 후보
 
-- Drive → 기기 다운로드(가져오기): `alt=media` 스트리밍을 `MediaStore` 로 저장하는 WorkManager 작업, 진행 알림, 원장에 `driveFileId` 가 있으면 "이미 기기에 있음" 표시.
+- 원장에 `driveFileId` 가 있으면 브라우저에서 "이미 기기에 있음" 표시.
+- S3·WebDAV·SMB 폴더 내 이름 필터(서버 검색이 없어 클라이언트에서).
 
 ## 7. 다중 선택 (2026-09-09 추가)
 
@@ -74,3 +75,12 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 - 검색 결과에는 부모 폴더 정보가 없어(`fields` 에 parents 를 넣어도 다중 부모·공유 항목이 있어 `removeParents` 가 애매) **이동은 숨긴다**(행 ⋮·다중 선택 상단바 모두). 이름 변경·휴지통·열기는 그대로. 하단 "업로드 폴더로 지정"도 숨김.
 - 뒤로 가기는 검색만 종료하고 원래 폴더를 다시 읽는다. S3·WebDAV·SMB 는 아이콘이 나오지 않는다(접두어 목록만 있음 — 폴더 내 필터는 후보).
 - 테스트: `DriveRestRepositoryTest` 검색 쿼리(공백 trim·따옴표 이스케이프), `DriveBrowserViewModelTest` 디바운스·결과·종료 복귀.
+
+## 9. 기기에 저장(다운로드) (2026-09-09 추가)
+
+- `Capability.DOWNLOAD` + `RemoteStorage.openDownload(entryId): InputStream` — Drive `GET files/{id}?alt=media`(`@Streaming`), S3 `GET` 오브젝트(SigV4), WebDAV `GET`, SMB 는 연결을 잡은 채 `File.inputStream` 을 돌려주고 스트림을 닫을 때 파일·공유·세션·연결을 함께 닫는다. 네 제공자 모두 지원.
+- 행 ⋮ "기기에 저장"(파일만), 다중 선택 상단바 ⬇(폴더는 건너뜀). 파일마다 `DownloadWorker`(WorkManager, 유니크 `download-<entryId>` KEEP, 네트워크 필요, 지수 백오프 15s, 3회) — 큐(Room)는 두지 않았다: 업로드처럼 수천 장을 한 번에 내리는 흐름이 아니고 WorkManager 가 재시도·순서를 맡는다.
+- 저장은 `MediaStoreSaver`: `IS_PENDING=1` 로 삽입 → 스트림 복사 → `IS_PENDING=0`. 이미지 `Pictures/Easy Gallery`, 영상 `Movies/Easy Gallery`, 그 외 `Download/Easy Gallery`. 실패하면 만든 항목을 지운다. 갤러리(MediaStore 관찰)에 자동으로 나타난다.
+- 알림은 업로드 채널을 공유(포그라운드 ID 1004, 결과 1005). 진행률은 워커가 `StateFlow` 로 받아 별도 코루틴에서 `setForeground` — 저장기 콜백은 블로킹 I/O 스레드라 suspend 를 못 부른다.
+- 재시도 판단: `RemoteStorageException` 은 5xx/코드 없음이면 재시도, 4xx 는 즉시 실패. `IOException` 은 재시도.
+- 테스트: `DriveRestRepositoryTest` `alt=media`, `DriveBrowserViewModelTest` 선택 다운로드(폴더 제외·선택 해제·이벤트). MediaStore 저장은 실기기 DRV-23.

@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
+import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,6 +25,7 @@ class GoogleDriveStorage @Inject constructor(
 
     override val capabilities: Set<Capability> = setOf(
         Capability.SEARCH,
+        Capability.DOWNLOAD,
         Capability.TRASH,
         Capability.RENAME,
         Capability.MOVE,
@@ -44,6 +46,8 @@ class GoogleDriveStorage @Inject constructor(
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder = drive.createFolder(name, parentId)
 
     override suspend fun search(query: String, pageToken: String?): RemotePage = drive.search(query, pageToken)
+
+    override suspend fun openDownload(entryId: String): InputStream = drive.download(entryId)
 
     override suspend fun rename(entryId: String, name: String): RemoteEntry = drive.rename(entryId, name)
 

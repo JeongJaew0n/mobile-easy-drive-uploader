@@ -4,6 +4,7 @@ import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
+import java.io.InputStream
 
 interface DriveRepository {
     suspend fun getAccount(): DriveAccount
@@ -15,6 +16,9 @@ interface DriveRepository {
     suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnly: Boolean = false): DrivePage
 
     suspend fun createFolder(name: String, parentId: String): DriveFolder
+
+    /** 파일 내용 스트림(`alt=media`). 호출자가 닫는다 */
+    suspend fun download(fileId: String): InputStream
 
     /** 이름 부분 일치(대소문자 무시는 Drive 가 처리). 휴지통 제외, 폴더 먼저 */
     suspend fun search(query: String, pageToken: String? = null): DrivePage

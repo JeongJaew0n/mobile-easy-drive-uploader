@@ -256,6 +256,11 @@
     <string name="drive_search_hint">Drive에서 파일 검색</string>
     <string name="drive_search_prompt">파일 이름을 입력하세요. 휴지통을 제외한 전체 Drive에서 찾습니다.</string>
     <string name="drive_search_empty">일치하는 파일이 없습니다</string>
+    <string name="drive_menu_download">기기에 저장</string>
+    <string name="drive_download_started">%1$d개 다운로드를 시작했습니다. 진행은 알림에서 확인하세요.</string>
+    <string name="notification_download_title">기기에 저장 중</string>
+    <string name="notification_download_done">%1$s 저장 완료 (Easy Gallery 폴더)</string>
+    <string name="notification_download_failed">%1$s 저장 실패</string>
     <string name="drive_restored">복원했습니다</string>
     <string name="action_undo">실행 취소</string>
 

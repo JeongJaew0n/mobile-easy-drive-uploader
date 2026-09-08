@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileNotFoundException
+import java.io.FilterInputStream
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.EnumSet
@@ -61,7 +62,13 @@ class SmbStorage(
     )
 
     override val capabilities: Set<Capability> =
-        setOf(Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.RESUMABLE_UPLOAD)
+        setOf(
+            Capability.DOWNLOAD,
+            Capability.RENAME,
+            Capability.MOVE,
+            Capability.FOLDER_MUTATION,
+            Capability.RESUMABLE_UPLOAD,
+        )
 
     override val rootId: String get() = ""
 
@@ -98,6 +105,38 @@ class SmbStorage(
     override suspend fun restore(entryId: String) = throw UnsupportedOperationException("SMB 에는 휴지통이 없습니다")
 
     override fun uploader(): RemoteUploader = SmbUploader()
+
+    /** 읽는 동안 연결을 유지해야 하므로 [withShare] 대신 직접 열고, 스트림을 닫을 때 함께 정리한다 */
+    override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
+        val (host, port) = SmbPaths.hostPort(account.endpoint)
+        val connection = client.connect(host, port)
+        try {
+            val session = connection.authenticate(
+                AuthenticationContext(account.username.orEmpty(), password.toCharArray(), account.region.orEmpty()),
+            )
+            val share = session.connectShare(shareName) as DiskShare
+            val file = share.openFile(
+                SmbPaths.toSmb(entryId),
+                EnumSet.of(AccessMask.GENERIC_READ),
+                null,
+                SHARE_ALL,
+                SMB2CreateDisposition.FILE_OPEN,
+                null,
+            )
+            object : FilterInputStream(file.inputStream) {
+                override fun close() {
+                    runCatching { super.close() }
+                    runCatching { file.close() }
+                    runCatching { share.close() }
+                    runCatching { session.close() }
+                    runCatching { connection.close() }
+                }
+            }
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            runCatching { connection.close() }
+            throw RemoteStorageException("SMB 오류: ${e.message ?: e.javaClass.simpleName}", cause = e)
+        }
+    }
 
     private suspend fun moveTo(entryId: String, targetId: String): RemoteEntry = withShare { share ->
         val from = SmbPaths.toSmb(entryId)

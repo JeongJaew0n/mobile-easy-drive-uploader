@@ -4,6 +4,7 @@ import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
+import java.io.InputStream
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import javax.inject.Inject
@@ -32,6 +33,8 @@ class DriveRestRepository @Inject constructor(
         )
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
+
+    override suspend fun download(fileId: String): InputStream = api.download(fileId).byteStream()
 
     override suspend fun search(query: String, pageToken: String?): DrivePage {
         val page = api.listFiles(

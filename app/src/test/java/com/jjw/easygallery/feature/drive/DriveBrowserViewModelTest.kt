@@ -1,6 +1,7 @@
 package com.jjw.easygallery.feature.drive
 
 import app.cash.turbine.test
+import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.StorageRegistry
@@ -13,6 +14,7 @@ import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -42,6 +44,7 @@ class DriveBrowserViewModelTest {
     }
     private val storages: StorageRegistry = mockk { coEvery { storage(null) } returns drive }
     private val prefs: UserPreferencesRepository = mockk()
+    private val downloads: DownloadScheduler = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -51,7 +54,7 @@ class DriveBrowserViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(storages, prefs)
+        val viewModel = DriveBrowserViewModel(storages, prefs, downloads)
         viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
@@ -155,6 +158,21 @@ class DriveBrowserViewModelTest {
         advanceUntilIdle()
         assertTrue(!viewModel.uiState.value.isSearching)
         assertEquals(listOf("Album", "a.jpg", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
+    }
+
+    @Test
+    fun `download selected enqueues files only and clears the selection`() = runTest(testDispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.selectAll()
+
+        viewModel.downloadSelected()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { downloads.enqueue(null, fileA) }
+        verify(exactly = 1) { downloads.enqueue(null, fileB) }
+        verify(exactly = 0) { downloads.enqueue(null, folderA) }
+        assertTrue(!viewModel.uiState.value.isSelecting)
+        viewModel.eventFlow.test { assertEquals(DriveBrowserEvent.DownloadStarted(2), awaitItem()) }
     }
 
     @Test
