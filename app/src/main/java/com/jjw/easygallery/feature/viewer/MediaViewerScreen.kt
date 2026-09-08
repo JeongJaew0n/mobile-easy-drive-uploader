@@ -3,6 +3,8 @@ package com.jjw.easygallery.feature.viewer
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -41,7 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -71,6 +75,7 @@ import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.feature.gallery.MoveDialog
 import com.jjw.easygallery.feature.gallery.RenameDialog
+import com.jjw.easygallery.feature.gallery.formatDuration
 import kotlinx.coroutines.delay
 import androidx.media3.common.MediaItem as Media3Item
 
@@ -151,10 +156,24 @@ internal fun MediaViewerScreen(
     val current = uiState.current ?: return
 
     var chromeVisible by rememberSaveable { mutableStateOf(true) }
+    var videoPlaying by remember { mutableStateOf(false) }
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = uiState.currentIndex) { uiState.items.size }
     val zoomState = rememberZoomState(current.id)
+
+    // 재생 중에는 잠시 뒤 컨트롤을 숨겨 영상에 집중하게 한다
+    LaunchedEffect(chromeVisible, videoPlaying) {
+        if (chromeVisible && videoPlaying) {
+            delay(CONTROLS_AUTO_HIDE_MILLIS)
+            chromeVisible = false
+        }
+    }
+    // 항목이 바뀌면 재생 상태를 초기화하고 컨트롤을 다시 보여준다
+    LaunchedEffect(current.id) {
+        videoPlaying = false
+        chromeVisible = true
+    }
 
     // 스와이프 결과를 ViewModel 에 알린다 (편집 대상·정보 패널이 현재 항목을 따라가도록)
     LaunchedEffect(pagerState) {
@@ -214,7 +233,11 @@ internal fun MediaViewerScreen(
                     VideoPage(
                         item = item,
                         isCurrent = page == pagerState.settledPage,
-                        onTap = { chromeVisible = !chromeVisible },
+                        controlsVisible = chromeVisible,
+                        onToggleControls = { chromeVisible = !chromeVisible },
+                        onPlayingChange = { playing ->
+                            if (page == pagerState.settledPage) videoPlaying = playing
+                        },
                     )
                 } else {
                     // 확대 중에는 스와이프가 막혀 다른 페이지가 보이지 않으므로 상태 하나를 공유해도 된다
@@ -280,7 +303,9 @@ private fun ImagePage(
 private fun VideoPage(
     item: MediaItem,
     isCurrent: Boolean,
-    onTap: () -> Unit,
+    controlsVisible: Boolean,
+    onToggleControls: () -> Unit,
+    onPlayingChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val player = remember(item.id) {
@@ -292,59 +317,124 @@ private fun VideoPage(
     DisposableEffect(player) { onDispose { player.release() } }
     // 다른 페이지로 넘어가면 재생을 멈춘다
     LaunchedEffect(isCurrent) { if (!isCurrent) player.pause() }
+    // 앱을 벗어나거나 화면이 꺼지면 소리가 계속 나지 않도록 멈춘다
+    LifecycleResumeEffect(player) { onPauseOrDispose { player.pause() } }
 
     var isPlaying by remember { mutableStateOf(false) }
-    var progress by remember { mutableFloatStateOf(0f) }
+    var positionMillis by remember { mutableLongStateOf(0L) }
+    var durationMillis by remember { mutableLongStateOf(0L) }
+    // 드래그 중에는 재생 위치 대신 손가락 위치를 보여준다
+    var scrubFraction by remember { mutableStateOf<Float?>(null) }
+
     LaunchedEffect(player) {
         while (true) {
             isPlaying = player.isPlaying
-            val duration = player.duration
-            progress = if (duration > 0) (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
+            durationMillis = player.duration.coerceAtLeast(0L)
+            positionMillis = player.currentPosition.coerceAtLeast(0L)
             delay(PROGRESS_POLL_MILLIS)
         }
     }
+    LaunchedEffect(isPlaying) { onPlayingChange(isPlaying) }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onToggleControls,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
         PlayerSurface(player = player, modifier = Modifier.fillMaxSize())
-        IconButton(
-            onClick = {
-                if (player.isPlaying) {
-                    player.pause()
+
+        AnimatedVisibility(visible = controlsVisible, modifier = Modifier.align(Alignment.Center)) {
+            IconButton(
+                onClick = {
+                    if (player.isPlaying) {
+                        player.pause()
+                    } else {
+                        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+                        player.play()
+                    }
+                },
+                modifier = Modifier
+                    .size(PLAY_BUTTON_SIZE_DP.dp)
+                    .background(Color.Black.copy(alpha = OVERLAY_ALPHA), CircleShape),
+            ) {
+                if (isPlaying) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_pause),
+                        contentDescription = stringResource(R.string.viewer_pause),
+                        tint = Color.White,
+                        modifier = Modifier.size(PLAY_ICON_SIZE_DP.dp),
+                    )
                 } else {
-                    if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
-                    player.play()
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.viewer_play),
+                        tint = Color.White,
+                        modifier = Modifier.size(PLAY_ICON_SIZE_DP.dp),
+                    )
                 }
-                onTap()
-            },
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(64.dp)
-                .background(Color.Black.copy(alpha = OVERLAY_ALPHA), CircleShape),
-        ) {
-            if (isPlaying) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_pause),
-                    contentDescription = stringResource(R.string.viewer_pause),
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = stringResource(R.string.viewer_play),
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp),
-                )
             }
         }
-        LinearProgressIndicator(
-            progress = { progress },
+
+        AnimatedVisibility(visible = controlsVisible, modifier = Modifier.align(Alignment.BottomCenter)) {
+            val scrub = scrubFraction
+            VideoSeekBar(
+                positionMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis,
+                durationMillis = durationMillis,
+                fraction = scrub ?: fractionOf(positionMillis, durationMillis),
+                onScrub = { scrubFraction = it },
+                onScrubFinished = {
+                    scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
+                    scrubFraction = null
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoSeekBar(
+    positionMillis: Long,
+    durationMillis: Long,
+    fraction: Float,
+    onScrub: (Float) -> Unit,
+    onScrubFinished: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = formatDuration(positionMillis),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+        )
+        Slider(
+            value = fraction,
+            onValueChange = onScrub,
+            onValueChangeFinished = onScrubFinished,
+            enabled = durationMillis > 0,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+        )
+        Text(
+            text = formatDuration(durationMillis),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
         )
     }
 }
+
+private fun fractionOf(positionMillis: Long, durationMillis: Long): Float =
+    if (durationMillis > 0) (positionMillis.toFloat() / durationMillis).coerceIn(0f, 1f) else 0f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -560,5 +650,8 @@ private fun InfoRow(label: String, value: String) {
 private const val OVERLAY_ALPHA = 0.55f
 private const val LABEL_ALPHA = 0.7f
 private const val PROGRESS_POLL_MILLIS = 400L
+private const val CONTROLS_AUTO_HIDE_MILLIS = 3_000L
+private const val PLAY_BUTTON_SIZE_DP = 64
+private const val PLAY_ICON_SIZE_DP = 36
 private const val INFO_LABEL_WIDTH_DP = 92
 private const val INFO_ROW_HEIGHT_DP = 20
