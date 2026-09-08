@@ -30,6 +30,9 @@ object DatabaseModule {
     fun providesMediaHashDao(db: AppDatabase): MediaHashDao = db.mediaHashDao()
 
     @Provides
+    fun providesCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()
+
+    @Provides
     @Singleton
     fun providesVideoCompressor(impl: Media3VideoCompressor): VideoCompressor = impl
 }
