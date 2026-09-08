@@ -23,7 +23,9 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-@Suppress("TooGenericExceptionCaught") // UI 경계: 네트워크·API 오류를 모두 메시지로 보여준다
+// TooGenericExceptionCaught: UI 경계, 네트워크·API 오류를 모두 메시지로. TooManyFunctions: 단일 항목 CRUD + 다중 선택 일괄 작업이
+// 한 화면의 액션이라 한 ViewModel 에 둔다(나누면 선택 상태를 둘이 공유해야 한다)
+@Suppress("TooGenericExceptionCaught", "TooManyFunctions")
 class DriveBrowserViewModel @Inject constructor(
     private val storages: StorageRegistry,
     private val prefs: UserPreferencesRepository,
@@ -174,6 +176,117 @@ class DriveBrowserViewModel @Inject constructor(
         )
     }
 
+    // ---- 다중 선택(`docs/DRIVE_FILE_CRUD.md` §7) ----
+
+    fun toggleSelection(entry: DriveEntry) = _uiState.update {
+        val ids = if (entry.id in it.selectedIds) it.selectedIds - entry.id else it.selectedIds + entry.id
+        it.copy(selectedIds = ids)
+    }
+
+    fun selectAll() = _uiState.update { it.copy(selectedIds = it.entries.map { e -> e.id }.toSet()) }
+
+    fun clearSelection() = _uiState.update { it.copy(selectedIds = emptySet()) }
+
+    /** 선택 항목을 휴지통(없으면 영구 삭제)으로 — 하나씩 처리하고 실패한 것은 목록에 남긴다 */
+    fun trashSelected() {
+        val targets = selectedEntries()
+        if (targets.isEmpty()) return
+        val hasTrash = Capability.TRASH in _uiState.value.capabilities
+        mutateBatch(
+            targets = targets,
+            action = { drive.delete(it.id) },
+            onSuccess = { done -> DriveBrowserEvent.BatchTrashed(done, isTrash = hasTrash) },
+        )
+    }
+
+    /** 선택 항목을 [target] 으로 — 선택된 폴더 자신·현재 폴더는 거부 */
+    fun moveSelected(target: DriveFolder) {
+        val current = _uiState.value.current ?: return
+        val targets = selectedEntries()
+        if (targets.isEmpty() || target.id == current.id) return
+        if (targets.any { it.isFolder && it.id == target.id }) {
+            viewModelScope.launch { events.send(DriveBrowserEvent.Error(MOVE_INTO_SELF_MESSAGE)) }
+            return
+        }
+        mutateBatch(
+            targets = targets,
+            action = { drive.move(it.id, fromParentId = current.id, toParentId = target.id) },
+            onSuccess = { done -> DriveBrowserEvent.BatchMoved(done.size, target) },
+        )
+    }
+
+    /** 일괄 휴지통의 "실행 취소" */
+    fun restoreAll(entries: List<DriveEntry>) {
+        if (entries.isEmpty()) return
+        if (_uiState.value.isMutating) return
+        _uiState.update { it.copy(entries = (it.entries + entries).sortedForDrive(), isMutating = true) }
+        viewModelScope.launch {
+            val failed = ArrayList<DriveEntry>()
+            entries.forEachIndexed { index, entry ->
+                _uiState.update { it.copy(mutationProgress = MutationProgress(index, entries.size)) }
+                runCatching { drive.restore(entry.id) }.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    Timber.e(e, "restore failed %s", entry.id)
+                    failed += entry
+                }
+            }
+            _uiState.update { state ->
+                state.copy(
+                    entries = state.entries.filterNot { e -> failed.any { f -> f.id == e.id } },
+                    isMutating = false,
+                    mutationProgress = null,
+                )
+            }
+            events.send(
+                if (failed.isEmpty()) DriveBrowserEvent.Restored else DriveBrowserEvent.BatchFailed(failed.size),
+            )
+        }
+    }
+
+    private fun selectedEntries(): List<DriveEntry> {
+        val state = _uiState.value
+        return state.entries.filter { it.id in state.selectedIds }
+    }
+
+    /**
+     * 선택 항목을 낙관적으로 목록에서 빼고 하나씩 [action]. 실패한 항목은 다시 목록에 넣고
+     * 성공 건수로 [onSuccess] 이벤트, 실패가 있으면 [DriveBrowserEvent.BatchFailed] 를 덧붙인다.
+     */
+    private fun mutateBatch(
+        targets: List<DriveEntry>,
+        action: suspend (DriveEntry) -> Unit,
+        onSuccess: (done: List<DriveEntry>) -> DriveBrowserEvent,
+    ) {
+        if (_uiState.value.isMutating) return
+        val ids = targets.map { it.id }.toSet()
+        _uiState.update {
+            it.copy(entries = it.entries.filterNot { e -> e.id in ids }, selectedIds = emptySet(), isMutating = true)
+        }
+        viewModelScope.launch {
+            val done = ArrayList<DriveEntry>()
+            val failed = ArrayList<DriveEntry>()
+            targets.forEachIndexed { index, entry ->
+                _uiState.update { it.copy(mutationProgress = MutationProgress(index, targets.size)) }
+                runCatching { action(entry) }
+                    .onSuccess { done += entry }
+                    .onFailure { e ->
+                        if (e is CancellationException) throw e
+                        Timber.e(e, "batch mutation failed %s", entry.id)
+                        failed += entry
+                    }
+            }
+            _uiState.update { state ->
+                state.copy(
+                    entries = (state.entries + failed).sortedForDrive(),
+                    isMutating = false,
+                    mutationProgress = null,
+                )
+            }
+            if (done.isNotEmpty()) events.send(onSuccess(done))
+            if (failed.isNotEmpty()) events.send(DriveBrowserEvent.BatchFailed(failed.size))
+        }
+    }
+
     /** 낙관적 갱신 → API → 실패 시 원래 목록으로 되돌리고 오류 이벤트 */
     private fun mutate(
         optimistic: (List<DriveEntry>) -> List<DriveEntry>,
@@ -234,6 +347,8 @@ class DriveBrowserViewModel @Inject constructor(
     }
 }
 
+private const val MOVE_INTO_SELF_MESSAGE = "폴더를 자기 자신 안으로 옮길 수 없습니다"
+
 data class DriveBrowserUiState(
     val current: DriveFolder? = null,
     val entries: List<DriveEntry> = emptyList(),
@@ -241,6 +356,8 @@ data class DriveBrowserUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val isMutating: Boolean = false,
+    /** 길게 눌러 고른 항목. 비어 있지 않으면 선택 모드 */
+    val selectedIds: Set<String> = emptySet(),
     /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
     val mutationProgress: MutationProgress? = null,
     val error: String? = null,
@@ -248,7 +365,9 @@ data class DriveBrowserUiState(
     val capabilities: Set<Capability> = emptySet(),
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
     val accountName: String? = null,
-)
+) {
+    val isSelecting: Boolean get() = selectedIds.isNotEmpty()
+}
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */
 internal fun List<DriveEntry>.sortedForDrive(): List<DriveEntry> =
@@ -264,6 +383,9 @@ sealed interface DriveBrowserEvent {
     data class Trashed(val entry: DriveEntry) : DriveBrowserEvent
     data class Deleted(val entry: DriveEntry) : DriveBrowserEvent
     data object Restored : DriveBrowserEvent
+    data class BatchTrashed(val entries: List<DriveEntry>, val isTrash: Boolean) : DriveBrowserEvent
+    data class BatchMoved(val count: Int, val target: DriveFolder) : DriveBrowserEvent
+    data class BatchFailed(val count: Int) : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent
 }

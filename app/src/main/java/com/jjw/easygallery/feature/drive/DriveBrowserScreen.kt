@@ -4,8 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
 import android.text.format.Formatter
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,7 +43,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
@@ -91,30 +94,7 @@ fun DriveBrowserRoute(
     LaunchedEffect(key) { viewModel.load(key.accountId, key.folderId, key.folderName, rootName) }
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
-            when (event) {
-                is DriveBrowserEvent.FolderCreated -> {
-                    val message = resources.getString(R.string.drive_folder_created, event.folder.name)
-                    snackbarHostState.showSnackbar(message)
-                }
-                is DriveBrowserEvent.UploadFolderSelected -> onUploadFolderSelected(event.folder)
-                is DriveBrowserEvent.Renamed ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_renamed, event.name))
-                is DriveBrowserEvent.Moved -> snackbarHostState.showSnackbar(
-                    resources.getString(R.string.drive_moved, event.entry.name, event.target.name),
-                )
-                is DriveBrowserEvent.Trashed -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = resources.getString(R.string.drive_trashed, event.entry.name),
-                        actionLabel = resources.getString(R.string.action_undo),
-                    )
-                    if (result == SnackbarResult.ActionPerformed) viewModel.restore(event.entry)
-                }
-                is DriveBrowserEvent.Deleted ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_deleted, event.entry.name))
-                DriveBrowserEvent.Restored ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
-                is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
-            }
+            showBrowserEvent(event, snackbarHostState, resources, viewModel, onUploadFolderSelected)
         }
     }
 
@@ -148,6 +128,11 @@ fun DriveBrowserRoute(
             onMove = viewModel::move,
             onTrash = viewModel::trash,
             loadFolders = viewModel::listFolders,
+            onToggleSelect = viewModel::toggleSelection,
+            onSelectAll = viewModel::selectAll,
+            onClearSelection = viewModel::clearSelection,
+            onTrashSelected = viewModel::trashSelected,
+            onMoveSelected = viewModel::moveSelected,
         ),
     )
 }
@@ -159,6 +144,12 @@ internal data class DriveEntryActions(
     val onMove: (DriveEntry, DriveFolder) -> Unit = { _, _ -> },
     val onTrash: (DriveEntry) -> Unit = {},
     val loadFolders: suspend (parentId: String) -> List<DriveFolder> = { emptyList() },
+    // 다중 선택
+    val onToggleSelect: (DriveEntry) -> Unit = {},
+    val onSelectAll: () -> Unit = {},
+    val onClearSelection: () -> Unit = {},
+    val onTrashSelected: () -> Unit = {},
+    val onMoveSelected: (DriveFolder) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -179,7 +170,10 @@ internal fun DriveBrowserScreen(
     var renaming by remember { mutableStateOf<DriveEntry?>(null) }
     var moving by remember { mutableStateOf<DriveEntry?>(null) }
     var deleting by remember { mutableStateOf<DriveEntry?>(null) }
+    var movingSelection by rememberSaveable { mutableStateOf(false) }
+    var deletingSelection by rememberSaveable { mutableStateOf(false) }
     val hasTrash = Capability.TRASH in uiState.capabilities
+    BackHandler(enabled = uiState.isSelecting) { entryActions.onClearSelection() }
     val listState = rememberLazyListState()
     val motion = LocalMotion.current
 
@@ -195,30 +189,14 @@ internal fun DriveBrowserScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { BrowserTitle(folderName = uiState.current?.name, accountName = uiState.accountName) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
-                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
-                    }
-                    IconButton(
-                        onClick = { showCreateDialog = true },
-                        enabled = uiState.current != null && !uiState.isMutating,
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_create_new_folder),
-                            contentDescription = stringResource(R.string.folder_picker_new_folder),
-                        )
-                    }
-                },
+            BrowserTopBar(
+                uiState = uiState,
+                onBackClick = onBackClick,
+                onRefresh = onRefresh,
+                onCreateFolder = { showCreateDialog = true },
+                onMoveSelection = { movingSelection = true },
+                onDeleteSelection = { if (hasTrash) entryActions.onTrashSelected() else deletingSelection = true },
+                entryActions = entryActions,
             )
         },
         bottomBar = {
@@ -263,7 +241,12 @@ internal fun DriveBrowserScreen(
                     items(uiState.entries, key = { it.id }) { entry ->
                         DriveEntryRow(
                             entry = entry,
-                            onClick = { onEntryClick(entry) },
+                            onClick = {
+                                if (uiState.isSelecting) entryActions.onToggleSelect(entry) else onEntryClick(entry)
+                            },
+                            onLongClick = { entryActions.onToggleSelect(entry) },
+                            selected = entry.id in uiState.selectedIds,
+                            selecting = uiState.isSelecting,
                             enabled = !uiState.isMutating,
                             menu = entryMenu(entry, uiState.capabilities),
                             onOpen = { entryActions.onOpen(entry) },
@@ -304,6 +287,14 @@ internal fun DriveBrowserScreen(
         onCreateFolder = onCreateFolder,
         entryActions = entryActions,
     )
+    DriveSelectionDialogs(
+        uiState = uiState,
+        deletingSelection = deletingSelection,
+        movingSelection = movingSelection,
+        onDismissDelete = { deletingSelection = false },
+        onDismissMove = { movingSelection = false },
+        entryActions = entryActions,
+    )
     deleting?.let { entry ->
         AlertDialog(
             onDismissRequest = { deleting = null },
@@ -324,6 +315,57 @@ internal fun DriveBrowserScreen(
             },
         )
     }
+}
+
+/** 일반 상단바 / 선택 모드 상단바 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BrowserTopBar(
+    uiState: DriveBrowserUiState,
+    onBackClick: () -> Unit,
+    onRefresh: () -> Unit,
+    onCreateFolder: () -> Unit,
+    onMoveSelection: () -> Unit,
+    onDeleteSelection: () -> Unit,
+    entryActions: DriveEntryActions,
+) {
+    if (uiState.isSelecting) {
+        DriveSelectionTopBar(
+            count = uiState.selectedIds.size,
+            canMove = Capability.MOVE in uiState.capabilities,
+            enabled = !uiState.isMutating,
+            onClose = entryActions.onClearSelection,
+            onSelectAll = entryActions.onSelectAll,
+            onMove = onMoveSelection,
+            onDelete = onDeleteSelection,
+        )
+        return
+    }
+    TopAppBar(
+        title = { BrowserTitle(folderName = uiState.current?.name, accountName = uiState.accountName) },
+        navigationIcon = {
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
+            }
+            IconButton(
+                onClick = onCreateFolder,
+                enabled = uiState.current != null && !uiState.isMutating,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_create_new_folder),
+                    contentDescription = stringResource(R.string.folder_picker_new_folder),
+                )
+            }
+        },
+    )
 }
 
 /** 제목: 현재 폴더 이름, 부제: 저장소(계정) 이름 */
@@ -411,6 +453,9 @@ private fun DriveBrowserDialogs(
 private fun DriveEntryRow(
     entry: DriveEntry,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    selected: Boolean,
+    selecting: Boolean,
     enabled: Boolean,
     menu: EntryMenu,
     onOpen: () -> Unit,
@@ -424,11 +469,12 @@ private fun DriveEntryRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EntryIcon(entry)
+        if (selecting) Checkbox(checked = selected, onCheckedChange = { onLongClick() }) else EntryIcon(entry)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -453,6 +499,7 @@ private fun DriveEntryRow(
             }
         }
         if (entry.isFolder) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        if (selecting) return@Row
         Box {
             IconButton(onClick = { menuExpanded = true }, enabled = enabled) {
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))

@@ -58,5 +58,12 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 ## 6. 후보
 
 - Drive → 기기 다운로드(가져오기): `alt=media` 스트리밍을 `MediaStore` 로 저장하는 WorkManager 작업, 진행 알림, 원장에 `driveFileId` 가 있으면 "이미 기기에 있음" 표시.
-- 다중 선택 후 일괄 이동/휴지통.
 - 파일 검색(`name contains`).
+
+## 7. 다중 선택 (2026-09-09 추가)
+
+- 행을 **길게 누르면** 선택 모드(`DriveBrowserUiState.selectedIds`). 선택 중에는 탭이 토글, 행 앞이 체크박스, ⋮ 숨김, 뒤로 가기가 선택 해제. 상단바는 `DriveSelectionTopBar`("n개 선택" · 전체 선택 · 이동(MOVE 능력) · 삭제).
+- **일괄 처리는 순차** — Drive REST 에 batch 엔드포인트가 있지만(multipart/mixed) 다른 제공자(S3·WebDAV·SMB)에는 없어 `RemoteStorage` 표면을 그대로 쓴다. `mutateBatch`: 선택 항목을 낙관적으로 빼고 하나씩 호출, 진행은 `mutationProgress`(n / total) 로, **실패한 항목만 목록에 되살리고** `BatchFailed(count)` 를 덧붙인다(전부 되돌리지 않는다 — 이미 옮겨진 것을 되돌릴 방법이 없다).
+- 휴지통 있는 저장소: 확인 없이 휴지통 → 스낵바 "n개를 휴지통으로 옮겼습니다 · 실행 취소"(`restoreAll` 순차 복원). 없는 저장소: "n개 항목 삭제" 확인 다이얼로그 후 영구 삭제.
+- 이동 대상이 선택된 폴더 자신이면 거부(하위 폴더로의 이동은 서버가 거부하고 그 항목만 실패로 남는다).
+- 테스트: `DriveBrowserViewModelTest` 일괄 휴지통(성공 1·실패 1), 자기 자신으로 이동 거부·전체 선택.

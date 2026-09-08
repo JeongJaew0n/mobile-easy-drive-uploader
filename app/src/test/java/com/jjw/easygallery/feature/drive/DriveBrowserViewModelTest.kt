@@ -100,6 +100,43 @@ class DriveBrowserViewModelTest {
     }
 
     @Test
+    fun `batch trash removes selected entries, keeps the failed one and reports both`() = runTest(testDispatcher) {
+        coEvery { drive.delete("f1") } returns Unit
+        coEvery { drive.delete("f2") } throws IOException("offline")
+        val viewModel = loadedViewModel()
+
+        viewModel.toggleSelection(fileA)
+        viewModel.toggleSelection(fileB)
+        assertTrue(viewModel.uiState.value.isSelecting)
+        viewModel.trashSelected()
+        assertEquals(listOf("Album"), viewModel.uiState.value.entries.map { it.name }) // 낙관적 제거
+        assertTrue(!viewModel.uiState.value.isSelecting)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Album", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
+        assertTrue(!viewModel.uiState.value.isMutating)
+        viewModel.eventFlow.test {
+            assertEquals(DriveBrowserEvent.BatchTrashed(listOf(fileA), isTrash = true), awaitItem())
+            assertEquals(DriveBrowserEvent.BatchFailed(1), awaitItem())
+        }
+    }
+
+    @Test
+    fun `batch move rejects a selected folder as its own target and select all covers every entry`() =
+        runTest(testDispatcher) {
+            val viewModel = loadedViewModel()
+            viewModel.selectAll()
+            assertEquals(3, viewModel.uiState.value.selectedIds.size)
+
+            viewModel.moveSelected(DriveFolder("d1", "Album")) // Album 이 선택돼 있음 → 거부
+            assertEquals(3, viewModel.uiState.value.entries.size)
+            viewModel.eventFlow.test { assertTrue(awaitItem() is DriveBrowserEvent.Error) }
+
+            viewModel.clearSelection()
+            assertTrue(!viewModel.uiState.value.isSelecting)
+        }
+
+    @Test
     fun `move removes the entry and ignores moving into the current folder`() = runTest(testDispatcher) {
         coEvery { drive.move("f1", "root", "d1") } returns fileA
         val viewModel = loadedViewModel()
