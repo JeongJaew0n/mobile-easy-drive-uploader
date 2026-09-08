@@ -147,7 +147,7 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
 
 ## 상세보기 (feature/viewer)
 
-- 그리드에서 항목을 탭하면 `MediaViewerKey(mediaId, favoritesOnly)` 로 진입. 목록을 통째로 넘기지 않고 **갤러리와 같은 필터로 다시 관찰**해 좌우 스와이프 범위를 맞춘다(`mediaId` 로 인덱스를 찾음).
+- 그리드에서 항목을 탭하면 `MediaViewerKey(mediaId, favoritesOnly)` 로 진입. 목록을 통째로 넘기지 않고 **갤러리와 같은 필터를 구독**해 좌우 스와이프 범위를 맞춘다(`mediaId` 로 인덱스를 찾음). `observeMedia` 가 필터별 `shareIn(replay = 1)` 이라 다시 조회하지 않고 갤러리가 받은 목록을 즉시 받는다 — 구독마다 재조회하던 때는 사진이 열릴 때 목록을 기다리며 멈칫했다(`VIEWER_STABILITY.md` §6).
 - `HorizontalPager` + 공용 `ZoomState`(`Animatable`): 핀치 중엔 즉시 반영, 손을 떼면 경계 보정 스프링, 두 번 탭은 탭 지점 중심 확대(`focalZoomOffset`/`clampOffset` 순수 함수). 확대 중에는 `userScrollEnabled = false` 로 페이저와 팬 제스처가 충돌하지 않게 한다(확대 중엔 다른 페이지가 보이지 않으므로 상태 하나를 공유해도 정확). 원본 디코딩은 `size(4096)` 상한.
 - 아래로 끌어 닫기 `Modifier.swipeToDismiss`(확대 중 비활성). 진입/복귀 전환은 `AppNavigation` 의 전역 `transitionSpec` 이 목적지 키를 보고 분기(상세보기 fade + scale 0.92, 히어로가 있으면 페이드만). 그리드 썸네일과 `thumb-<id>` 메모리 캐시 키를 공유해 원본 로드 전까지 썸네일을 보여준다.
 - **히어로 오버레이**(`HeroOverlay`): 그리드가 `onPlaced` 로 잡은 썸네일 윈도우 좌표·원본 정보를 `MediaViewerKey.hero` 로 넘기면, 라우트가 페이저 위에 캐시 썸네일을 시작 사각형→`fittedRect`(원본 비율) 까지 250ms 확대해 그린다. 첫 진입 1회, 역방향은 없음. `SharedTransitionLayout` 의 상시 이중 측정 비용을 피하기 위한 선택 — 근거는 `ANIMATION_IMPROVEMENT.md` §3.3.

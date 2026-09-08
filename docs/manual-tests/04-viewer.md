@@ -29,3 +29,4 @@
 | VW-25 | 영상 페이지 진입 직후 | 검은 화면 대신 썸네일이 보이고 첫 프레임으로 교체 | ✅ 2026-09-08 | `ContentFrame.shutter` |
 | VW-26 | EXIF 회전 90° 사진 히어로 진입·정보 패널 | 히어로 끝 사각형이 세로 비율, 해상도 표기가 세로×가로 | ⬜ | `ORIENTATION` 컬럼으로 교환. 폰에서 직접(예: 2021년 세로 사진) |
 | VW-27 | 자동 회전 꺼진 상태에서 가로 보기 → 해제 / 가로 보기 → 뒤로 | 두 경우 모두 세로로 복귀, 시스템 `user_rotation` 이 0 유지 | ✅ 2026-09-08 | `adb shell settings get system user_rotation` 으로 확인 |
+| VW-28 | 사진을 3번 연속 열기 | 히어로 뒤 검은 화면 없이 바로 사진. `adb logcat \| grep "MediaStore query"` 에 새 조회가 찍히지 않음 | ✅ 2026-09-08 | 3회 연속 열기에 `MediaStore query` 0건, 탭 350ms 뒤 스크린샷에 원본 표시. 프레임 스킵 로그 없음 |

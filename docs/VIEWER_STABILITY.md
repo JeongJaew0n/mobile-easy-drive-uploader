@@ -77,3 +77,21 @@ adb 로 확인 가능한 것: VW-21(가로 영상 스크린샷의 레터박스),
 - **가로 보기 해제가 안 됨**: 해제 시 `UNSPECIFIED` 를 주면 자동 회전이 꺼진 기기에서 시스템이 `user_rotation` 을 1(가로)로 바꿔 상세보기를 나가도 가로로 남았다. `OrientationLockEffect` 가 잠그기 전 사용자 방향(`ACCELEROMETER_ROTATION`/`USER_ROTATION`)을 기억해 해제·종료 시 잠깐 명시한 뒤 1초 후 `UNSPECIFIED` 로 돌린다. 해제·뒤로가기 두 경로 모두 세로 복귀, `user_rotation=0` 유지 확인.
 - **상세보기 진입 크래시**: `ACCESS_MEDIA_LOCATION` 을 매니페스트에만 선언하고 런타임 요청을 안 해 `setRequireOriginal` 경로가 `UnsupportedOperationException` 으로 죽었다. 읽기 권한과 함께 요청하고, 권한이 없으면 원본 요청을 생략하며 예외도 잡는다.
 - **롱프레스만 하면 선택이 풀림**(갤러리): `detectDragGesturesAfterLongPress` 가 움직임 없는 UP 을 소비하지 않아 썸네일 `clickable` 의 onClick 이 실행됐다. `DragSelect` 가 롱프레스 뒤 이벤트를 Initial 패스에서 소비하도록 직접 구현.
+
+## 6. 사진 열기 멈칫 — 상세보기가 목록을 다시 조회한다 (2026-09-08 추가)
+
+**증상** 썸네일을 탭하면 히어로 연출이 끝난 뒤 잠깐 검은 화면이 머물고 사진이 나타난다.
+
+**원인** `MediaViewerViewModel.load()` 가 `mediaRepository.observeMedia(filter)` 를 새로 구독하고, `observeMedia` 는 구독마다 `queryAll` 을 즉시 실행한다(캐시 없음). 6,119행 커서 읽기 + `MediaItem` 변환 + 날짜순 재정렬이 끝날 때까지 `isLoading = true` 라 화면이 비어 있다. 기기 로그에 사진을 연 시각마다 `MediaStore query(All): 6119 items` 가 찍혀 확인(23:14:23 / :31 / :33 / :38 / :42 / :44). 갤러리 ViewModel 은 이미 같은 목록을 들고 있으므로 두 화면이 같은 작업을 두 번 한다.
+
+**방침**
+| # | 변경 | 파일 | 근거/비용 |
+|---|---|---|---|
+| F6 | `observeMedia(filter)` 를 필터별로 `shareIn(replay = 1, WhileSubscribed(5s))` 해 앱 범위에서 한 번만 조회·관찰한다. 상세보기는 구독 즉시 갤러리가 받은 목록을 replay 로 받고, ContentObserver 도 하나만 등록된다 | `MediaStoreRepository` | replay 캐시(6천 개 참조 리스트 1개)만 추가. 구독자가 5초 이상 없으면 업스트림(옵저버)은 해제되고, 다시 구독하면 캐시를 먼저 준 뒤 `flowOf(Unit)` 로 즉시 재조회하므로 stale 상태가 오래가지 않는다 |
+| F7 | 문서: `ARCHITECTURE.md` 의 "갤러리와 같은 필터로 다시 관찰" 문장을 공유 구독으로 고친다 | docs | |
+
+하지 않는 것: 탭한 항목을 `MediaViewerKey` 에 통째로 실어 목록 전에 그리기 — F6 만으로 목록이 첫 프레임에 도착하므로(갤러리가 백스택에 살아 있는 동안 replay), `Uri` 직렬화 비용을 들일 이유가 없다. F6 적용 후에도 멈칫이 남으면 그때 재검토.
+
+**검증** 사진을 3번 연속 열 때 `MediaStore query` 로그가 새로 찍히지 않아야 하고(`adb logcat | grep "MediaStore query"`), 탭 직후 약 300ms 스크린샷에 사진이 이미 보여야 한다. → `manual-tests/04-viewer.md` VW-28.
+
+**결과(2026-09-08)** 앱 시작 시 조회 1회만 찍히고, 사진 3회 연속 열기 동안 `MediaStore query` 0건. 탭 350ms 뒤 스크린샷에 원본이 이미 표시됨(VW-28 ✅). `Skipped frames`/`Davey` 로그 없음.

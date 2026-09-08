@@ -25,20 +25,24 @@ import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,14 +62,23 @@ class MediaStoreRepository @Inject constructor(
     override val supportsTrashAndFavorites: Boolean = isApi30
     override val mutationsCompleteOnConsent: Boolean = isApi30
 
+    /** 필터별로 하나만 유지되는 공유 흐름. 갤러리·상세보기가 같은 목록을 받는다 */
+    private val sharedMedia = ConcurrentHashMap<MediaFilter, Flow<List<MediaItem>>>()
+    private val shareScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+
     /**
      * 최초 1회 즉시 조회하고, 이후 MediaStore 변경은 디바운스해서 재조회한다.
      * 변경 폭주 중에는 mapLatest 가 진행 중인 쿼리를 취소한다.
+     *
+     * 필터별로 `shareIn(replay = 1)` 이라 상세보기가 구독하면 갤러리가 이미 받은 목록을 즉시 받는다 —
+     * 구독마다 6천 행을 다시 읽으면 사진이 열릴 때 목록이 올 때까지 화면이 비어 멈칫한다(`VIEWER_STABILITY.md` §6).
+     * 구독자가 [SHARE_STOP_TIMEOUT_MILLIS] 동안 없으면 옵저버를 해제하고, 다시 구독하면 캐시를 먼저 준 뒤 곧바로 재조회한다.
      */
-    override fun observeMedia(filter: MediaFilter): Flow<List<MediaItem>> =
+    override fun observeMedia(filter: MediaFilter): Flow<List<MediaItem>> = sharedMedia.getOrPut(filter) {
         merge(flowOf(Unit), mediaChanges().debounce(CHANGE_DEBOUNCE_MILLIS))
             .mapLatest { queryAll(filter) }
-            .flowOn(ioDispatcher)
+            .shareIn(shareScope, SharingStarted.WhileSubscribed(SHARE_STOP_TIMEOUT_MILLIS), replay = 1)
+    }
 
     // ---------- 자동 백업 스캔 ----------
 
@@ -350,6 +363,7 @@ class MediaStoreRepository @Inject constructor(
     private companion object {
         const val UNSUPPORTED_MESSAGE = "휴지통·즐겨찾기는 Android 11 이상에서만 지원됩니다"
         const val CHANGE_DEBOUNCE_MILLIS = 300L
+        const val SHARE_STOP_TIMEOUT_MILLIS = 5_000L
         const val MILLIS_PER_SECOND = 1_000L
         const val HALF_TURN_DEGREES = 180
     }
