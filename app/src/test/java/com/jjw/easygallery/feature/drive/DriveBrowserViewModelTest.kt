@@ -8,6 +8,8 @@ import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
+import com.jjw.easygallery.core.domain.model.RemoteAccount
+import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -35,6 +37,8 @@ class DriveBrowserViewModelTest {
         coEvery { listChildren("root", null, false) } returns DrivePage(listOf(folderA, fileA, fileB), null)
         every { rootId } returns "root"
         every { capabilities } returns setOf(Capability.TRASH, Capability.RENAME, Capability.MOVE)
+        every { account } returns
+            RemoteAccount(RemoteAccount.GOOGLE_DRIVE_ID, RemoteAccountKind.GOOGLE_DRIVE, "Google Drive")
     }
     private val storages: StorageRegistry = mockk { coEvery { storage(null) } returns drive }
     private val prefs: UserPreferencesRepository = mockk()

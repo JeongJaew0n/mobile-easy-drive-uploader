@@ -194,16 +194,7 @@ internal fun DriveBrowserScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(uiState.current?.name ?: stringResource(R.string.drive_title))
-                        Text(
-                            text = stringResource(R.string.drive_title),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
+                title = { BrowserTitle(folderName = uiState.current?.name, accountName = uiState.accountName) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -329,6 +320,20 @@ internal fun DriveBrowserScreen(
             dismissButton = {
                 TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.action_cancel)) }
             },
+        )
+    }
+}
+
+/** 제목: 현재 폴더 이름, 부제: 저장소(계정) 이름 */
+@Composable
+private fun BrowserTitle(folderName: String?, accountName: String?) {
+    val storageName = accountName ?: stringResource(R.string.drive_title)
+    Column {
+        Text(folderName ?: storageName)
+        Text(
+            text = storageName,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

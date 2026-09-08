@@ -51,7 +51,13 @@ class DriveBrowserViewModel @Inject constructor(
                 drive = storages.storage(accountId)
                 val folder = DriveFolder(folderId ?: drive.rootId, folderName ?: rootName)
                 _uiState.update {
-                    it.copy(current = folder, isLoading = true, error = null, capabilities = drive.capabilities)
+                    it.copy(
+                        current = folder,
+                        isLoading = true,
+                        error = null,
+                        capabilities = drive.capabilities,
+                        accountName = drive.account.displayName,
+                    )
                 }
                 fetchPage(reset = true)
             } catch (e: CancellationException) {
@@ -227,6 +233,8 @@ data class DriveBrowserUiState(
     val error: String? = null,
     /** 저장소가 지원하는 동작 — 메뉴 구성에 쓴다 */
     val capabilities: Set<Capability> = emptySet(),
+    /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
+    val accountName: String? = null,
 )
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */
