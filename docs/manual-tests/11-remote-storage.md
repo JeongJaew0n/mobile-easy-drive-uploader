@@ -20,3 +20,8 @@
 | NAS-04 | 업로드 폴더 지정 → 큰 영상 업로드 | NAS 에 파일 생성, NAS 에서 재생 가능. 중간에 끊기면 처음부터 다시(재개 없음) | ⬜ | |
 | NAS-05 | http(비TLS) 주소 입력 | 빨간 경고 "https 가 아니면 비밀번호가 평문으로 전송됩니다"(입력은 허용) | ⬜ | |
 | NAS-06 | 자체 서명 인증서 NAS 로 연결 테스트 | "서버 인증서를 신뢰할까요?" 다이얼로그에 SHA-256 지문 표시 → 신뢰 → 재테스트 성공 → 저장. 폼에 "신뢰한 인증서" 표시. 이후 NAS 인증서를 바꾸면 연결 실패 | ⬜ | `certSha256`, `pinCertificate` |
+| NAS-07 | 저장소 추가 → SMB, 주소(`192.168.x.x` 또는 `nas.local`)·공유 이름·사용자·비밀번호 → 연결 테스트 | 같은 Wi-Fi 에서 "연결 성공". 비밀번호 틀리면 "SMB 오류: STATUS_LOGON_FAILURE …", 공유 이름 틀리면 "STATUS_BAD_NETWORK_NAME" | ⬜ | Synology: 파일 서비스 → SMB 켬, 최소 SMB2 |
+| NAS-08 | SMB 탐색·새 폴더·이름 변경·폴더 이동·삭제 | 한글 폴더·파일 정상, 폴더 이름 변경/이동 즉시(복사 없음), 삭제 확인 후 즉시(휴지통 없음) | ⬜ | `rename` = SMB2 FileRenameInformation |
+| NAS-09 | SMB 폴더를 업로드 폴더로 지정 → 큰 영상 업로드 중 Wi-Fi 를 끄고 다시 켬 | 워커 재시도 시 원격 파일 크기부터 이어 올림(처음부터 아님), 완료 후 NAS 에서 재생 가능 | ⬜ | `queryStatus` → `Incomplete(size)` |
+| NAS-10 | 같은 이름 파일이 이미 있는 폴더로 업로드 | 덮어쓰지 않고 `이름 (1).jpg` 로 생성 | ⬜ | `RemoteNames.unique` |
+| NAS-11 | 모바일 데이터(Wi-Fi 끔)에서 SMB 연결 테스트 | 30초 안에 "SMB 오류: … timed out/unreachable" — 앱이 멈추지 않음 | ⬜ | 외부망 불가는 폼 힌트로 안내 |

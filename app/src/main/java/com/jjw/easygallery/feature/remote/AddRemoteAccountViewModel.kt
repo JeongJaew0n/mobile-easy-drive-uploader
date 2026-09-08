@@ -52,7 +52,7 @@ data class AddRemoteAccountUiState(
 ) {
     val canSubmit: Boolean
         get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() && secret.isNotBlank() &&
-            (kind != RemoteAccountKind.S3 || bucketOrRoot.isNotBlank())
+            (kind == RemoteAccountKind.WEBDAV || bucketOrRoot.isNotBlank())
 }
 
 sealed interface AddRemoteAccountEvent {

@@ -201,6 +201,11 @@
     <string name="remote_kind_google">Google Drive</string>
     <string name="remote_kind_s3">S3 호환 (Naver Cloud · KT Cloud · AWS · MinIO)</string>
     <string name="remote_kind_webdav">WebDAV (NAS · Nextcloud)</string>
+    <string name="remote_kind_smb">SMB (NAS 공유 폴더 · Windows)</string>
+    <string name="remote_smb_host">NAS 주소 (host 또는 host:port)</string>
+    <string name="remote_smb_hint">예: 192.168.0.10 또는 nas.local. 같은 Wi-Fi에서만 연결됩니다(외부망은 VPN 필요).</string>
+    <string name="remote_smb_share">공유 폴더 이름</string>
+    <string name="remote_smb_domain">도메인/작업 그룹 (선택)</string>
     <string name="remote_preset">서비스</string>
     <string name="remote_preset_naver">Naver Cloud Object Storage</string>
     <string name="remote_preset_kt">KT Cloud Object Storage</string>

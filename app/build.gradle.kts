@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
     implementation(libs.kizitonwose.calendar.compose)
+    implementation(libs.smbj)
 
     // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)

@@ -1,5 +1,6 @@
 package com.jjw.easygallery.feature.remote
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -152,18 +153,7 @@ internal fun AddRemoteAccountScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (uiState.isBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = uiState.kind == RemoteAccountKind.S3,
-                    onClick = { onKindChange(RemoteAccountKind.S3) },
-                    label = { Text(stringResource(R.string.remote_kind_s3)) },
-                )
-                FilterChip(
-                    selected = uiState.kind == RemoteAccountKind.WEBDAV,
-                    onClick = { onKindChange(RemoteAccountKind.WEBDAV) },
-                    label = { Text(stringResource(R.string.remote_kind_webdav)) },
-                )
-            }
+            KindChips(uiState.kind, onKindChange)
             if (uiState.kind == RemoteAccountKind.S3) PresetDropdown(uiState.preset, onPresetChange)
             OutlinedTextField(
                 value = uiState.displayName,
@@ -172,36 +162,8 @@ internal fun AddRemoteAccountScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = uiState.endpoint,
-                onValueChange = { v -> onUpdate { copy(endpoint = v) } },
-                label = { Text(stringResource(R.string.remote_endpoint)) },
-                supportingText = {
-                    when {
-                        uiState.endpoint.isNotBlank() && !uiState.endpoint.startsWith("https://") ->
-                            Text(stringResource(R.string.remote_https_warning), color = MaterialTheme.colorScheme.error)
-                        uiState.kind == RemoteAccountKind.WEBDAV -> Text(stringResource(R.string.remote_webdav_hint))
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (uiState.kind == RemoteAccountKind.S3) {
-                OutlinedTextField(
-                    value = uiState.region,
-                    onValueChange = { v -> onUpdate { copy(region = v) } },
-                    label = { Text(stringResource(R.string.remote_region)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = uiState.bucketOrRoot,
-                    onValueChange = { v -> onUpdate { copy(bucketOrRoot = v) } },
-                    label = { Text(stringResource(R.string.remote_bucket)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            EndpointField(uiState, onUpdate)
+            KindSpecificFields(uiState, onUpdate)
             OutlinedTextField(
                 value = uiState.username,
                 onValueChange = { v -> onUpdate { copy(username = v) } },
@@ -288,4 +250,79 @@ private fun S3Preset.labelRes(): Int = when (this) {
     S3Preset.AWS -> R.string.remote_preset_aws
     S3Preset.R2 -> R.string.remote_preset_r2
     S3Preset.CUSTOM -> R.string.remote_preset_custom
+}
+
+@Composable
+private fun KindChips(kind: RemoteAccountKind, onKindChange: (RemoteAccountKind) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(
+            selected = kind == RemoteAccountKind.S3,
+            onClick = { onKindChange(RemoteAccountKind.S3) },
+            label = { Text(stringResource(R.string.remote_kind_s3)) },
+        )
+        FilterChip(
+            selected = kind == RemoteAccountKind.WEBDAV,
+            onClick = { onKindChange(RemoteAccountKind.WEBDAV) },
+            label = { Text(stringResource(R.string.remote_kind_webdav)) },
+        )
+        FilterChip(
+            selected = kind == RemoteAccountKind.SMB,
+            onClick = { onKindChange(RemoteAccountKind.SMB) },
+            label = { Text(stringResource(R.string.remote_kind_smb)) },
+        )
+    }
+}
+
+/** 서버 주소. SMB 는 host[:port], 나머지는 https URL(https 아니면 경고) */
+@Composable
+private fun EndpointField(
+    uiState: AddRemoteAccountUiState,
+    onUpdate: (AddRemoteAccountUiState.() -> AddRemoteAccountUiState) -> Unit,
+) {
+    val isSmb = uiState.kind == RemoteAccountKind.SMB
+    OutlinedTextField(
+        value = uiState.endpoint,
+        onValueChange = { v -> onUpdate { copy(endpoint = v) } },
+        label = { Text(stringResource(if (isSmb) R.string.remote_smb_host else R.string.remote_endpoint)) },
+        supportingText = {
+            when {
+                isSmb -> Text(stringResource(R.string.remote_smb_hint))
+                uiState.endpoint.isNotBlank() && !uiState.endpoint.startsWith("https://") ->
+                    Text(stringResource(R.string.remote_https_warning), color = MaterialTheme.colorScheme.error)
+                uiState.kind == RemoteAccountKind.WEBDAV -> Text(stringResource(R.string.remote_webdav_hint))
+            }
+        },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** 종류별 추가 입력 — S3: 리전·버킷, SMB: 공유 이름·도메인. WebDAV 는 없음 */
+@Composable
+private fun KindSpecificFields(
+    uiState: AddRemoteAccountUiState,
+    onUpdate: (AddRemoteAccountUiState.() -> AddRemoteAccountUiState) -> Unit,
+) {
+    when (uiState.kind) {
+        RemoteAccountKind.SMB -> {
+            SimpleField(uiState.bucketOrRoot, R.string.remote_smb_share) { v -> onUpdate { copy(bucketOrRoot = v) } }
+            SimpleField(uiState.region, R.string.remote_smb_domain) { v -> onUpdate { copy(region = v) } }
+        }
+        RemoteAccountKind.S3 -> {
+            SimpleField(uiState.region, R.string.remote_region) { v -> onUpdate { copy(region = v) } }
+            SimpleField(uiState.bucketOrRoot, R.string.remote_bucket) { v -> onUpdate { copy(bucketOrRoot = v) } }
+        }
+        else -> Unit
+    }
+}
+
+@Composable
+private fun SimpleField(value: String, @StringRes label: Int, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(stringResource(label)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

@@ -37,6 +37,7 @@ kotlinxSerialization = "1.11.0"
 # 3rd party
 coil = "3.6.2"
 kizitonwoseCalendar = "2.10.1"
+smbj = "0.15.0"
 retrofit = "3.0.0"
 okhttp = "5.5.0"
 timber = "5.0.1"
@@ -110,6 +111,7 @@ androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", vers
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-video = { module = "io.coil-kt.coil3:coil-video", version.ref = "coil" }
 kizitonwose-calendar-compose = { module = "com.kizitonwose.calendar:compose", version.ref = "kizitonwoseCalendar" }
+smbj = { module = "com.hierynomus:smbj", version.ref = "smbj" }
 
 # Auth (Credential Manager + Google Identity + OAuth AuthorizationClient)
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidxCredentials" }

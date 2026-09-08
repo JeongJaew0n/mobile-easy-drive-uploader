@@ -1,4 +1,4 @@
-# NAS 연동 — WebDAV 우선, SMB 는 후속
+# NAS 연동 — WebDAV(W1) + SMB(W2)
 
 작성 2026-09-09. 집·사무실 NAS(Synology·QNAP·Nextcloud·일반 리눅스 서버)로 사진을 옮기고 탐색·CRUD 하려는 요구. `MULTI_CLOUD.md` 의 `RemoteStorage` 제공자로 구현한다.
 
@@ -7,7 +7,7 @@
 | 프로토콜 | 장점 | 단점 | 결정 |
 |---|---|---|---|
 | **WebDAV(HTTPS)** | 표준 HTTP — 기존 OkHttp 로 끝, 외부망(DDNS·QuickConnect 역방향 프록시)에서도 동작, Synology·QNAP·Nextcloud 모두 기본 제공, TLS | 서버에서 WebDAV 서비스를 켜야 함, 재개 업로드 없음(전체 PUT) | **W1 로 먼저** |
-| SMB2/3 | NAS 기본, 로컬 네트워크 빠름, 별도 설정 없음 | 외부망 불가(VPN 필요), 라이브러리 필요(`smbj`, Apache 2.0, ~1MB, BouncyCastle 의존), 배터리·절전 시 연결 유지 문제 | **W2**(§5) |
+| SMB2/3 | NAS 기본, 로컬 네트워크 빠름, 별도 설정 없음, **오프셋 쓰기로 재개 업로드** | 외부망 불가(VPN 필요), 라이브러리 필요(`smbj`, Apache 2.0, ~1MB, BouncyCastle 의존), 배터리·절전 시 연결 유지 문제 | **W2 구현**(§5) |
 | SFTP | 어디나 있음 | 라이브러리(`sshj`) 무거움, 파일 목록 메타데이터 빈약 | 후보 |
 | FTP | 구식·평문 | 제외 | 제외 |
 
@@ -31,16 +31,21 @@
 - 단위: MockWebServer 로 PROPFIND 207 파싱(폴더/파일/자기 자신 제외/한글 경로 인코딩), MKCOL·MOVE(Destination 절대 URL)·DELETE·PUT 요청 형태, 401/404 매핑.
 - 실기기(지시 시): `manual-tests/11-remote-storage.md` NAS-01~08 — Synology WebDAV 연결, 한글 폴더, 큰 영상 업로드 후 NAS 에서 재생, 절전 후 재개(처음부터 다시 올라가는지), 자체 서명 인증서 지문 고정.
 
-## 5. SMB (W2, 후속)
+## 5. SMB (W2) — `SmbStorage`
 
-- `com.hierynomus:smbj`(Apache 2.0) — SMB2/3, 서명·암호화. 연결은 세션당 하나 유지, 워커 실행 중에만 열고 닫는다.
-- Wi-Fi 에서만 동작(외부망 없음) → 업로드 제약에 "이 저장소는 Wi-Fi 필요"를 자동 적용.
-- 호스트 발견은 하지 않는다(mDNS 광고가 제각각). 주소·공유 이름·계정 직접 입력.
-- 재개: `SMB2 Write` 는 오프셋 지정이 가능하므로 `queryStatus` 로 원격 파일 크기를 읽어 그 지점부터 이어 쓴다(`RESUMABLE_UPLOAD` 가능).
-- 위험: BouncyCastle 이 R8 규칙과 크기를 늘린다. W1 이 충분하면 미룬다.
+- 라이브러리 `com.hierynomus:smbj` 0.15.0(Apache 2.0; 의존 bcprov-jdk18on·asn-one·mbassador·slf4j-api). SMB2/3, 서명·암호화 협상은 smbj 기본값. slf4j 바인딩은 넣지 않는다(첫 호출에 "No SLF4J providers" 한 줄만 나온다).
+- 계정: `RemoteAccountEntity(kind = SMB, endpoint = "host[:port]"(기본 445), bucketOrRoot = 공유 이름, region = 도메인/작업 그룹(선택), username, secretRef)`. 호스트 발견(mDNS/NetBIOS)은 하지 않는다 — 주소·공유·계정 직접 입력.
+- **연결은 작업마다 열고 닫는다**(`withShare`: connect → authenticate → connectShare → 작업 → close). 소켓을 워커 밖에서 들고 있지 않아 절전·Wi-Fi 전환에 강하고, 목록 한 번에 왕복 3~4회가 늘지만 LAN 이라 체감 없다. 타임아웃 30초.
+- `entryId` 는 다른 제공자와 같은 `/` 구분 상대 경로(폴더는 `/` 끝), smbj 로 넘길 때만 `\\` 로 바꾼다(`SmbPaths`). 루트는 빈 문자열.
+- 목록: `DiskShare.list(path)` → `FileIdBothDirectoryInformation`(`.`/`..` 제외, `FILE_ATTRIBUTE_DIRECTORY` 로 폴더 판정, `endOfFile`, `changeTime`). 페이징 없음. 폴더 생성 `mkdir`, 이름 변경·이동은 `openFile/openDirectory(DELETE)` 후 `rename(새 전체 경로)`(SMB2 `FileRenameInformation`, 같은 공유 안에서만), 삭제는 `rm` / `rmdir(recursive)`. 휴지통 없음 → 능력 `RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD`.
+- **업로드(재개)**: `startSession` 은 같은 이름이 있으면 ` (n)` 을 붙인 대상 경로를 세션 URI 로 돌려준다. `queryStatus` 는 원격 파일 크기를 읽어 `길이와 같음 → Complete`, `작음 → Incomplete(size)`(그 오프셋부터 이어 씀), `없음/큼 → Expired`. `upload` 는 content 스트림을 오프셋까지 `skip` 한 뒤 `ByteChunkProvider` 로 `File.write` — 청크마다 `Progress`. 첫 시도는 `FILE_OVERWRITE_IF`, 이어 쓰기는 `FILE_OPEN_IF`.
+- 외부망: SMB 는 인터넷에 노출하면 안 되는 프로토콜이라 Wi-Fi(또는 VPN) 안에서만 동작한다. 업로드 제약의 "Wi-Fi 전용"을 켜는 자동 규칙은 두지 않았다(VPN 사용자를 막지 않기 위해) — 폼 힌트로만 안내.
+- R8: `-keep com.hierynomus.**`(mbassador 이벤트 버스가 리플렉션으로 핸들러를 찾음), `-keep net.engio.mbassy.**`, `-dontwarn org.bouncycastle.** / org.slf4j.** / javax.naming.**`. `assembleRelease` 후 `missing_rules.txt` 없음 확인. 첫 빌드에서 `org.ietf.jgss.*`(Kerberos)·`javax.el.*`(mbassador EL) 누락이 나와 `-dontwarn` 추가. 릴리스 APK 6.17MB → 8.01MB(+1.8MB, 대부분 BouncyCastle).
+- 검증: 단위 `SmbPathsTest`(경로 변환·host:port). smbj 는 실제 서버가 필요해 프로토콜 테스트는 없고 실기기 `NAS-07~10` 으로.
 
 ## 6. 진행 기록
 
 - 2026-09-09 W1 구현(`0a2c34d`): `WebDavStorage`(PROPFIND/MKCOL/MOVE/DELETE/PUT), 계정 추가 폼, 탐색·CRUD·업로드 대상 지정.
 - 2026-09-09 자체 서명 인증서 지문 고정: 연결 테스트가 TLS 오류로 실패하면 서버 리프 인증서의 SHA-256 을 읽어 "이 인증서 신뢰" 다이얼로그를 띄우고, 수락 시 `RemoteAccount.certSha256`(Room v7)에 저장. `WebDavStorage` 는 그 인증서와 **정확히 같은** 경우만 연결(`pinCertificate`, 호스트 이름 검사는 생략 — 인증서 자체를 고정). 전체 신뢰 옵션은 두지 않았다. `PinnedTlsTest`(okhttp-tls 자체 서명 서버).
-- 남은 것: Digest 인증, SMB(W2).
+- 2026-09-09 W2 SMB 구현: `SmbStorage`/`SmbModule`(`@RemoteKindKey(SMB)`), 계정 추가 폼에 SMB 종류(주소·공유 이름·도메인·사용자·비밀번호), 오프셋 재개 업로드, R8 규칙. `SmbPathsTest`.
+- 남은 것: Digest 인증(WebDAV), SMB 서버 검색(mDNS), SFTP.

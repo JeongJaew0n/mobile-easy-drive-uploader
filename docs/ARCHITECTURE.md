@@ -10,7 +10,7 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
 │   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
-│   ├── data/remote/           # RemoteStorage/RemoteUploader 제공자 추상화, GoogleDriveStorage 어댑터, s3/(SigV4·S3Storage), webdav/(WebDavStorage),
+│   ├── data/remote/           # RemoteStorage/RemoteUploader 제공자 추상화, GoogleDriveStorage 어댑터, s3/(SigV4·S3Storage), webdav/(WebDavStorage), smb/(SmbStorage·SmbPaths, smbj),
 │   │                          # RemoteAccountRepository(Room remote_account) + KeystoreSecretStore, StorageRegistry(accountId → 제공자) — MULTI_CLOUD.md / NAS_STORAGE.md
 │   ├── data/duplicates/       # MediaHasher(SHA-256), DuplicateRepository(크기 충돌만 해시·캐시·그룹), DuplicateScanWorker/Scheduler
 │   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
@@ -35,7 +35,7 @@ app/src/main/java/com/jjw/easygallery/
     ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
-    ├── remote/                # AddRemoteAccount(S3 호환·WebDAV 계정 추가, 프리셋, 연결 테스트)
+    ├── remote/                # AddRemoteAccount(S3 호환·WebDAV·SMB 계정 추가, 프리셋, 연결 테스트)
     ├── drive/                 # 원격 저장소 탐색(계정별 RemoteStorage, 능력 기반 메뉴): 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push),
     │                          # 행 ⋮ 이름 변경·이동(DriveFolderPickerSheet)·휴지통(실행 취소) — 낙관적 갱신, DRIVE_FILE_CRUD.md
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
@@ -89,9 +89,9 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 
 ## 다중 클라우드 / NAS (core/data/remote)
 
-- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK)으로 화면 메뉴가 달라진다.
+- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS)·SMB(NAS·Windows 공유, smbj) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK)으로 화면 메뉴가 달라진다.
 - 계정은 Room `remote_account`(비밀 제외) + `KeystoreSecretStore`(AES-GCM, Android Keystore). `StorageRegistry` 가 `accountId`(null = Drive) → 제공자 인스턴스를 만들고 캐시한다. 종류별 구현은 Hilt `@IntoMap @RemoteKindKey` 팩토리로 등록.
-- 업로드 대상은 `UserPreferences.uploadAccountId` + 폴더. 큐·원장에 `accountId` 가 있고 `UploadWorker` 는 태스크의 계정으로 `RemoteUploader` 를 고른다. Drive 만 로그인이 필요하고(`canUpload`), S3·WebDAV 는 재개가 없어 상태 조회가 `Expired` 를 돌려 처음부터 다시 올린다.
+- 업로드 대상은 `UserPreferences.uploadAccountId` + 폴더. 큐·원장에 `accountId` 가 있고 `UploadWorker` 는 태스크의 계정으로 `RemoteUploader` 를 고른다. Drive 만 로그인이 필요하고(`canUpload`), S3(단일 PUT)·WebDAV 는 재개가 없어 상태 조회가 `Expired` 를 돌려 처음부터 다시 올리며, SMB 는 원격 파일 크기에서 이어 쓴다.
 - S3 는 AWS SDK 없이 `S3Signer`(SigV4, UNSIGNED-PAYLOAD) 로 서명하고 XML 은 `XmlPullParser` 로 읽는다. 폴더 = 접두어, 폴더 이름 변경·이동은 미지원(FOLDER_MUTATION 없음), 삭제는 영구.
 
 ## 인증 / Drive / 업로드 흐름

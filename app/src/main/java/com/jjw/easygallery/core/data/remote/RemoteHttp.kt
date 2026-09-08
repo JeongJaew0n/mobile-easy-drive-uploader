@@ -9,7 +9,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** 제공자 공통 HTTP 오류. [httpCode] 4xx 는 영구 실패, 그 외는 재시도 대상(워커 규칙) */
-open class RemoteStorageException(message: String, val httpCode: Int? = null) : IOException(message)
+open class RemoteStorageException(message: String, val httpCode: Int? = null, cause: Throwable? = null) :
+    IOException(message, cause)
 
 /** 제공자가 지원하지 않는 동작(폴더 이름 변경 등). UI 는 능력 집합으로 미리 숨기므로 방어용 */
 class UnsupportedOperationException(message: String) : RemoteStorageException(message)
