@@ -7,7 +7,7 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 
 | ID | 시나리오 | 기대 결과 | 상태 | 메모 |
 |---|---|---|---|---|
-| DRV-01 | GCP OAuth 클라이언트 등록 | 위 사전 준비 완료 | ⬜ | 미등록 시 `DEVELOPER_ERROR`(status 10) |
+| DRV-01 | GCP OAuth 클라이언트 등록 | 위 사전 준비 완료 | ⬜ | 미등록 시 `DEVELOPER_ERROR`(status 10). 2026-09-09 로그인 실패 보고 → 원인 후보·확정 절차는 `../GOOGLE_SIGN_IN_TROUBLESHOOTING.md` |
 | DRV-02 | 설정 → Google 계정 연결 | 계정 선택 → Drive 전체 접근 동의 → 스낵바 "연결되었습니다", 카드에 이메일·이름·저장공간 | ⬜ | scope 는 `drive`(전체) |
 | DRV-03 | 동의 화면에서 취소 | "로그인이 취소되었습니다", 상태 변화 없음 | ⬜ | |
 | DRV-04 | 연결 해제 | 카드가 연결 전 상태로, 업로드 큐도 취소됨 | ⬜ | |
