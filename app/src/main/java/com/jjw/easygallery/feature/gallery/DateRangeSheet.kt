@@ -21,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -89,7 +91,9 @@ internal fun DateRangeSheet(
     )
     val scope = rememberCoroutineScope()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // 반만 펼친 상태면 달력이 잘리고 적용 버튼이 화면 밖으로 나간다 → 처음부터 전체 펼침
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -107,6 +111,7 @@ internal fun DateRangeSheet(
                 },
             )
             WeekdayHeader(firstDayOfWeek)
+            HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
             RangeCalendar(
                 state = calendarState,
                 dayCounts = dayCounts,
