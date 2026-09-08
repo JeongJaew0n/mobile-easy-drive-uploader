@@ -1,10 +1,6 @@
 package com.jjw.easygallery.feature.trash
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,12 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -40,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.feature.gallery.GalleryGrid
-import com.jjw.easygallery.feature.gallery.actionDoneMessage
 
 @Composable
 fun TrashRoute(
@@ -50,25 +44,13 @@ fun TrashRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val resources = LocalResources.current
 
-    val consentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result -> viewModel.onConsentResult(result.resultCode == Activity.RESULT_OK) }
-
-    LaunchedEffect(Unit) {
-        viewModel.eventFlow.collect { event ->
-            when (event) {
-                is TrashEvent.LaunchConsent ->
-                    consentLauncher.launch(IntentSenderRequest.Builder(event.intentSender).build())
-                is TrashEvent.ActionDone ->
-                    snackbarHostState.showSnackbar(actionDoneMessage(resources, event.action, event.affected))
-                TrashEvent.ActionCancelled ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.gallery_action_cancelled))
-                is TrashEvent.Error -> snackbarHostState.showSnackbar(event.message)
-            }
-        }
-    }
+    MediaActionEffect(
+        events = viewModel.actionEvents,
+        snackbarHostState = snackbarHostState,
+        onConsentResult = viewModel::onConsentResult,
+        onActionDone = { viewModel.clearSelection() },
+    )
 
     TrashScreen(
         uiState = uiState,

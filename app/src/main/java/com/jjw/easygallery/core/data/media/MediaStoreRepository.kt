@@ -14,8 +14,10 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
+import androidx.exifinterface.media.ExifInterface
 import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
+import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,6 +35,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -60,6 +63,37 @@ class MediaStoreRepository @Inject constructor(
         merge(flowOf(Unit), mediaChanges().debounce(CHANGE_DEBOUNCE_MILLIS))
             .mapLatest { queryAll(filter) }
             .flowOn(ioDispatcher)
+
+    // ---------- 상세 정보 ----------
+
+    override suspend fun readDetails(item: MediaItem): MediaDetails = withContext(ioDispatcher) {
+        if (item.isVideo) return@withContext MediaDetails()
+        try {
+            // 위치 정보가 지워지지 않은 원본을 요청한다 (ACCESS_MEDIA_LOCATION 권한 필요)
+            val uri = runCatching { MediaStore.setRequireOriginal(item.uri) }.getOrDefault(item.uri)
+            resolver.openInputStream(uri)?.use { stream ->
+                val exif = ExifInterface(stream)
+                val latLong = FloatArray(2)
+                val hasLocation = exif.getLatLong(latLong)
+                MediaDetails(
+                    cameraMake = exif.getAttribute(ExifInterface.TAG_MAKE),
+                    cameraModel = exif.getAttribute(ExifInterface.TAG_MODEL),
+                    aperture = exif.getAttribute(ExifInterface.TAG_F_NUMBER),
+                    exposureTime = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME),
+                    isoSensitivity = exif.getAttribute(ExifInterface.TAG_ISO_SPEED_RATINGS),
+                    focalLength = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH),
+                    latitude = if (hasLocation) latLong[0].toDouble() else null,
+                    longitude = if (hasLocation) latLong[1].toDouble() else null,
+                )
+            } ?: MediaDetails()
+        } catch (e: IOException) {
+            Timber.w(e, "EXIF 읽기 실패: %s", item.displayName)
+            MediaDetails()
+        } catch (e: SecurityException) {
+            Timber.w(e, "EXIF 원본 접근 거부: %s", item.displayName)
+            MediaDetails()
+        }
+    }
 
     // ---------- 편집 ----------
 

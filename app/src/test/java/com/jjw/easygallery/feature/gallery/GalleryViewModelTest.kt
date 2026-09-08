@@ -2,6 +2,7 @@ package com.jjw.easygallery.feature.gallery
 
 import android.net.Uri
 import app.cash.turbine.test
+import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
@@ -31,7 +32,7 @@ class GalleryViewModelTest {
     private val repository: MediaRepository = mockk {
         every { supportsTrashAndFavorites } returns true
     }
-    private val actionRunner: MediaActionRunner = mockk()
+    private val actionController = MediaActionController(mockk<MediaActionRunner>())
     private val uploadQueue: UploadQueueRepository = mockk {
         every { observeSummary() } returns flowOf(UploadSummary())
     }
@@ -53,7 +54,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `stays Loading and does not query until permission status is known`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -64,7 +65,7 @@ class GalleryViewModelTest {
 
     @Test
     fun `denied permission shows PermissionRequired without querying`() = runTest(testDispatcher) {
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -78,7 +79,7 @@ class GalleryViewModelTest {
     fun `full permission loads content grouped by date`() = runTest(testDispatcher) {
         val item = sampleItem(id = 1)
         every { repository.observeMedia(any()) } returns flowOf(listOf(item))
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             assertEquals(GalleryUiState.Loading, awaitItem())
@@ -93,7 +94,7 @@ class GalleryViewModelTest {
     @Test
     fun `partial permission flags content as partial access`() = runTest(testDispatcher) {
         every { repository.observeMedia(any()) } returns flowOf(emptyList())
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             awaitItem() // Loading
@@ -108,7 +109,7 @@ class GalleryViewModelTest {
     fun `toggleSelection adds and removes ids and clearSelection resets`() = runTest(testDispatcher) {
         val items = listOf(sampleItem(1), sampleItem(2))
         every { repository.observeMedia(any()) } returns flowOf(items)
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             awaitItem() // Loading
@@ -138,7 +139,7 @@ class GalleryViewModelTest {
     fun `repository failure maps to Error state`() = runTest(testDispatcher) {
         val boom = IllegalStateException("boom")
         every { repository.observeMedia(any()) } returns flow { throw boom }
-        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionRunner)
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
 
         viewModel.uiState.test {
             awaitItem() // Loading

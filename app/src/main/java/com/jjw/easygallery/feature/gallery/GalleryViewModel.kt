@@ -1,12 +1,10 @@
 package com.jjw.easygallery.feature.gallery
 
-import android.content.IntentSender
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
-import com.jjw.easygallery.core.data.media.ActionOutcome
 import com.jjw.easygallery.core.data.media.MediaAction
-import com.jjw.easygallery.core.data.media.MediaActionRunner
+import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
@@ -37,28 +35,27 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-@Suppress("TooGenericExceptionCaught") // UI 경계: 편집·큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
+@Suppress("TooGenericExceptionCaught") // UI 경계: 큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
 class GalleryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     uploadQueue: UploadQueueRepository,
     private val enqueueUploads: EnqueueUploadsUseCase,
     private val manageQueue: ManageUploadQueueUseCase,
-    private val actionRunner: MediaActionRunner,
+    private val actionController: MediaActionController,
 ) : ViewModel() {
 
     // null = 아직 권한 상태를 확인하지 않음
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
     private val filter = MutableStateFlow(MediaFilter.All)
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val isMutating = MutableStateFlow(false)
     private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
     val eventFlow: Flow<GalleryEvent> = events.receiveAsFlow()
 
-    private var latestItems: List<MediaItem> = emptyList()
+    /** 편집 동의 흐름은 공용 컨트롤러가 담당 */
+    val actionEvents = actionController.events
 
-    /** 시스템 동의 다이얼로그가 떠 있는 동안 보류된 액션 */
-    private var pendingAction: MediaAction? = null
+    private var latestItems: List<MediaItem> = emptyList()
 
     val uiState: StateFlow<GalleryUiState> = combine(permissionStatus, filter) { status, f -> status to f }
         .flatMapLatest { (status, f) -> stateFor(status, f) }
@@ -130,6 +127,8 @@ class GalleryViewModel @Inject constructor(
         perform(MediaAction.Favorite(items, favorite = !items.all { it.isFavorite }))
     }
 
+    fun onConsentResult(granted: Boolean) = actionController.onConsentResult(viewModelScope, granted)
+
     /** 확장자를 안 적으면 원본 확장자를 유지한다. */
     fun renameSelected(newName: String) {
         val item = selectedItems().singleOrNull() ?: return
@@ -140,46 +139,7 @@ class GalleryViewModel @Inject constructor(
 
     fun moveSelected(relativePath: String) = perform(MediaAction.Move(selectedItems(), relativePath))
 
-    /** 동의 다이얼로그 결과 */
-    fun onConsentResult(granted: Boolean) {
-        val action = pendingAction ?: return
-        pendingAction = null
-        if (!granted) {
-            isMutating.value = false
-            viewModelScope.launch { events.send(GalleryEvent.ActionCancelled) }
-            return
-        }
-        viewModelScope.launch { runGuarded { actionRunner.afterConsent(action) } }
-    }
-
-    private fun perform(action: MediaAction) {
-        if (action.items.isEmpty() || isMutating.value) return
-        viewModelScope.launch { runGuarded { actionRunner.run(action) } }
-    }
-
-    private suspend fun runGuarded(block: suspend () -> ActionOutcome) {
-        isMutating.value = true
-        try {
-            when (val outcome = block()) {
-                is ActionOutcome.NeedsConsent -> {
-                    pendingAction = outcome.action
-                    events.send(GalleryEvent.LaunchConsent(outcome.intentSender))
-                    // 동의 결과가 올 때까지 isMutating 유지
-                    return
-                }
-                is ActionOutcome.Done -> {
-                    clearSelection()
-                    events.send(GalleryEvent.ActionDone(outcome.action, outcome.affected))
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.e(e, "media action failed")
-            events.send(GalleryEvent.Error(e.message ?: e.toString()))
-        }
-        isMutating.value = false
-    }
+    private fun perform(action: MediaAction) = actionController.perform(viewModelScope, action)
 
     private fun selectedItems(): List<MediaItem> = latestItems.filter { it.id in selectedIds.value }
 
@@ -191,7 +151,8 @@ class GalleryViewModel @Inject constructor(
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         val media = mediaRepository.observeMedia(filter).onEach { latestItems = it }
-        return combine(media, selectedIds, uploadSummary, isMutating) { items, selected, summary, mutating ->
+        return combine(media, selectedIds, uploadSummary, actionController.isMutating) {
+                items, selected, summary, mutating ->
             GalleryUiState.Content(
                 sections = groupByDate(items),
                 itemCount = items.size,
@@ -244,8 +205,5 @@ sealed interface GalleryUiState {
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
-    data class LaunchConsent(val intentSender: IntentSender) : GalleryEvent
-    data class ActionDone(val action: MediaAction, val affected: Int) : GalleryEvent
-    data object ActionCancelled : GalleryEvent
     data class Error(val message: String) : GalleryEvent
 }

@@ -1,6 +1,7 @@
 package com.jjw.easygallery.core.data.media
 
 import android.content.IntentSender
+import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import kotlinx.coroutines.flow.Flow
 
@@ -32,6 +33,9 @@ interface MediaRepository {
 
     /** 기기 갤러리의 사진·영상을 최신순으로 관찰한다. MediaStore 변경 시 재발행. */
     fun observeMedia(filter: MediaFilter = MediaFilter.All): Flow<List<MediaItem>>
+
+    /** EXIF 기반 상세 정보. 읽을 수 없으면 빈 [MediaDetails]. */
+    suspend fun readDetails(item: MediaItem): MediaDetails
 
     suspend fun requestDelete(items: List<MediaItem>): MediaMutation
 

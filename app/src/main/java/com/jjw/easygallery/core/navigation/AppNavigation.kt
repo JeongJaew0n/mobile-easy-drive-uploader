@@ -11,6 +11,7 @@ import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
 import com.jjw.easygallery.feature.uploads.UploadQueueRoute
+import com.jjw.easygallery.feature.viewer.MediaViewerRoute
 
 @Composable
 fun AppNavigation() {
@@ -31,6 +32,9 @@ fun AppNavigation() {
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onTrashClick = { backStack.add(TrashKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
+                    onOpenItem = { mediaId, favoritesOnly ->
+                        backStack.add(MediaViewerKey(mediaId, favoritesOnly))
+                    },
                 )
             }
             entry<SettingsKey> {
@@ -46,6 +50,13 @@ fun AppNavigation() {
             }
             entry<TrashKey> {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
+            }
+            entry<MediaViewerKey> { key ->
+                MediaViewerRoute(
+                    key = key,
+                    onBackClick = { backStack.removeLastOrNull() },
+                    onSettingsClick = { backStack.add(SettingsKey) },
+                )
             }
             entry<DriveBrowserKey> { key ->
                 DriveBrowserRoute(

@@ -8,7 +8,6 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +61,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
 @Composable
@@ -70,6 +70,7 @@ fun GalleryRoute(
     onUploadQueueClick: () -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
+    onOpenItem: (mediaId: Long, favoritesOnly: Boolean) -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -97,10 +98,13 @@ fun GalleryRoute(
         }
     }
 
-    // MediaStore 편집 동의 다이얼로그
-    val consentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result -> viewModel.onConsentResult(result.resultCode == android.app.Activity.RESULT_OK) }
+    // 편집 동의 다이얼로그 + 결과 스낵바 (공용)
+    MediaActionEffect(
+        events = viewModel.actionEvents,
+        snackbarHostState = snackbarHostState,
+        onConsentResult = viewModel::onConsentResult,
+        onActionDone = { viewModel.clearSelection() },
+    )
 
     // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
     LifecycleResumeEffect(Unit) {
@@ -125,12 +129,6 @@ fun GalleryRoute(
                         resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
                 )
-                is GalleryEvent.LaunchConsent ->
-                    consentLauncher.launch(IntentSenderRequest.Builder(event.intentSender).build())
-                is GalleryEvent.ActionDone ->
-                    snackbarHostState.showSnackbar(actionDoneMessage(resources, event.action, event.affected))
-                GalleryEvent.ActionCancelled ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.gallery_action_cancelled))
                 is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
@@ -157,6 +155,7 @@ fun GalleryRoute(
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
+        onOpenItem = onOpenItem,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,
             onDelete = viewModel::deleteSelected,
@@ -193,6 +192,7 @@ internal fun GalleryScreen(
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
+    onOpenItem: (mediaId: Long, favoritesOnly: Boolean) -> Unit = { _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -268,6 +268,7 @@ internal fun GalleryScreen(
                     uiState = uiState,
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
+                    onOpenItem = { mediaId -> onOpenItem(mediaId, uiState.favoritesOnly) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -330,6 +331,7 @@ private fun GalleryContent(
     uiState: GalleryUiState.Content,
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
+    onOpenItem: (Long) -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -357,6 +359,7 @@ private fun GalleryContent(
                 selectedIds = uiState.selectedIds,
                 onToggleSelection = onToggleSelection,
                 onSelectionChange = onSelectionChange,
+                onOpenItem = onOpenItem,
                 modifier = Modifier.fillMaxSize(),
             )
         }

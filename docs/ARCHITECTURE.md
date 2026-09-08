@@ -10,7 +10,8 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
 │   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
-│   ├── data/media/            # MediaRepository(조회+편집) / MediaStoreRepository / MediaActions(MediaAction, MediaActionRunner)
+│   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
+│   │                          # MediaActions(MediaAction, MediaActionRunner), MediaActionController(동의 흐름 상태)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
 │   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody, UploadQueueRepository
 │   │   ├── db/                # Room: AppDatabase, UploadTaskEntity, UploadTaskDao (schemas/ 에 내보냄)
@@ -20,9 +21,11 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── navigation/            # AppNavKey(@Serializable NavKey), AppNavigation(NavDisplay)
 │   └── ui/
 │       ├── image/             # Coil Fetcher (MediaStore 썸네일)
+│       ├── media/             # MediaActionEffect (동의 실행 + 결과 스낵바, 3개 화면 공용)
 │       └── theme/             # Material 3 테마
 └── feature/
     ├── gallery/               # GalleryRoute/Screen/Grid, GalleryActions(하단 바·다이얼로그·메뉴), GalleryViewModel, MediaPermission
+    ├── viewer/                # 상세보기: 페이저 스와이프, 확대/축소, 영상 재생, 정보 패널, 단일 항목 편집
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
     ├── drive/                 # Google Drive 탐색: 폴더·파일 목록(페이징), 새 폴더, 파일 열기, 업로드 폴더 지정 (DriveBrowserKey 중첩 push)
@@ -91,12 +94,21 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
         그 외 API 29  → 같은 요청 재시도 (RecoverableSecurityException 경로)
 ```
 
-- `MediaActionRunner` 는 UI 프레임워크와 무관한 순수 로직이라 mock 저장소로 단위 테스트한다. 갤러리·휴지통 ViewModel 이 같은 러너를 공유.
+- `MediaActionRunner` 는 UI 프레임워크와 무관한 순수 로직이라 mock 저장소로 단위 테스트한다.
+- `MediaActionController`(ViewModel 마다 새 인스턴스) 가 `pendingAction`·`isMutating`·이벤트를 들고 있고, UI 쪽은 `MediaActionEffect` 가 동의 실행과 결과 스낵바를 담당한다 → 갤러리·휴지통·상세보기가 같은 부품을 쓴다.
 - 동의 다이얼로그가 떠 있는 동안 `isMutating` 으로 액션 버튼을 잠근다.
 - 조회 필터: `MediaFilter.All / Favorites(IS_FAVORITE=1) / Trashed(QUERY_ARG_MATCH_TRASHED=MATCH_ONLY)`. API 29 는 All 만.
 - 앨범 이동 대상은 현재 목록의 `RELATIVE_PATH` 집합(`albumsFrom`) + 새 앨범(`Pictures/<이름>/`).
 - 이름 변경 시 확장자를 생략하면 원본 확장자를 유지(`normalizeDisplayName`).
 - `MANAGE_MEDIA`(API 31+) 를 사용자가 시스템 설정에서 허용하면 createXxxRequest 가 다이얼로그 없이 즉시 OK 로 돌아온다 — 코드 경로는 동일.
+
+## 상세보기 (feature/viewer)
+
+- 그리드에서 항목을 탭하면 `MediaViewerKey(mediaId, favoritesOnly)` 로 진입. 목록을 통째로 넘기지 않고 **갤러리와 같은 필터로 다시 관찰**해 좌우 스와이프 범위를 맞춘다(`mediaId` 로 인덱스를 찾음).
+- `HorizontalPager` + 공용 `ZoomState`: 핀치 확대·드래그 이동·두 번 탭 토글. 확대 중에는 `userScrollEnabled = false` 로 페이저와 팬 제스처가 충돌하지 않게 한다(확대 중엔 다른 페이지가 보이지 않으므로 상태 하나를 공유해도 정확).
+- 영상은 항목별 `ExoPlayer` + media3 `PlayerSurface`. 페이지를 벗어나면 `pause()`, 화면을 나가면 `release()`. media3 의 `UnstableApi` 는 Java 마커라 `@androidx.annotation.OptIn` 이 필요하다(kotlin.OptIn 은 lint 가 인정하지 않음).
+- 정보 패널은 `MediaRepository.readDetails()` 로 EXIF(카메라·조리개·ISO·초점거리·좌표)를 읽는다. 위치가 지워지지 않은 원본은 `MediaStore.setRequireOriginal` + `ACCESS_MEDIA_LOCATION` 권한이 필요하며, 실패하면 빈 값으로 대체한다. 영상은 EXIF 를 읽지 않는다.
+- 현재 항목을 삭제하면 같은 인덱스(다음 항목)를 이어서 보여주고, 목록이 비면 화면을 닫는다.
 
 ## 백그라운드 업로드 (WorkManager)
 

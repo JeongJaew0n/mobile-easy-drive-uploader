@@ -49,6 +49,7 @@ internal fun GalleryGrid(
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenItem: (Long) -> Unit = {},
 ) {
     val selectionMode = selectedIds.isNotEmpty()
     val gridState = rememberLazyGridState()
@@ -99,6 +100,7 @@ internal fun GalleryGrid(
                     selected = item.id in selectedIds,
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
+                    onOpen = { onOpenItem(item.id) },
                 )
             }
         }
@@ -124,14 +126,16 @@ private fun MediaThumbnail(
     selected: Boolean,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
+    onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            // 길게 누르기·드래그 선택은 그리드(dragSelect)가 처리. 선택 모드에서는 탭으로 토글
-            .clickable(enabled = selectionMode, onClick = onToggleSelection),
+            // 길게 누르기·드래그 선택은 그리드(dragSelect)가 처리.
+            // 선택 모드에서는 탭으로 토글, 아니면 상세보기로 진입
+            .clickable { if (selectionMode) onToggleSelection() else onOpen() },
     ) {
         AsyncImage(
             model = item.uri,
