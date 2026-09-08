@@ -40,6 +40,7 @@ GCP 콘솔에서 필요한 것: ① Drive API 사용 설정 ② OAuth 동의 화
 | 폰에서 보이는 것 | 실패 지점 | 가장 유력한 원인 | 로그에 남는 것 |
 |---|---|---|---|
 | 버튼을 눌러도 계정 선택 화면이 안 뜨고 스낵바에 **`10:`** (또는 `10: DEVELOPER_ERROR`) | ① `authorize()` 가 `ApiException(10)` | Android OAuth 클라이언트 미등록, 또는 패키지명(`.debug` 누락)·SHA-1 불일치 | `SettingsViewModel: settings action failed … ApiException: 10:` |
+| **계정을 고르면 바로 "로그인이 취소되었습니다"** (동의 웹 화면 없음) | ② Play 서비스가 토큰을 받다 실패 → `AuthorizationActivity` 가 오류로 종료 → `RESULT_CANCELED` | **GCP 에 이 패키지명+SHA-1 의 Android OAuth 클라이언트가 없음**(`UNREGISTERED_ON_API_CONSOLE`). 계정 선택 화면은 등록 확인 **전**에 뜨므로 ①은 통과한 것처럼 보인다 | 앱 로그 없음. gms: `Auth: [GetTokenResponseHandler] Server returned error: This android application is not registered to use OAuth2.0…`, `Auth.Api.Credentials: cpwk: [8] Unknown error [status=UNREGISTERED_ON_API_CONSOLE]` |
 | 스낵바 **`8:`** / `17:` / `16:` | ① | 8 INTERNAL_ERROR(Play 서비스 상태), 17 API_NOT_CONNECTED, 16 CANCELED | 같은 위치, 코드 다름 |
 | 계정 선택은 뜨는데 다음 웹 화면이 **"액세스 차단됨 / 이 앱은 Google 의 확인을 받지 않았습니다"** (Error 403: access_denied) | ② | 동의 화면이 테스트 상태인데 **로그인 계정이 테스트 사용자에 없음**, 또는 scope `…/auth/drive` 가 동의 화면에 등록되지 않음 | 앱 로그 없음. 창을 닫으면 RESULT_CANCELED → "로그인이 취소되었습니다" 로만 보임 |
 | 동의까지 마쳤는데 "로그인이 취소되었습니다" | ③ `getAuthorizationResultFromIntent` 가 `ApiException` | 결과 파싱 실패. **현재 코드가 모든 ApiException 을 '취소'로 바꿔 버려 원인이 가려진다**(§5) | `GoogleAuthRepository: authorization result parse failed: status=N` |
@@ -75,4 +76,23 @@ adb -s R3CTC0CSZ1R logcat -d | grep -E "GoogleAuthRepository|SettingsViewModel|S
 
 ## 7. 진행 기록
 
-- **2026-09-09 00:42 (무선 ADB, 사용자 지시로 시도)** 설정 → "Google 계정 연결" 탭 → Play 서비스 `AuthorizationActivity` 의 **계정 선택 화면이 정상적으로 뜸**. 따라서 §3 의 ①(`authorize()` → `ApiException 10`) 은 아니다 — Android OAuth 클라이언트(패키지·SHA-1)는 매칭된다. 남은 후보는 ②(동의 웹 화면 "액세스 차단됨" = 테스트 사용자 미등록/scope 미등록) · ③(결과 파싱) · ④(Drive API 미활성화 403). 계정 선택·동의는 사용자가 직접 진행하기로 하고 여기서 멈춤. 이어서 §4 의 로그 명령으로 확정 예정.
+- **2026-09-09 00:42 (무선 ADB, 사용자 지시로 시도)** 설정 → "Google 계정 연결" 탭 → Play 서비스 `AuthorizationActivity` 의 계정 선택 화면이 뜸. 계정 선택·동의는 사용자가 직접 진행.
+- **2026-09-09 00:45 원인 확정** 사용자가 계정을 고르자 즉시 "로그인이 취소되었습니다". gms 로그:
+  ```
+  W Auth: [GetTokenResponseHandler] Server returned error: This android application is not registered to use OAuth2.0,
+          please confirm the package name and SHA-1 certificate fingerprint match what you registered in Google Developer Console.
+  W Auth.Api.Credentials: [Authorization_flowRunner] Flow failed.  cpwk: [8] Unknown error [status=UNREGISTERED_ON_API_CONSOLE]
+  W Auth.Api.Credentials: [AuthorizationChimeraActivity] Activity finished with error.
+  ```
+  → **GCP 에 `com.jjw.easygallery.debug` + SHA-1 `A1:10:A5:5F:91:AC:1F:A8:65:0A:5F:26:B8:A7:31:21:5F:E0:14:38` 조합의 Android OAuth 클라이언트가 없다.** (계정 선택 화면은 등록 확인 전에 뜨기 때문에 ①을 통과한 것으로 잘못 판단했었다 — §3 표에 행 추가.) 앱은 `RESULT_CANCELED` 만 받아 "취소"로 표시했다.
+
+## 8. 조치
+
+1. GCP 콘솔 → API 및 서비스 → 사용자 인증 정보 → **OAuth 클라이언트 ID 만들기 → Android**
+   - 패키지 이름: `com.jjw.easygallery.debug` (끝의 `.debug` 필수 — 디버그 빌드는 `applicationIdSuffix`)
+   - SHA-1: `A1:10:A5:5F:91:AC:1F:A8:65:0A:5F:26:B8:A7:31:21:5F:E0:14:38`
+   - 이미 만든 클라이언트가 있으면 패키지명에 `.debug` 가 빠졌거나 SHA-1 이 다른지 확인. 릴리스용(`com.jjw.easygallery`)은 별도 클라이언트.
+2. 같은 프로젝트에서 OAuth 동의 화면이 **테스트** 상태이고 로그인 계정이 테스트 사용자에 있는지, Drive API 가 사용 설정됐는지 확인(다음 단계 ②·④에서 걸린다).
+3. 등록 직후에는 Play 서비스 캐시 때문에 수 분 정도 같은 오류가 날 수 있다. 안 되면 설정 → 앱 → Google Play 서비스 → 저장공간 → 캐시 삭제 후 재시도.
+4. 앱 쪽(§5): `RESULT_CANCELED` 를 "취소"로만 보여 주는 문구를 "취소되었거나 앱 등록(패키지·SHA-1)이 맞지 않습니다" 로 바꾸고, 문서 §4 의 로그 명령을 안내하는 것을 검토.
+
