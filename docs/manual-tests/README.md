@@ -28,6 +28,8 @@
 | `07-auto-backup.md` | 자동 백업: 트리거·중복 방지·기존 항목 백업·마이그레이션 |
 | `08-duplicates.md` | 완전 중복 탐지: 검사·그룹·기본 선택·휴지통 |
 | `09-video-compression.md` | 업로드 영상 압축: 프리셋·세로 영상·캐시·실패 처리 |
+| `10-categories.md` | 카테고리: 지정(tri-state)·필터·관리·배지·고아 정리 |
+| `11-remote-storage.md` | 다중 클라우드(S3 호환: Naver·KT·AWS)·NAS(WebDAV): 계정 추가·연결 테스트·탐색·CRUD·업로드·인증서 고정 |
 
 ## 실기기 연결
 

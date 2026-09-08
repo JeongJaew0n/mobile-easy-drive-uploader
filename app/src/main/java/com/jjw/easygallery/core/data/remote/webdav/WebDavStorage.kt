@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.remote.webdav
 import android.content.Context
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
+import com.jjw.easygallery.core.data.remote.RemoteNames
 import com.jjw.easygallery.core.data.remote.RemotePage
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
@@ -182,8 +183,16 @@ class WebDavStorage(
                 .getOrNull()?.takeIf { it >= 0 } ?: source.sizeBytes
         }
 
-        override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String =
-            normalizeFolder(folderId) + source.displayName
+        /** 같은 이름이 있으면 ` (n)` 을 붙인다 — PUT 은 덮어쓰기라서 */
+        override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String {
+            val folder = normalizeFolder(folderId)
+            val name = RemoteNames.unique(source.displayName) { candidate -> exists(folder + candidate) }
+            return folder + name
+        }
+
+        private suspend fun exists(path: String): Boolean = withContext(ioDispatcher) {
+            client.newCall(Request.Builder().url(url(path)).head().build()).awaitResponse().use { it.isSuccessful }
+        }
 
         override suspend fun queryStatus(sessionUri: String, length: Long): SessionStatus = withContext(ioDispatcher) {
             client.newCall(Request.Builder().url(url(sessionUri)).head().build()).awaitResponse().use { response ->

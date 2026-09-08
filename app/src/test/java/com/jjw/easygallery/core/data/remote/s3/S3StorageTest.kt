@@ -165,11 +165,13 @@ class S3StorageTest {
     fun `multipart session starts with uploads query and resumes from listed parts`() = runTest {
         val uploader = storage.uploader()
         val source = UploadSource(1, Uri.parse("content://media/1"), "big.bin", "application/octet-stream", PART * 3)
+        server.enqueue(MockResponse(code = 404)) // HEAD: 같은 이름 없음
         server.enqueue(xml("<InitiateMultipartUploadResult><UploadId>u-1</UploadId></InitiateMultipartUploadResult>"))
 
         val session = uploader.startSession(source, "2026/", PART * 3)
 
         assertEquals("mpu|u-1|2026/big.bin", session)
+        assertEquals("HEAD", server.takeRequest().method)
         val start = server.takeRequest()
         assertEquals("POST", start.method)
         assertEquals("", start.url.queryParameter("uploads"))
@@ -254,6 +256,18 @@ class S3StorageTest {
         assertEquals("/photos/old/a.jpg", server.takeRequest().url.encodedPath)
         assertEquals("/photos/old/", server.takeRequest().url.encodedPath)
         assertEquals("/photos/new/", server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `startSession avoids overwriting an existing object by appending a counter`() = runTest {
+        server.enqueue(MockResponse(code = 200)) // a.jpg 있음
+        server.enqueue(MockResponse(code = 200)) // a (1).jpg 있음
+        server.enqueue(MockResponse(code = 404)) // a (2).jpg 없음
+        val source = UploadSource(3, Uri.parse("content://media/3"), "a.jpg", "image/jpeg", 10)
+
+        val session = storage.uploader().startSession(source, "2026/", 10)
+
+        assertEquals("2026/a (2).jpg", session)
     }
 
     private fun xml(body: String) =

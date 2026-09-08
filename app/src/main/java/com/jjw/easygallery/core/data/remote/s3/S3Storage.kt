@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.remote.s3
 import android.content.Context
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
+import com.jjw.easygallery.core.data.remote.RemoteNames
 import com.jjw.easygallery.core.data.remote.RemotePage
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
@@ -209,7 +210,8 @@ class S3Storage(
         }
 
         override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String {
-            val key = folderId + source.displayName
+            // 같은 키가 있으면 덮어쓰지 않고 ` (n)` 을 붙인다
+            val key = folderId + RemoteNames.unique(source.displayName) { candidate -> exists(folderId + candidate) }
             if (length < partSize) return key
             val request = Request.Builder()
                 .url(keyUrl(key).newBuilder().addQueryParameter("uploads", "").build())
@@ -231,6 +233,10 @@ class S3Storage(
                     else -> SessionStatus.Incomplete(contiguousBytes(S3Xml.parseListParts(it.body.string())))
                 }
             }
+        }
+
+        private suspend fun exists(key: String): Boolean = withContext(ioDispatcher) {
+            client.newCall(Request.Builder().url(keyUrl(key)).head().build()).awaitResponse().use { it.isSuccessful }
         }
 
         private suspend fun singleStatus(key: String, length: Long): SessionStatus {
