@@ -15,8 +15,8 @@ app/src/main/java/com/jjw/easygallery/
 │   │                          # MediaActions(MediaAction, MediaActionRunner), MediaActionController(동의 흐름 상태)
 │   ├── data/prefs/            # UserPreferencesRepository (DataStore: 계정, 업로드 폴더)
 │   ├── data/upload/           # DriveUploader(세션 시작/상태 조회/이어 올리기), ContentUriRequestBody,
-│   │   │                      # UploadQueueRepository(큐), UploadLedgerRepository(영구 원장)
-│   │   ├── db/                # Room v3: AppDatabase, UploadTaskEntity/Dao, UploadedMediaEntity/Dao, MediaHashEntity/Dao (schemas/, AutoMigration 1→2→3)
+│   │   │                      # UploadQueueRepository(큐), UploadLedgerRepository(영구 원장), VideoCompressor(Media3 Transformer)
+│   │   ├── db/                # Room v4: AppDatabase, UploadTaskEntity/Dao(+width/height), UploadedMediaEntity/Dao, MediaHashEntity/Dao (schemas/, AutoMigration 1→…→4)
 │   │   └── work/              # UploadWorker, UploadScheduler, UploadNotifications, AutoBackupWorker, AutoBackupScheduler
 │   ├── domain/model/          # MediaItem, DriveFolder, DriveAccount, DuplicateGroup(findDuplicateGroups)
 │   ├── domain/usecase/        # SignInUseCase, GetUploadFolderUseCase, EnqueueUploadsUseCase, ManageUploadQueueUseCase, AutoBackupUseCase
@@ -172,6 +172,7 @@ UploadWorker (유니크 워크 "upload-queue", KEEP)
 - **제약 조건**: `UserPreferences.uploadWifiOnly`(기본 true → UNMETERED) / `uploadChargingOnly`, 배터리 부족 아님. 설정이 바뀌면 `schedule(replace = true)` — 진행 중 항목은 세션 상태 조회로 이어 올리므로 손실 없음.
 - **프로세스 종료 복구**: RUNNING 도 `nextUnfinished()` 대상. `MainActivity` 시작 시 `ensureScheduled()` 로 남은 큐가 있으면 워커 재예약.
 - **알림**: 채널 `upload`, 진행(1001, ongoing, FGS dataSync) / 요약·로그인 필요(1002). 13+ 는 업로드 버튼을 누를 때 `POST_NOTIFICATIONS` 를 묻고 결과와 무관하게 큐에 넣는다.
+- **영상 압축(선택)**: `VideoCompressor.compress()` 가 프리셋(짧은 변 1080/720, H.264)과 원본 해상도(큐 행의 width/height)를 보고 필요할 때만 `cache/transcode/<id>_<shortSide>.mp4` 를 만든다. 같은 이름의 캐시가 있으면 재사용해 재시도·세션 재개에서도 바이트가 같다. Transformer 는 Looper 가 필요해 Main 에서 생성(인코딩은 내부 스레드), 진행률은 `getProgress` 폴링 → "영상 압축 중" 알림. 완료·영구 실패 시 캐시 삭제, 인코더 실패는 `CompressionException` 으로 영구 실패. 기기 원본은 건드리지 않는다.
 - **중복 방지**: 같은 mediaId 가 PENDING/RUNNING 이면 건너뜀. 새 배치를 넣을 때 지난 COMPLETED 행은 정리해 진행률 분모를 현재 배치로 맞춘다.
 
 ## 테스트

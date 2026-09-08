@@ -54,7 +54,7 @@ iOS는 수요가 확인되면 "업로드 전용 축소판"으로 별도 판단.
 | EXIF 조회·편집 | `androidx.exifinterface` |
 | 권한 | `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` (13+), `READ_MEDIA_VISUAL_USER_SELECTED` (14+ 부분 접근), `READ_EXTERNAL_STORAGE` (10~12), `POST_NOTIFICATIONS` (13+) |
 | 영상 재생 | **Media3 ExoPlayer** |
-| (확장) 영상 압축·트리밍 | Media3 Transformer |
+| 업로드 영상 압축 | **Media3 Transformer** + `media3-effect` `Presentation.createForShortSide` — 업로드 사본만 변환, 원본 유지 |
 | (확장) 중복·유사 사진 탐지 | 퍼셉추얼 해시 자체 구현 또는 ML Kit |
 
 ### Google 인증 / Drive
@@ -132,5 +132,5 @@ Gradle은 프로젝트의 Gradle Wrapper(`./gradlew`)로 실행하므로 별도 
 3. Google 로그인 + Drive 폴더 선택 + 다중 선택 업로드(포그라운드) ✅ (2026-09-07, GCP OAuth 클라이언트 등록 후 기기 검증 예정)
 4. WorkManager 기반 백그라운드 업로드·재개·알림 ✅ (2026-09-07)
 5. 갤러리 CRUD 확장 — 삭제/휴지통/즐겨찾기/이름 변경/이동 ✅ (2026-09-08)
-6. 고급 기능 — 자동 백업 규칙 ✅ (2026-09-08), 완전 중복 탐지 ✅ (2026-09-08, 유사 사진은 의도적으로 제외), 영상 압축
+6. 고급 기능 — 자동 백업 규칙 ✅ (2026-09-08), 완전 중복 탐지 ✅ (2026-09-08, 유사 사진은 의도적으로 제외), 영상 압축 ✅ (2026-09-08)
 7. 릴리스 빌드(R8·서명 폴백·CI) ✅ (2026-09-08) — 절차는 RELEASE.md

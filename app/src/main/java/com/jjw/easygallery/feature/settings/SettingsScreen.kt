@@ -56,6 +56,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
 @Composable
@@ -111,6 +112,7 @@ fun SettingsRoute(
         onDuplicatesClick = onDuplicatesClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
+        onVideoCompressionChange = viewModel::setVideoCompression,
         manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
         onManageMediaClick = {
             context.startActivity(
@@ -133,6 +135,7 @@ internal fun SettingsScreen(
     onWifiOnlyChange: (Boolean) -> Unit,
     onChargingOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onVideoCompressionChange: (VideoCompression) -> Unit = {},
     onDriveClick: () -> Unit = {},
     onAutoBackupClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
@@ -206,6 +209,10 @@ internal fun SettingsScreen(
                     checked = uiState.uploadChargingOnly,
                     onCheckedChange = onChargingOnlyChange,
                 )
+                VideoCompressionRow(
+                    current = uiState.videoCompression,
+                    onChange = onVideoCompressionChange,
+                )
             }
             Text(
                 text = stringResource(R.string.settings_gallery_section),
@@ -249,6 +256,77 @@ internal fun SettingsScreen(
             }
         }
     }
+}
+
+/** 업로드 영상 압축 프리셋 — 탭하면 선택 다이얼로그 */
+@Composable
+private fun VideoCompressionRow(
+    current: VideoCompression,
+    onChange: (VideoCompression) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { open = true }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_video_compression), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = stringResource(current.labelRes()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
+        HorizontalDivider()
+    }
+    if (open) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.settings_video_compression)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.settings_video_compression_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    VideoCompression.entries.forEach { preset ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    open = false
+                                    onChange(preset)
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = preset == current, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(preset.labelRes()))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { open = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+private fun VideoCompression.labelRes(): Int = when (this) {
+    VideoCompression.ORIGINAL -> R.string.settings_video_compression_original
+    VideoCompression.HD_1080 -> R.string.settings_video_compression_1080
+    VideoCompression.HD_720 -> R.string.settings_video_compression_720
 }
 
 @Composable

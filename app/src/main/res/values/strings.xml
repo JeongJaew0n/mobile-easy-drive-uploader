@@ -125,6 +125,11 @@
     <string name="settings_upload_wifi_only_description">모바일 데이터에서는 대기하고 Wi-Fi에 연결되면 이어서 올립니다</string>
     <string name="settings_upload_charging_only">충전 중에만 업로드</string>
     <string name="settings_upload_charging_only_description">배터리 소모를 줄이려면 켜세요</string>
+    <string name="settings_video_compression">업로드 영상 압축</string>
+    <string name="settings_video_compression_description">기기의 원본은 그대로 두고 Drive에 올리는 사본만 변환합니다. 목표보다 작은 영상은 압축하지 않습니다. 변환 시간과 배터리가 추가로 듭니다.</string>
+    <string name="settings_video_compression_original">원본 그대로</string>
+    <string name="settings_video_compression_1080">1080p (H.264, 8 Mbps)</string>
+    <string name="settings_video_compression_720">720p (H.264, 4 Mbps)</string>
     <string name="settings_upload_folder_default">Easy Gallery (기본)</string>
 
     <!-- Google Drive 탐색 -->
@@ -151,6 +156,7 @@
     <string name="notification_channel_upload">Drive 업로드</string>
     <string name="notification_channel_upload_description">Google Drive 업로드 진행 상황</string>
     <string name="notification_upload_title">Drive에 업로드 중 (%1$d/%2$d)</string>
+    <string name="notification_compress_title">영상 압축 중 (%1$d/%2$d)</string>
     <string name="notification_upload_summary_title">Drive 업로드 완료</string>
     <plurals name="notification_upload_done">
         <item quantity="other">%1$d개 항목을 업로드했습니다</item>

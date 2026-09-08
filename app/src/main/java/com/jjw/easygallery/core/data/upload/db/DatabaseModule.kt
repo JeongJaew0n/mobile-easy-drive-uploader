@@ -2,6 +2,8 @@ package com.jjw.easygallery.core.data.upload.db
 
 import android.content.Context
 import androidx.room.Room
+import com.jjw.easygallery.core.data.upload.Media3VideoCompressor
+import com.jjw.easygallery.core.data.upload.VideoCompressor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,4 +28,8 @@ object DatabaseModule {
 
     @Provides
     fun providesMediaHashDao(db: AppDatabase): MediaHashDao = db.mediaHashDao()
+
+    @Provides
+    @Singleton
+    fun providesVideoCompressor(impl: Media3VideoCompressor): VideoCompressor = impl
 }

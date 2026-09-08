@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.jjw.easygallery.core.domain.model.VideoCompression
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -33,6 +34,8 @@ data class UserPreferences(
     /** 이 시각(초, DATE_ADDED 기준) 이후 추가된 항목만 자동 백업. 0 = 미설정 */
     val autoBackupSinceSeconds: Long = 0,
     val autoBackupLastRunMillis: Long = 0,
+    /** 업로드 전 영상 압축 프리셋. 원본 파일은 건드리지 않고 업로드 사본만 변환 */
+    val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 }
@@ -56,6 +59,8 @@ class UserPreferencesRepository @Inject constructor(
             autoBackupIncludeVideos = prefs[KEY_AUTO_BACKUP_VIDEOS] ?: true,
             autoBackupSinceSeconds = prefs[KEY_AUTO_BACKUP_SINCE] ?: 0L,
             autoBackupLastRunMillis = prefs[KEY_AUTO_BACKUP_LAST_RUN] ?: 0L,
+            videoCompression = prefs[KEY_VIDEO_COMPRESSION]?.let { VideoCompression.fromStorageKey(it) }
+                ?: VideoCompression.ORIGINAL,
         )
     }
 
@@ -109,6 +114,10 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun setVideoCompression(preset: VideoCompression) {
+        store.edit { it[KEY_VIDEO_COMPRESSION] = preset.name }
+    }
+
     suspend fun setUploadWifiOnly(enabled: Boolean) {
         store.edit { it[KEY_UPLOAD_WIFI_ONLY] = enabled }
     }
@@ -123,6 +132,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_AUTO_BACKUP_VIDEOS = booleanPreferencesKey("auto_backup_videos")
         val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")
         val KEY_AUTO_BACKUP_LAST_RUN = longPreferencesKey("auto_backup_last_run")
+        val KEY_VIDEO_COMPRESSION = stringPreferencesKey("video_compression")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")

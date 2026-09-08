@@ -1,5 +1,6 @@
 package com.jjw.easygallery.core.data.upload.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -26,4 +27,6 @@ data class UploadTaskEntity(
     val attemptCount: Int = 0,
     val createdAt: Long,
     val updatedAt: Long,
+    @ColumnInfo(defaultValue = "0") val width: Int = 0,
+    @ColumnInfo(defaultValue = "0") val height: Int = 0,
 )

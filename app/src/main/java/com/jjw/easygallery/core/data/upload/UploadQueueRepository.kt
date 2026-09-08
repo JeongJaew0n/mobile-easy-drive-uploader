@@ -43,6 +43,8 @@ class UploadQueueRepository @Inject constructor(
                 displayName = item.displayName,
                 mimeType = item.mimeType,
                 sizeBytes = item.sizeBytes,
+                width = item.width,
+                height = item.height,
                 folderId = folder?.id,
                 folderName = folder?.name,
                 createdAt = now,
@@ -105,5 +107,7 @@ class UploadQueueRepository @Inject constructor(
         errorMessage = errorMessage,
         attemptCount = attemptCount,
         createdAt = createdAt,
+        width = width,
+        height = height,
     )
 }

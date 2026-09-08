@@ -38,6 +38,8 @@ data class UploadSource(
     val displayName: String,
     val mimeType: String,
     val sizeBytes: Long,
+    val width: Int = 0,
+    val height: Int = 0,
 )
 
 sealed interface UploadEvent {

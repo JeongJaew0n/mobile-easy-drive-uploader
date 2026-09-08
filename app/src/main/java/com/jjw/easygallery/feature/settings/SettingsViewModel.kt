@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.auth.SignInStep
 import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.domain.model.DriveAccount
+import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.SignInUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,6 +53,7 @@ class SettingsViewModel @Inject constructor(
             uploadFolderName = p.uploadFolderName,
             uploadWifiOnly = p.uploadWifiOnly,
             uploadChargingOnly = p.uploadChargingOnly,
+            videoCompression = p.videoCompression,
             isBusy = busy,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SettingsUiState())
@@ -90,6 +92,8 @@ class SettingsViewModel @Inject constructor(
         prefs.setUploadWifiOnly(enabled)
         manageQueue.rescheduleWithCurrentConstraints()
     }
+
+    fun setVideoCompression(preset: VideoCompression) = viewModelScope.launch { prefs.setVideoCompression(preset) }
 
     fun setUploadChargingOnly(enabled: Boolean) = viewModelScope.launch {
         prefs.setUploadChargingOnly(enabled)
@@ -139,6 +143,7 @@ data class SettingsUiState(
     val uploadFolderName: String? = null,
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
+    val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     val isBusy: Boolean = false,
 )
 

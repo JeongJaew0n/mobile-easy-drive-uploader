@@ -32,10 +32,17 @@ class UploadNotifications @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    fun progressForegroundInfo(done: Int, total: Int, currentName: String, fraction: Float): ForegroundInfo {
+    fun progressForegroundInfo(
+        done: Int,
+        total: Int,
+        currentName: String,
+        fraction: Float,
+        compressing: Boolean = false,
+    ): ForegroundInfo {
+        val titleRes = if (compressing) R.string.notification_compress_title else R.string.notification_upload_title
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_upload)
-            .setContentTitle(context.getString(R.string.notification_upload_title, done + 1, total))
+            .setContentTitle(context.getString(titleRes, done + 1, total))
             .setContentText(currentName)
             .setProgress(PROGRESS_MAX, (fraction * PROGRESS_MAX).toInt(), false)
             .setOngoing(true)

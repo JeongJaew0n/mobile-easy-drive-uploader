@@ -8,6 +8,8 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.jjw.easygallery.core.data.auth.NotSignedInException
+import com.jjw.easygallery.core.data.prefs.UserPreferences
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.upload.DriveUploadException
 import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionStatus
@@ -15,10 +17,12 @@ import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.UploadSource
+import com.jjw.easygallery.core.data.upload.VideoCompressor
 import com.jjw.easygallery.core.data.upload.db.AppDatabase
 import com.jjw.easygallery.core.data.upload.db.UploadTaskEntity
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.UploadState
+import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.domain.usecase.GetUploadFolderUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -46,6 +50,12 @@ class UploadWorkerTest {
     private val uploader: DriveUploader = mockk()
     private val getUploadFolder: GetUploadFolderUseCase = mockk()
     private val notifications = UploadNotifications(context)
+    private val compressor: VideoCompressor = mockk(relaxed = true) {
+        coEvery { compress(any(), any(), any()) } returns null
+    }
+    private val prefs: UserPreferencesRepository = mockk {
+        coEvery { current() } returns UserPreferences(videoCompression = VideoCompression.HD_720)
+    }
 
     @Before
     fun setUp() {
@@ -175,6 +185,40 @@ class UploadWorkerTest {
     }
 
     @Test
+    fun `compressed video replaces the source and the cache is cleaned after upload`() = runTest {
+        insert(mediaId = 1)
+        val compressed = UploadSource(
+            mediaId = 1,
+            uri = android.net.Uri.parse("file:///cache/1_720.mp4"),
+            displayName = "VID_1.mp4",
+            mimeType = "video/mp4",
+            sizeBytes = 400,
+        )
+        coEvery { compressor.compress(match { it.mediaId == 1L }, VideoCompression.HD_720, any()) } returns compressed
+        coEvery { uploader.resolveLength(compressed) } returns 400
+        coEvery { uploader.startSession(compressed, "f", 400) } returns "https://s/c"
+        every { uploader.upload(compressed, "https://s/c", 0, 400) } returns flowOf(UploadEvent.Completed("d"))
+
+        assertEquals(ListenableWorker.Result.success(), buildWorker().doWork())
+
+        assertEquals(UploadState.COMPLETED, rows().single().state)
+        io.mockk.verify { compressor.cleanup(compressed) }
+    }
+
+    @Test
+    fun `compression failure fails the task permanently`() = runTest {
+        insert(mediaId = 1)
+        coEvery { compressor.compress(any(), any(), any()) } throws
+            com.jjw.easygallery.core.data.upload.CompressionException("encoder")
+
+        assertEquals(ListenableWorker.Result.success(), buildWorker().doWork())
+
+        val row = rows().single()
+        assertEquals(UploadState.FAILED, row.state)
+        assertEquals("encoder", row.errorMessage)
+    }
+
+    @Test
     fun `missing folder is resolved and persisted before upload`() = runTest {
         insert(mediaId = 1, folderId = null)
         coEvery { getUploadFolder() } returns DriveFolder("resolved", "Easy Gallery")
@@ -202,6 +246,8 @@ class UploadWorkerTest {
                         uploader,
                         getUploadFolder,
                         notifications,
+                        compressor,
+                        prefs,
                     )
                 },
             )

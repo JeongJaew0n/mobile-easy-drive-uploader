@@ -6,6 +6,8 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jjw.easygallery.core.data.auth.AuthException
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.upload.CompressionException
 import com.jjw.easygallery.core.data.upload.DriveUploadException
 import com.jjw.easygallery.core.data.upload.DriveUploader
 import com.jjw.easygallery.core.data.upload.SessionExpiredException
@@ -14,6 +16,7 @@ import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.UploadSource
+import com.jjw.easygallery.core.data.upload.VideoCompressor
 import com.jjw.easygallery.core.domain.model.UploadTask
 import com.jjw.easygallery.core.domain.usecase.GetUploadFolderUseCase
 import dagger.assisted.Assisted
@@ -37,6 +40,8 @@ class UploadWorker @AssistedInject constructor(
     private val uploader: DriveUploader,
     private val getUploadFolder: GetUploadFolderUseCase,
     private val notifications: UploadNotifications,
+    private val compressor: VideoCompressor,
+    private val prefs: UserPreferencesRepository,
 ) : CoroutineWorker(appContext, params) {
 
     private var succeeded = 0
@@ -85,9 +90,15 @@ class UploadWorker @AssistedInject constructor(
 
     private suspend fun uploadTask(task: UploadTask): Outcome {
         val folderId = task.folderId ?: getUploadFolder().also { queue.setFolder(task.id, it) }.id
-        val source = task.toSource()
+        // 영상은 설정에 따라 압축 사본을 올린다. 캐시가 재사용되므로 재시도·세션 재개에서도 같은 바이트.
+        val source = compressor.compress(task.toSource(), prefs.current().videoCompression) { fraction ->
+            updateForeground(task, fraction, compressing = true)
+        } ?: task.toSource()
         val length = uploader.resolveLength(source)
-        val (sessionUri, offset) = resolveSession(task, source, folderId, length) ?: return Outcome.Success
+        val (sessionUri, offset) = resolveSession(task, source, folderId, length) ?: run {
+            compressor.cleanup(source)
+            return Outcome.Success
+        }
 
         var driveFileId: String? = null
         uploader.upload(source, sessionUri, offset, length).collect { event ->
@@ -98,6 +109,7 @@ class UploadWorker @AssistedInject constructor(
         }
         val fileId = requireNotNull(driveFileId) { "업로드가 파일 ID 없이 끝났습니다" }
         markUploaded(task, fileId)
+        compressor.cleanup(source)
         return Outcome.Success
     }
 
@@ -135,6 +147,8 @@ class UploadWorker @AssistedInject constructor(
         }
         // 원본이 삭제됨 — 재시도 의미 없음
         is FileNotFoundException -> failPermanently(task, e)
+        // 인코더 문제는 다시 해도 같으므로 영구 실패 (사용자가 압축을 끄면 원본으로 올릴 수 있음)
+        is CompressionException -> failPermanently(task, e)
         is SessionExpiredException -> {
             queue.setSession(task.id, null)
             retryTransient(task, e)
@@ -156,6 +170,7 @@ class UploadWorker @AssistedInject constructor(
     private suspend fun failPermanently(task: UploadTask, e: Exception): Outcome {
         Timber.e(e, "upload failed permanently: %s", task.displayName)
         queue.fail(task.id, e.message ?: e.toString())
+        compressor.cleanup(task.toSource())
         return Outcome.Failed
     }
 
@@ -179,9 +194,17 @@ class UploadWorker @AssistedInject constructor(
         updateForeground(task, event.fraction)
     }
 
-    private suspend fun updateForeground(task: UploadTask, fraction: Float) {
+    private suspend fun updateForeground(task: UploadTask, fraction: Float, compressing: Boolean = false) {
         try {
-            setForeground(notifications.progressForegroundInfo(succeeded + failed, total, task.displayName, fraction))
+            setForeground(
+                notifications.progressForegroundInfo(
+                    done = succeeded + failed,
+                    total = total,
+                    currentName = task.displayName,
+                    fraction = fraction,
+                    compressing = compressing,
+                ),
+            )
         } catch (e: IllegalStateException) {
             // 백그라운드 FGS 시작 제한 등 — 알림 없이 계속 진행한다
             Timber.w(e, "setForeground rejected")
@@ -194,6 +217,8 @@ class UploadWorker @AssistedInject constructor(
         displayName = displayName,
         mimeType = mimeType,
         sizeBytes = sizeBytes,
+        width = width,
+        height = height,
     )
 
     private enum class Outcome { Success, Failed, RetryLater, SignInRequired }
