@@ -4,7 +4,10 @@ import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,8 +48,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.feature.categories.CategoryDot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +69,7 @@ internal fun ViewerTopBar(
     onMoveClick: () -> Unit,
     onUpload: () -> Unit,
     onDelete: () -> Unit,
+    onCategoriesClick: () -> Unit = {},
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
     TopAppBar(
@@ -135,6 +142,14 @@ internal fun ViewerTopBar(
                     },
                 )
                 DropdownMenuItem(
+                    text = { Text(stringResource(R.string.viewer_categories_edit)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },
+                    onClick = {
+                        menuExpanded = false
+                        onCategoriesClick()
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text(stringResource(R.string.viewer_info)) },
                     leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
                     onClick = {
@@ -161,6 +176,7 @@ internal fun ViewerTopBar(
 internal fun ViewerBottomBar(
     item: MediaItem,
     details: MediaDetails?,
+    categories: List<Category>,
     showInfo: Boolean,
     supportsTrash: Boolean,
     enabled: Boolean,
@@ -178,7 +194,7 @@ internal fun ViewerBottomBar(
             ),
     ) {
         if (showInfo) {
-            InfoPanel(item = item, details = details)
+            InfoPanel(item = item, details = details, categories = categories)
         }
         Row(
             modifier = Modifier
@@ -207,6 +223,7 @@ internal fun ViewerBottomBar(
 private fun InfoPanel(
     item: MediaItem,
     details: MediaDetails?,
+    categories: List<Category>,
 ) {
     val context = LocalContext.current
     Column(
@@ -228,6 +245,7 @@ private fun InfoPanel(
         }
         InfoRow(stringResource(R.string.viewer_info_path), item.relativePath.ifBlank { item.bucketName })
         InfoRow(stringResource(R.string.viewer_info_mime), item.mimeType)
+        CategoryInfoRow(categories)
         if (details?.hasCameraInfo == true) {
             val camera = listOfNotNull(details.cameraMake, details.cameraModel).joinToString(" ")
             if (camera.isNotBlank()) InfoRow(stringResource(R.string.viewer_info_camera), camera)
@@ -244,6 +262,40 @@ private fun InfoPanel(
                 stringResource(R.string.viewer_info_location),
                 stringResource(R.string.viewer_info_location_value, details.latitude!!, details.longitude!!),
             )
+        }
+    }
+}
+
+/** "카테고리" 행: 색 점 + 이름 칩. 없으면 "없음" */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CategoryInfoRow(categories: List<Category>) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.viewer_info_categories),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = LABEL_ALPHA),
+            modifier = Modifier.size(width = INFO_LABEL_WIDTH_DP.dp, height = INFO_ROW_HEIGHT_DP.dp),
+        )
+        if (categories.isEmpty()) {
+            Text(
+                text = stringResource(R.string.viewer_info_categories_none),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                categories.forEach { category ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CategoryDot(colorIndex = category.colorIndex, size = INFO_DOT_DP)
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = category.name, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    }
+                }
+            }
         }
     }
 }
@@ -274,3 +326,5 @@ private const val LABEL_ALPHA = 0.7f
 private const val INFO_LABEL_WIDTH_DP = 92
 
 private const val INFO_ROW_HEIGHT_DP = 20
+
+private const val INFO_DOT_DP = 8

@@ -36,6 +36,8 @@ data class UserPreferences(
     val autoBackupLastRunMillis: Long = 0,
     /** 업로드 전 영상 압축 프리셋. 원본 파일은 건드리지 않고 업로드 사본만 변환 */
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
+    /** 썸네일 오른쪽 위 카테고리 색 점. 배지가 많으면 시끄러울 수 있어 끌 수 있다 */
+    val showCategoryBadges: Boolean = true,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 }
@@ -61,6 +63,7 @@ class UserPreferencesRepository @Inject constructor(
             autoBackupLastRunMillis = prefs[KEY_AUTO_BACKUP_LAST_RUN] ?: 0L,
             videoCompression = prefs[KEY_VIDEO_COMPRESSION]?.let { VideoCompression.fromStorageKey(it) }
                 ?: VideoCompression.ORIGINAL,
+            showCategoryBadges = prefs[KEY_SHOW_CATEGORY_BADGES] ?: true,
         )
     }
 
@@ -126,6 +129,10 @@ class UserPreferencesRepository @Inject constructor(
         store.edit { it[KEY_UPLOAD_CHARGING_ONLY] = enabled }
     }
 
+    suspend fun setShowCategoryBadges(enabled: Boolean) {
+        store.edit { it[KEY_SHOW_CATEGORY_BADGES] = enabled }
+    }
+
     private companion object {
         val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_BACKUP_PATHS = stringSetPreferencesKey("auto_backup_paths")
@@ -133,6 +140,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")
         val KEY_AUTO_BACKUP_LAST_RUN = longPreferencesKey("auto_backup_last_run")
         val KEY_VIDEO_COMPRESSION = stringPreferencesKey("video_compression")
+        val KEY_SHOW_CATEGORY_BADGES = booleanPreferencesKey("show_category_badges")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")

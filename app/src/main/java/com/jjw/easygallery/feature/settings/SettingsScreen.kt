@@ -114,6 +114,7 @@ fun SettingsRoute(
         onCategoriesClick = onCategoriesClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
+        onCategoryBadgesChange = viewModel::setShowCategoryBadges,
         onVideoCompressionChange = viewModel::setVideoCompression,
         manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
         onManageMediaClick = {
@@ -136,6 +137,7 @@ internal fun SettingsScreen(
     onUploadQueueClick: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
     onChargingOnlyChange: (Boolean) -> Unit,
+    onCategoryBadgesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onVideoCompressionChange: (VideoCompression) -> Unit = {},
     onDriveClick: () -> Unit = {},
@@ -230,6 +232,12 @@ internal fun SettingsScreen(
                 icon = painterResource(R.drawable.ic_label),
                 title = stringResource(R.string.settings_categories),
                 onClick = onCategoriesClick,
+            )
+            SwitchRow(
+                title = stringResource(R.string.settings_category_badges),
+                description = stringResource(R.string.settings_category_badges_description),
+                checked = uiState.showCategoryBadges,
+                onCheckedChange = onCategoryBadgesChange,
             )
             if (manageMedia != null) {
                 Column {

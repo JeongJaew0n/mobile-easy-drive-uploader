@@ -150,6 +150,7 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
 
 - 설계 문서 `CATEGORIES.md`. Room v5 `category`(이름 대소문자 무시 유일, 색 인덱스, 순서) + `media_category`(mediaId ↔ categoryId, CASCADE). `CategoryRepository`(Room 구현 `RoomCategoryRepository`)가 CRUD·할당을 맡고, 할당 맵 `Map<Long, Set<Long>>` 은 `shareIn(replay = 1)` 로 갤러리·상세보기·관리 화면이 공유한다.
 - 갤러리: `Catalog` 결합에 카테고리 목록·할당·`CategoryFilter`(여러 개 OR, `Uncategorized`) 가 들어가고 메모리 필터 순서는 백업 → 카테고리 → 기간. 선택 모드 하단 바 "카테고리" → `CategoryPickerSheet`(전부/일부/없음 tri-state, 바뀐 행만 `AssignCategoriesUseCase` 로 반영, 시트 안에서 생성). ⋮ → 카테고리 → `CategoryFilterSheet`. 필터가 켜지면 제목·`CategoryFilterBar` 가 바뀌고 `MediaViewerKey.categoryIds/uncategorizedOnly` 로 상세보기 스와이프 범위도 같아진다.
+- 표시: 썸네일 오른쪽 위 색 점(최대 3, `categoryColor` 팔레트 8색은 테마와 독립, 설정 `showCategoryBadges` 로 끔), 상세보기 정보 패널 "카테고리" 칩과 ⋮ "카테고리 편집"(같은 피커를 항목 하나로).
 - 정합: 영구 삭제 완료(`onActionDone`) 시 할당 제거, `OrphanAssignmentCleaner` 가 **전체 접근 권한일 때만** 일반+휴지통 목록에 없는 항목의 할당을 2초 디바운스로 정리(일부 접근·빈 목록은 건너뜀 — 오판으로 전부 지우는 사고 방지).
 
 ## 상세보기 (feature/viewer)

@@ -10,6 +10,7 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionEvent
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
@@ -49,6 +50,7 @@ import javax.inject.Inject
 @Suppress(
     "TooGenericExceptionCaught", // UI 경계: 큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
     "TooManyFunctions", // 화면이 호출하는 API 표면(필터 4·선택 3·편집 7·카테고리 3). 내부 로직은 UseCase/컨트롤러에 있다
+    "LongParameterList", // Hilt 생성자 주입의 조합 지점. 각 의존성은 저장소/유즈케이스로 이미 분리돼 있다
 )
 class GalleryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
@@ -60,7 +62,10 @@ class GalleryViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
     orphanCleaner: OrphanAssignmentCleaner,
+    prefs: UserPreferencesRepository,
 ) : ViewModel() {
+
+    private val showCategoryBadges: Flow<Boolean> = prefs.preferences.map { it.showCategoryBadges }
 
     // null = 아직 권한 상태를 확인하지 않음
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
@@ -295,8 +300,8 @@ class GalleryViewModel @Inject constructor(
             )
         }
 
-        return combine(catalog, selectedIds, uploadSummary, actionController.isMutating) {
-                c, selected, summary, mutating ->
+        return combine(catalog, selectedIds, uploadSummary, actionController.isMutating, showCategoryBadges) {
+                c, selected, summary, mutating, badges ->
             // 필터 변경 후 첫 목록은 애니메이션 없이 교체, 그 뒤(삭제·이동 등)부터 animateItem
             val animate = c.version == animatedVersion
             animatedVersion = c.version
@@ -315,6 +320,7 @@ class GalleryViewModel @Inject constructor(
                 categories = c.categories,
                 assignments = c.assignments,
                 categoryFilter = c.categoryFilter,
+                showCategoryBadges = badges,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -361,6 +367,7 @@ sealed interface GalleryUiState {
         /** mediaId → 카테고리 ID. 썸네일 배지·피커 초기 상태 */
         val assignments: CategoryAssignments = emptyMap(),
         val categoryFilter: CategoryFilter? = null,
+        val showCategoryBadges: Boolean = true,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,

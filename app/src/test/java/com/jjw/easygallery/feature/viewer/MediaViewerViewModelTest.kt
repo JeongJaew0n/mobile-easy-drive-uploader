@@ -1,6 +1,7 @@
 package com.jjw.easygallery.feature.viewer
 
 import android.net.Uri
+import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaFilter
@@ -9,6 +10,7 @@ import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
+import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import io.mockk.coEvery
 import io.mockk.every
@@ -145,8 +147,14 @@ class MediaViewerViewModelTest {
         actionController = MediaActionController(mockk<MediaActionRunner>()),
         enqueueUploads = enqueueUploads,
         uploadLedger = uploadLedger,
-        categoryRepository = mockk { every { observeAssignments() } returns MutableStateFlow(emptyMap()) },
+        categoryRepository = categoryRepository,
+        assignCategories = AssignCategoriesUseCase(categoryRepository),
     )
+
+    private val categoryRepository: CategoryRepository = mockk {
+        every { observeAssignments() } returns MutableStateFlow(emptyMap())
+        every { observeCategories() } returns MutableStateFlow(emptyList())
+    }
 
     private companion object {
         fun item(id: Long) = MediaItem(

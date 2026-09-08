@@ -58,6 +58,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.core.ui.theme.categoryColor
 import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -78,6 +79,8 @@ internal fun GalleryGrid(
     animateChanges: Boolean = true,
     /** Drive 에 올라간 항목 — 썸네일에 클라우드 체크 배지 */
     uploadedIds: Set<Long> = emptySet(),
+    /** 항목 ID → 카테고리 색 인덱스(최대 3). 빈 목록이면 배지 없음 */
+    categoryColorsOf: (Long) -> List<Int> = { emptyList() },
 ) {
     val selectionMode = selectedIds.isNotEmpty()
     val gridState = rememberLazyGridState()
@@ -142,6 +145,7 @@ internal fun GalleryGrid(
                     item = item,
                     selected = item.id in selectedIds,
                     uploaded = item.id in uploadedIds,
+                    categoryColors = categoryColorsOf(item.id),
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
                     onOpen = { bounds -> onOpenItem(item, bounds) },
@@ -229,6 +233,7 @@ private fun MediaThumbnail(
     item: MediaItem,
     selected: Boolean,
     uploaded: Boolean,
+    categoryColors: List<Int>,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
     onOpen: (Rect?) -> Unit,
@@ -283,16 +288,31 @@ private fun MediaThumbnail(
                 label = "selectionIndicator",
             ) { isSelected -> SelectionIndicator(selected = isSelected) }
         }
-        if (item.isFavorite) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(16.dp),
-            )
+        // 오른쪽 위: 카테고리 색 점(최대 3) + 즐겨찾기 별. 점은 배경만 있는 Box — 애니메이션 없음
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            categoryColors.forEach { colorIndex ->
+                Box(
+                    Modifier
+                        .size(CATEGORY_DOT_DP.dp)
+                        .background(Color.Black.copy(alpha = BADGE_ALPHA), CircleShape)
+                        .padding(1.dp)
+                        .background(categoryColor(colorIndex), CircleShape),
+                )
+            }
+            if (item.isFavorite) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
         if (item.isVideo) {
             VideoBadge(
@@ -389,3 +409,5 @@ private const val UNSELECTED_BORDER_DP = 2
 private const val SELECTED_SCALE = 0.88f
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L
+
+private const val CATEGORY_DOT_DP = 10

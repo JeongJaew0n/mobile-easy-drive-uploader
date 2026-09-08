@@ -385,6 +385,7 @@ private fun GalleryContent(
                 onOpenItem = onOpenItem,
                 animateChanges = uiState.animateItemChanges,
                 uploadedIds = uiState.uploadedIds,
+                categoryColorsOf = categoryBadgeColors(uiState),
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -462,3 +463,22 @@ internal fun categoryTitle(filter: CategoryFilter?, categories: List<Category>):
         selected.singleOrNull()?.name ?: stringResource(R.string.gallery_title_category_count, selected.size)
     }
 }
+
+/** 항목별 카테고리 배지 색(최대 3개). 설정이 꺼져 있으면 항상 빈 목록 */
+@Composable
+private fun categoryBadgeColors(content: GalleryUiState.Content): (Long) -> List<Int> {
+    if (!content.showCategoryBadges || content.assignments.isEmpty()) return { emptyList() }
+    val colorById = remember(content.categories) { content.categories.associate { it.id to it.colorIndex } }
+    val ordered = remember(content.categories) { content.categories.map { it.id } }
+    val assignments = content.assignments
+    return { mediaId ->
+        val assigned = assignments[mediaId]
+        if (assigned.isNullOrEmpty()) {
+            emptyList()
+        } else {
+            ordered.asSequence().filter { it in assigned }.mapNotNull { colorById[it] }.take(MAX_BADGE_DOTS).toList()
+        }
+    }
+}
+
+private const val MAX_BADGE_DOTS = 3

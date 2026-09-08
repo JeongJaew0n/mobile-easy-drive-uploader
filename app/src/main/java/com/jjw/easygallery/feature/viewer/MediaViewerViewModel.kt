@@ -10,12 +10,15 @@ import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.Category
+import com.jjw.easygallery.core.domain.model.CategoryAssignments
 import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
+import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.feature.gallery.normalizeDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +46,7 @@ class MediaViewerViewModel @Inject constructor(
     private val enqueueUploads: EnqueueUploadsUseCase,
     uploadLedger: UploadLedgerRepository,
     private val categoryRepository: CategoryRepository,
+    private val assignCategories: AssignCategoriesUseCase,
 ) : ViewModel() {
 
     private val uploadedIds = uploadLedger.observeUploadedIds()
@@ -140,13 +144,14 @@ class MediaViewerViewModel @Inject constructor(
         filteredMedia(mediaFilter),
         currentId,
         details,
-        combine(showInfo, uploadedIds) { info, uploaded -> info to uploaded },
+        extras(),
         actionController.isMutating,
-    ) { list, id, detailMap, (info, uploaded), mutating ->
+    ) { list, id, detailMap, extras, mutating ->
         items = list
         val index = list.indexOfFirst { it.id == id }.takeIf { it >= 0 }
         val current = index?.let(list::get)
         if (current != null) loadDetailsIfNeeded(current)
+        val assigned = current?.let { extras.assignments[it.id] }.orEmpty()
         MediaViewerUiState(
             items = list,
             // 현재 항목이 삭제되면 같은 자리(다음 항목)를 보여준다
@@ -155,8 +160,11 @@ class MediaViewerViewModel @Inject constructor(
             details = current?.let { detailMap[it.id] },
             albums = albumsFrom(list),
             supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
-            showInfo = info,
-            isUploaded = current != null && current.id in uploaded,
+            showInfo = extras.showInfo,
+            isUploaded = current != null && current.id in extras.uploaded,
+            categories = extras.categories,
+            assignments = extras.assignments,
+            currentCategories = extras.categories.filter { it.id in assigned },
             isMutating = mutating,
             isLoading = false,
         )
@@ -168,6 +176,31 @@ class MediaViewerViewModel @Inject constructor(
     /** 현재 항목이 목록에서 사라졌을 때 유지할 인덱스 */
     private fun currentIndex(list: List<MediaItem>): Int =
         uiState.value.currentIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+
+    /** 정보 패널·업로드·카테고리처럼 목록과 무관하게 바뀌는 값 묶음(combine 인자 수 제한) */
+    private class Extras(
+        val showInfo: Boolean,
+        val uploaded: Set<Long>,
+        val categories: List<Category>,
+        val assignments: CategoryAssignments,
+    )
+
+    private fun extras(): Flow<Extras> = combine(
+        showInfo,
+        uploadedIds,
+        categoryRepository.observeCategories(),
+        categoryRepository.observeAssignments(),
+    ) { info, uploaded, categories, assignments -> Extras(info, uploaded, categories, assignments) }
+
+    // ---------- 카테고리 ----------
+
+    suspend fun createCategory(name: String, colorIndex: Int): Result<Category> =
+        categoryRepository.create(name, colorIndex)
+
+    /** 현재 항목 하나에 카테고리를 붙이고 뗀다 */
+    fun assignCategoriesToCurrent(add: Set<Long>, remove: Set<Long>) = withCurrent { item ->
+        viewModelScope.launch { assignCategories(listOf(item.id), add, remove) }
+    }
 
     /** 갤러리와 같은 순서로 거른다: 카테고리 → 기간 */
     private fun filteredMedia(mediaFilter: MediaFilter): Flow<List<MediaItem>> {
@@ -199,6 +232,10 @@ data class MediaViewerUiState(
     val albums: List<Album> = emptyList(),
     val supportsTrashAndFavorites: Boolean = true,
     val showInfo: Boolean = false,
+    val categories: List<Category> = emptyList(),
+    val assignments: CategoryAssignments = emptyMap(),
+    /** 현재 항목에 붙은 카테고리(sortOrder 순) */
+    val currentCategories: List<Category> = emptyList(),
     /** 현재 항목이 Drive 에 올라가 있음 */
     val isUploaded: Boolean = false,
     val isMutating: Boolean = false,

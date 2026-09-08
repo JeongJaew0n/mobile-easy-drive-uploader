@@ -53,6 +53,7 @@ class SettingsViewModel @Inject constructor(
             uploadFolderName = p.uploadFolderName,
             uploadWifiOnly = p.uploadWifiOnly,
             uploadChargingOnly = p.uploadChargingOnly,
+            showCategoryBadges = p.showCategoryBadges,
             videoCompression = p.videoCompression,
             isBusy = busy,
         )
@@ -94,6 +95,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setVideoCompression(preset: VideoCompression) = viewModelScope.launch { prefs.setVideoCompression(preset) }
+
+    fun setShowCategoryBadges(enabled: Boolean) = viewModelScope.launch { prefs.setShowCategoryBadges(enabled) }
 
     fun setUploadChargingOnly(enabled: Boolean) = viewModelScope.launch {
         prefs.setUploadChargingOnly(enabled)
@@ -143,6 +146,7 @@ data class SettingsUiState(
     val uploadFolderName: String? = null,
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
+    val showCategoryBadges: Boolean = true,
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     val isBusy: Boolean = false,
 )

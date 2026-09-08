@@ -94,6 +94,8 @@ fun MediaViewerRoute(
             onMove = viewModel::move,
             onUpload = viewModel::upload,
             onToggleInfo = viewModel::toggleInfo,
+            onCreateCategory = viewModel::createCategory,
+            onAssignCategories = viewModel::assignCategoriesToCurrent,
         )
         val hero = key.hero
         if (!heroDone && hero != null) {

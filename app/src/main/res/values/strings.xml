@@ -41,6 +41,11 @@
     <string name="category_empty">카테고리가 없습니다. + 로 만들어 보세요</string>
     <string name="category_delete_title">\'%1$s\' 삭제</string>
     <string name="settings_categories">카테고리 관리</string>
+    <string name="settings_category_badges">썸네일에 카테고리 색 점 표시</string>
+    <string name="settings_category_badges_description">항목에 붙은 카테고리를 오른쪽 위 색 점으로 보여줍니다(최대 3개)</string>
+    <string name="viewer_categories_edit">카테고리 편집</string>
+    <string name="viewer_info_categories">카테고리</string>
+    <string name="viewer_info_categories_none">없음</string>
     <plurals name="category_item_count">
         <item quantity="other">%d개 항목</item>
     </plurals>

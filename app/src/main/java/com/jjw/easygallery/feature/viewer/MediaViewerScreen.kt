@@ -29,7 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.feature.categories.CategoryPickerSheet
 import com.jjw.easygallery.feature.gallery.MoveDialog
 import com.jjw.easygallery.feature.gallery.RenameDialog
 import kotlinx.coroutines.delay
@@ -48,6 +50,10 @@ internal fun MediaViewerScreen(
     onUpload: () -> Unit,
     onToggleInfo: () -> Unit,
     modifier: Modifier = Modifier,
+    onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
+        Result.failure(IllegalStateException("카테고리 생성이 연결되지 않았습니다"))
+    },
+    onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit = { _, _ -> },
     /** 히어로 오버레이가 진행 중이면 페이저·스피너를 숨겨 두 이미지가 겹쳐 보이지 않게 한다 */
     contentHidden: Boolean = false,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -71,6 +77,7 @@ internal fun MediaViewerScreen(
     OrientationLockEffect(landscapeLocked)
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
+    var showCategories by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = uiState.currentIndex) { uiState.items.size }
     val zoomState = rememberZoomState(current.id)
 
@@ -116,6 +123,7 @@ internal fun MediaViewerScreen(
                     onToggleInfo = onToggleInfo,
                     onRenameClick = { showRename = true },
                     onMoveClick = { showMove = true },
+                    onCategoriesClick = { showCategories = true },
                     onUpload = onUpload,
                     onDelete = onDelete,
                 )
@@ -130,6 +138,7 @@ internal fun MediaViewerScreen(
                 ViewerBottomBar(
                     item = current,
                     details = uiState.details,
+                    categories = uiState.currentCategories,
                     showInfo = uiState.showInfo,
                     supportsTrash = uiState.supportsTrashAndFavorites,
                     enabled = !uiState.isMutating,
@@ -220,6 +229,19 @@ internal fun MediaViewerScreen(
                 showMove = false
                 onMove(path)
             },
+        )
+    }
+    if (showCategories) {
+        CategoryPickerSheet(
+            mediaIds = listOf(current.id),
+            categories = uiState.categories,
+            assignments = uiState.assignments,
+            onCreateCategory = onCreateCategory,
+            onApply = { add, remove ->
+                showCategories = false
+                onAssignCategories(add, remove)
+            },
+            onDismiss = { showCategories = false },
         )
     }
 }

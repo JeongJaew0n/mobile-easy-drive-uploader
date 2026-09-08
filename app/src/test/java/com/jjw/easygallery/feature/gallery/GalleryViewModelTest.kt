@@ -7,6 +7,8 @@ import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.prefs.UserPreferences
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Category
@@ -59,6 +61,9 @@ class GalleryViewModelTest {
         coEvery { removeMedia(any()) } returns Unit
     }
     private val assignCategories = AssignCategoriesUseCase(categoryRepository)
+    private val prefs: UserPreferencesRepository = mockk {
+        every { preferences } returns kotlinx.coroutines.flow.MutableStateFlow(UserPreferences())
+    }
 
     // StandardTestDispatcher: 구독 전까지 upstream 이 실행되지 않아 상태 전이 순서를 관찰할 수 있다.
     private val testDispatcher = StandardTestDispatcher()
@@ -84,6 +89,7 @@ class GalleryViewModelTest {
             categoryRepository,
             assignCategories,
             OrphanAssignmentCleaner(repository, categoryRepository),
+            prefs,
         )
 
     @Test
