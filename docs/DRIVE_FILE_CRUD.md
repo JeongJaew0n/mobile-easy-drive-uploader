@@ -59,6 +59,10 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 
 - (2026-09-09 구현) 원장 기반 "이 기기에서 올림" 표시, S3·WebDAV·SMB 폴더 내 로컬 이름 필터 — §8.
 
+## 6.1 당겨서 새로고침 (2026-09-09 추가)
+
+- 목록을 아래로 당기면 `PullToRefreshBox`(M3) 가 `refresh()` 를 부른다. 목록이 있으면 `isRefreshing`(목록은 그대로, 상단 인디케이터), 비어 있으면 기존 전체 로딩. 상단바 새로고침 버튼은 그대로 둔다.
+
 ## 7. 다중 선택 (2026-09-09 추가)
 
 - 행을 **길게 누르면** 선택 모드(`DriveBrowserUiState.selectedIds`). 선택 중에는 탭이 토글, 행 앞이 체크박스, ⋮ 숨김, 뒤로 가기가 선택 해제. 상단바는 `DriveSelectionTopBar`("n개 선택" · 전체 선택 · 이동(MOVE 능력) · 삭제).

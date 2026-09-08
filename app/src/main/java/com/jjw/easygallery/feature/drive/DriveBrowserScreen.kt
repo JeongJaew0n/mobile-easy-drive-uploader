@@ -32,6 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -223,39 +224,49 @@ internal fun DriveBrowserScreen(
                         .padding(24.dp),
                 )
 
-                else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    items(uiState.entries, key = { it.id }) { entry ->
-                        DriveEntryRow(
-                            entry = entry,
-                            onClick = {
-                                if (uiState.isSelecting) entryActions.onToggleSelect(entry) else onEntryClick(entry)
-                            },
-                            onLongClick = { entryActions.onToggleSelect(entry) },
-                            selected = entry.id in uiState.selectedIds,
-                            selecting = uiState.isSelecting,
-                            enabled = !uiState.isMutating,
-                            menu = entryMenu(entry, uiState.capabilities, allowMove = !uiState.isRemoteSearchResult),
-                            uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
-                            onOpen = { entryActions.onOpen(entry) },
-                            onDownload = { entryActions.onDownload(entry) },
-                            onRename = { renaming = entry },
-                            onMove = { moving = entry },
-                            onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
-                            modifier = Modifier.animateItem(
-                                fadeInSpec = motion.quick(),
-                                placementSpec = motion.settle(),
-                                fadeOutSpec = motion.quick(),
-                            ),
-                        )
-                    }
-                    if (uiState.isLoadingMore) {
-                        item(key = "loading-more") {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center,
-                            ) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+                else -> PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = onRefresh,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(uiState.entries, key = { it.id }) { entry ->
+                            DriveEntryRow(
+                                entry = entry,
+                                onClick = {
+                                    if (uiState.isSelecting) entryActions.onToggleSelect(entry) else onEntryClick(entry)
+                                },
+                                onLongClick = { entryActions.onToggleSelect(entry) },
+                                selected = entry.id in uiState.selectedIds,
+                                selecting = uiState.isSelecting,
+                                enabled = !uiState.isMutating,
+                                menu = entryMenu(
+                                    entry,
+                                    uiState.capabilities,
+                                    allowMove = !uiState.isRemoteSearchResult,
+                                ),
+                                uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
+                                onOpen = { entryActions.onOpen(entry) },
+                                onDownload = { entryActions.onDownload(entry) },
+                                onRename = { renaming = entry },
+                                onMove = { moving = entry },
+                                onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = motion.quick(),
+                                    placementSpec = motion.settle(),
+                                    fadeOutSpec = motion.quick(),
+                                ),
+                            )
+                        }
+                        if (uiState.isLoadingMore) {
+                            item(key = "loading-more") {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+                            }
                         }
                     }
                 }

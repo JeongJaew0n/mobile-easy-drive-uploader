@@ -100,8 +100,11 @@ class DriveBrowserViewModel @Inject constructor(
         }
     }
 
+    /** 목록이 있으면 당겨서 새로고침 표시([DriveBrowserUiState.isRefreshing]), 비어 있으면 전체 로딩 */
     fun refresh() {
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update {
+            it.copy(isRefreshing = it.entries.isNotEmpty(), isLoading = it.entries.isEmpty(), error = null)
+        }
         fetchPage(reset = true)
     }
 
@@ -411,6 +414,7 @@ class DriveBrowserViewModel @Inject constructor(
                         entries = if (reset) page.entries else state.entries + page.entries,
                         nextPageToken = page.nextPageToken,
                         isLoading = false,
+                        isRefreshing = false,
                         isLoadingMore = false,
                     )
                 }
@@ -420,7 +424,12 @@ class DriveBrowserViewModel @Inject constructor(
                 Timber.e(e, "drive list failed")
                 val message = e.message ?: e.toString()
                 _uiState.update {
-                    it.copy(isLoading = false, isLoadingMore = false, error = if (reset) message else null)
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isLoadingMore = false,
+                        error = if (reset) message else null,
+                    )
                 }
                 if (!reset) events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
             }
@@ -436,6 +445,8 @@ data class DriveBrowserUiState(
     val entries: List<DriveEntry> = emptyList(),
     val nextPageToken: String? = null,
     val isLoading: Boolean = true,
+    /** 당겨서 새로고침 중(목록은 그대로 보임) */
+    val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val isMutating: Boolean = false,
     /** 길게 눌러 고른 항목. 비어 있지 않으면 선택 모드 */
