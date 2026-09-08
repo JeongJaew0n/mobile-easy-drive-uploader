@@ -31,3 +31,4 @@ plugins {
 
 rootProject.name = "EasyGallery"
 include(":app")
+include(":baselineprofile")

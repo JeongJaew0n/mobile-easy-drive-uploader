@@ -14,8 +14,10 @@ import coil3.request.crossfade
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 
-/** 그리드 썸네일과 같은 메모리 캐시 키 — 상세보기가 원본을 받기 전까지 썸네일을 먼저 보여준다 */
-internal fun thumbnailCacheKey(item: MediaItem): String = "thumb-${item.id}"
+/** 그리드 썸네일과 같은 메모리 캐시 키 — 상세보기·히어로 오버레이가 원본을 받기 전까지 썸네일을 먼저 보여준다 */
+internal fun thumbnailCacheKey(mediaId: Long): String = "thumb-$mediaId"
+
+internal fun thumbnailCacheKey(item: MediaItem): String = thumbnailCacheKey(item.id)
 
 @Composable
 internal fun ImagePage(

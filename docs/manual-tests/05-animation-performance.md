@@ -28,7 +28,24 @@
 | ANI-18 | Drive 새 폴더 / 업로드 목록 완료 정리 | 항목이 미끄러지며 들어오고 나감 | ⬜ | 2단계 R1 |
 | ANI-19 | 앨범 이동 | 바텀시트가 아래에서 올라옴, 바깥 탭·아래로 끌어 닫기 | ⬜ | 2단계 R4 |
 
+| ANI-20 | 갤러리에서 썸네일 탭 | 썸네일이 제자리에서 커지며 상세보기로 이어짐(히어로), 끝난 뒤 이미지가 튀지 않음. 회전 후 같은 항목 재진입 시엔 히어로 없이 열림(정상) | ⬜ | 3단계 V1 |
+| ANI-21 | 히어로 진행 중 화면 | 배경이 어둡게 전환되고 상·하단 바는 바로 표시 | ⬜ | |
+
 ## 프레임 측정 (릴리스 빌드)
+
+### 방법 A — Macrobenchmark (권장, 수치가 JSON 으로 남음)
+
+```bash
+# 실기기(API 33+, 개발자 옵션 켬) 연결 후. 권한이 없으면 그리드가 뜨지 않으므로 먼저:
+adb shell pm grant com.jjw.easygallery android.permission.READ_MEDIA_IMAGES
+adb shell pm grant com.jjw.easygallery android.permission.READ_MEDIA_VIDEO
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest
+# 결과: baselineprofile/build/outputs/connected_android_test_additional_output/**/*.json
+#   startupNoCompilation vs startupBaselineProfile → timeToInitialDisplayMs
+#   galleryScrollBaselineProfile → frameDurationCpuMs P50/P90/P95/P99, frameOverrunMs
+```
+
+### 방법 B — gfxinfo (빠른 확인)
 
 ```bash
 ./gradlew :app:assembleRelease          # 서명 설정 필요 시 debug 키로 임시 서명
@@ -42,6 +59,8 @@ adb shell dumpsys gfxinfo $PKG | grep -E "Total frames|Janky|90th|95th|99th"
 | ID | 시나리오 | 목표 | 결과 | 상태 | 메모 |
 |---|---|---|---|---|---|
 | PERF-01 | 그리드 플링 5회 | janky < 5%, 95th < 16ms(60Hz) / < 8ms(120Hz) | | ⬜ | 디버그 기준값: janky 16.7%, 90th 65ms (2026-09-07) |
+| PERF-04 | Baseline Profile 생성 | `./gradlew :app:generateBaselineProfile` (GMD `pixel6Api34` 자동 다운로드 또는 연결 기기) → `app/src/release/generated/baselineProfiles/baseline-prof.txt` 생성, 커밋 | | ⬜ | 첫 실행은 에뮬레이터 이미지(~1.5GB) 다운로드 |
+| PERF-05 | 콜드 스타트 프로파일 유/무 비교 | `startupBaselineProfile` 의 TTID 가 `startupNoCompilation` 보다 짧음(보통 20~40%) | | ⬜ | 프로파일 파일이 있어야 의미 있음 |
 | PERF-02 | 선택 모드 진입·해제 5회 | 95th < 16ms | | ⬜ | Catalog 분리 효과 확인 |
 | PERF-03 | 상세보기 열기·닫기 5회 | 95th < 16ms | | ⬜ | |
 

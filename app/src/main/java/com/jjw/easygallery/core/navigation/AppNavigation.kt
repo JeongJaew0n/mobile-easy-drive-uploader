@@ -29,20 +29,35 @@ fun AppNavigation() {
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
-        // fade-through: 새 화면은 살짝 작은 상태에서 커지며 나타나고, 이전 화면은 빨리 사라진다
+        // fade-through: 새 화면은 살짝 작은 상태에서 커지며 나타나고, 이전 화면은 빨리 사라진다.
+        // 상세보기는 히어로 오버레이가 있으면 페이드만(움직임은 오버레이가 담당), 없으면 조금 더 작게(0.92)서 커진다
         transitionSpec = {
-            (fadeIn(motion.standard()) + scaleIn(motion.standard(), initialScale = ENTER_SCALE)) togetherWith
-                fadeOut(motion.quick())
+            val target = targetState.entries.lastOrNull()?.contentKey
+            val scale = when {
+                target is MediaViewerKey && target.hero != null -> null
+                target is MediaViewerKey -> VIEWER_ENTER_SCALE
+                else -> ENTER_SCALE
+            }
+            val enter = if (scale == null) {
+                fadeIn(motion.quick())
+            } else {
+                fadeIn(motion.standard()) + scaleIn(motion.standard(), initialScale = scale)
+            }
+            enter togetherWith fadeOut(motion.quick())
         },
         // 뒤로: 이전 화면은 제자리에서 나타나고, 떠나는 화면이 작아지며 사라진다
         popTransitionSpec = {
+            val leaving = initialState.entries.lastOrNull()?.contentKey
+            val scale = if (leaving is MediaViewerKey) VIEWER_ENTER_SCALE else ENTER_SCALE
             fadeIn(motion.standard()) togetherWith
-                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = ENTER_SCALE))
+                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = scale))
         },
         // 예측 뒤로가기 제스처 중에도 같은 연출을 진행률에 따라 보여준다
         predictivePopTransitionSpec = { _ ->
+            val leaving = initialState.entries.lastOrNull()?.contentKey
+            val scale = if (leaving is MediaViewerKey) VIEWER_ENTER_SCALE else ENTER_SCALE
             fadeIn(motion.standard()) togetherWith
-                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = ENTER_SCALE))
+                (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = scale))
         },
         entryDecorators = listOf(
             rememberSaveableStateHolderNavEntryDecorator(),
@@ -57,13 +72,14 @@ fun AppNavigation() {
                     onTrashClick = { backStack.add(TrashKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
-                    onOpenItem = { mediaId, favoritesOnly, range ->
+                    onOpenItem = { item, favoritesOnly, range, hero ->
                         backStack.add(
                             MediaViewerKey(
-                                mediaId = mediaId,
+                                mediaId = item.id,
                                 favoritesOnly = favoritesOnly,
                                 startEpochDay = range?.start?.toEpochDay(),
                                 endEpochDay = range?.endInclusive?.toEpochDay(),
+                                hero = hero,
                             ),
                         )
                     },
@@ -91,19 +107,7 @@ fun AppNavigation() {
             entry<TrashKey> {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
             }
-            // 상세보기는 썸네일에서 "커지며" 열리고 닫힐 때 작아진다 (공유 요소 전환의 저비용 대안)
-            entry<MediaViewerKey>(
-                metadata = NavDisplay.transitionSpec {
-                    val grow = scaleIn(motion.standard(), initialScale = VIEWER_ENTER_SCALE)
-                    (fadeIn(motion.standard()) + grow) togetherWith fadeOut(motion.quick())
-                } + NavDisplay.popTransitionSpec {
-                    fadeIn(motion.standard()) togetherWith
-                        (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = VIEWER_ENTER_SCALE))
-                } + NavDisplay.predictivePopTransitionSpec { _ ->
-                    fadeIn(motion.standard()) togetherWith
-                        (fadeOut(motion.standard()) + scaleOut(motion.standard(), targetScale = VIEWER_ENTER_SCALE))
-                },
-            ) { key ->
+            entry<MediaViewerKey> { key ->
                 MediaViewerRoute(
                     key = key,
                     onBackClick = { backStack.removeLastOrNull() },

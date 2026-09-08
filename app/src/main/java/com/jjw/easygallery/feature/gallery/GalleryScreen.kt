@@ -25,12 +25,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DateRange
+import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
@@ -54,7 +57,8 @@ internal fun GalleryScreen(
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
-    onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit = { _, _, _ -> },
+    onOpenItem: (item: MediaItem, favoritesOnly: Boolean, range: DateRange?, hero: HeroOrigin?) -> Unit =
+        { _, _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -151,7 +155,9 @@ internal fun GalleryScreen(
                     uiState = uiState,
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
-                    onOpenItem = { mediaId -> onOpenItem(mediaId, uiState.favoritesOnly, uiState.dateRange) },
+                    onOpenItem = { item, bounds ->
+                        onOpenItem(item, uiState.favoritesOnly, uiState.dateRange, bounds?.toHeroOrigin(item))
+                    },
                     onClearDateRange = { onDateRangeChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
@@ -225,7 +231,7 @@ private fun GalleryContent(
     uiState: GalleryUiState.Content,
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
-    onOpenItem: (Long) -> Unit,
+    onOpenItem: (MediaItem, Rect?) -> Unit,
     onClearDateRange: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
@@ -333,3 +339,14 @@ private fun GalleryScreenUploadingPreview() {
         )
     }
 }
+
+/** 썸네일 윈도우 좌표 + 원본 정보 → 상세보기 히어로 원점 */
+private fun Rect.toHeroOrigin(item: MediaItem) = HeroOrigin(
+    left = left.toInt(),
+    top = top.toInt(),
+    width = width.toInt(),
+    height = height.toInt(),
+    uri = item.uri.toString(),
+    imageWidth = item.width,
+    imageHeight = item.height,
+)

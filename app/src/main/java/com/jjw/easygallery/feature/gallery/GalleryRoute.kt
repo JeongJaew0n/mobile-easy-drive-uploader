@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DateRange
+import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 
 @Composable
@@ -33,7 +35,7 @@ fun GalleryRoute(
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
-    onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit,
+    onOpenItem: (item: MediaItem, favoritesOnly: Boolean, range: DateRange?, hero: HeroOrigin?) -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current

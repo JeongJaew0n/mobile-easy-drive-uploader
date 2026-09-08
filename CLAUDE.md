@@ -13,6 +13,8 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 ./gradlew :app:lintDebug              # Android Lint
 ./gradlew :app:connectedDebugAndroidTest   # 계측 테스트 (기기/에뮬레이터 필요)
 ./gradlew :app:assembleRelease        # R8 릴리스 (keystore.properties 없으면 디버그 키 폴백) — 규칙은 docs/RELEASE.md
+./gradlew :app:generateBaselineProfile                       # Baseline Profile 수집 (GMD 또는 연결 기기 API 33+)
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest   # Macrobenchmark (실기기 필요)
 ```
 
 코드 변경 후에는 최소 `detekt` + `testDebugUnitTest` 를 통과시킨다.

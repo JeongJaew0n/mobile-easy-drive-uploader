@@ -51,6 +51,7 @@ fun EasyGalleryTheme(
     }
 
     CompositionLocalProvider(LocalMotion provides motion) {
+        // material3 1.4.0 은 MotionScheme 이 internal 이라 M3 컴포넌트 내부 모션은 기본값을 쓴다 (1.5 안정화 후 재검토)
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

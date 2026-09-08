@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
+    alias(libs.plugins.baselineprofile)
 }
 
 // 릴리스 서명: 저장소 밖의 keystore.properties 가 있으면 그 키로, 없으면 디버그 키로 폴백해 빌드가 항상 통과한다.
@@ -162,6 +163,10 @@ dependencies {
 
     // Logging
     implementation(libs.timber)
+
+    // Baseline Profile: 앱 설치 시 프로파일을 ART 에 심어 첫 실행·첫 스크롤 JIT 비용을 줄인다
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 
     // Unit test
     testImplementation(libs.junit)

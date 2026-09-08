@@ -33,6 +33,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.gallery.MoveDialog
@@ -53,10 +54,14 @@ internal fun MediaViewerScreen(
     onUpload: () -> Unit,
     onToggleInfo: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 히어로 오버레이가 진행 중이면 페이저·스피너를 숨겨 두 이미지가 겹쳐 보이지 않게 한다 */
+    contentHidden: Boolean = false,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     if (uiState.isLoading) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (!contentHidden) CircularProgressIndicator()
+        }
         return
     }
     val current = uiState.current ?: return
@@ -84,18 +89,16 @@ internal fun MediaViewerScreen(
     val pagerState = rememberPagerState(initialPage = uiState.currentIndex) { uiState.items.size }
     val zoomState = rememberZoomState(current.id)
 
-    // 재생 중에는 잠시 뒤 컨트롤을 숨겨 영상에 집중하게 한다
-    LaunchedEffect(chromeVisible, videoPlaying) {
-        if (chromeVisible && videoPlaying) {
-            delay(CONTROLS_AUTO_HIDE_MILLIS)
-            chromeVisible = false
-        }
-    }
-    // 항목이 바뀌면 재생 상태를 초기화하고 컨트롤을 다시 보여준다
-    LaunchedEffect(current.id) {
-        videoPlaying = false
-        chromeVisible = true
-    }
+    ChromeAutoHide(
+        currentId = current.id,
+        chromeVisible = chromeVisible,
+        videoPlaying = videoPlaying,
+        onHide = { chromeVisible = false },
+        onReset = {
+            videoPlaying = false
+            chromeVisible = true
+        },
+    )
 
     // 스와이프 결과를 ViewModel 에 알린다 (편집 대상·정보 패널이 현재 항목을 따라가도록)
     LaunchedEffect(pagerState) {
@@ -170,7 +173,9 @@ internal fun MediaViewerScreen(
                 state = pagerState,
                 // 확대 상태에서는 스와이프 대신 팬 제스처를 쓴다
                 userScrollEnabled = !zoomState.isZoomed,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = if (contentHidden) 0f else 1f },
             ) { page ->
                 val item = uiState.items.getOrNull(page) ?: return@HorizontalPager
                 if (item.isVideo) {
@@ -237,6 +242,24 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** 재생 중에는 잠시 뒤 컨트롤을 숨기고, 항목이 바뀌면 재생 상태와 컨트롤을 초기화한다 */
+@Composable
+private fun ChromeAutoHide(
+    currentId: Long,
+    chromeVisible: Boolean,
+    videoPlaying: Boolean,
+    onHide: () -> Unit,
+    onReset: () -> Unit,
+) {
+    LaunchedEffect(chromeVisible, videoPlaying) {
+        if (chromeVisible && videoPlaying) {
+            delay(CONTROLS_AUTO_HIDE_MILLIS)
+            onHide()
+        }
+    }
+    LaunchedEffect(currentId) { onReset() }
 }
 
 private const val CONTROLS_AUTO_HIDE_MILLIS = 3_000L

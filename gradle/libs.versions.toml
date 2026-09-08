@@ -40,6 +40,11 @@ retrofit = "3.0.0"
 okhttp = "5.5.0"
 timber = "5.0.1"
 
+# Benchmark / Baseline Profile
+benchmark = "1.5.0-rc02"   # 1.4.x 는 AGP 9 미지원(newDsl 요구), 1.5.0-alpha01+ 에서 해결
+profileinstaller = "1.4.1"
+uiautomator = "2.4.0"
+
 # Test
 junit = "4.13.2"
 mockk = "1.14.11"
@@ -126,6 +131,11 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 # Logging
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
+# Benchmark / Baseline Profile
+androidx-benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "benchmark" }
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+
 # Lint
 detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
 
@@ -148,3 +158,5 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "androidxRoom" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+android-test = { id = "com.android.test", version.ref = "androidGradlePlugin" }
+baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark" }

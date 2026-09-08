@@ -13,7 +13,7 @@
   - `➖` 이 기기에서 확인 불가(예: API 29 전용 경로) — 이유를 메모에
 - 한 파일은 한 영역. 항목 ID 는 `영역-번호` (예: `GAL-03`). 커밋 메시지·이슈에서 ID 로 참조한다.
 - 확인 기기는 기본적으로 Galaxy S23+ (Android 16, API 36). 다른 기기로 확인했으면 메모에 적는다.
-- 성능·전력 측정은 **릴리스 빌드**로 한다. 절차는 `05-animation-performance.md`.
+- 성능·전력 측정은 **릴리스 빌드**로 한다. 절차는 `05-animation-performance.md` (Macrobenchmark: `:baselineprofile` 모듈).
 
 ## 파일
 

@@ -25,6 +25,21 @@ data object AutoBackupKey : AppNavKey
 @Serializable
 data object DuplicatesKey : AppNavKey
 
+/**
+ * 탭한 썸네일의 화면(윈도우) 좌표와 원본 정보. 상세보기가 이 사각형에서 확대되는 히어로 연출을 그린다.
+ * 회전·복원 시 좌표가 어긋날 수 있어 상세보기는 첫 진입 1회만 사용하고 이후 무시한다.
+ */
+@Serializable
+data class HeroOrigin(
+    val left: Int,
+    val top: Int,
+    val width: Int,
+    val height: Int,
+    val uri: String,
+    val imageWidth: Int,
+    val imageHeight: Int,
+)
+
 /** 사진·영상 상세보기. 갤러리에서 보던 필터(즐겨찾기·기간)를 이어받아 좌우 스와이프 범위를 맞춘다. */
 @Serializable
 data class MediaViewerKey(
@@ -32,6 +47,7 @@ data class MediaViewerKey(
     val favoritesOnly: Boolean = false,
     val startEpochDay: Long? = null,
     val endEpochDay: Long? = null,
+    val hero: HeroOrigin? = null,
 ) : AppNavKey
 
 /** Drive 탐색. 기본은 내 드라이브(`root`). 하위 폴더로 들어갈 때마다 새 키를 push 한다. */

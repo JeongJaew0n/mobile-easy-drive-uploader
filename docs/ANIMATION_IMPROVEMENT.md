@@ -216,9 +216,12 @@ G1 모션 토큰 → **D7 숨겨진 컨트롤 폴링 중단** → **§4.4 파생
 
 구현 메모: D1 은 `ZoomState` 를 `Animatable` 로 바꾸고 순수 함수 `focalZoomOffset/clampOffset`(테스트 4건)로 탭 지점 확대·경계 보정, `size(4096)` 디코딩 상한. V2 는 `entry<MediaViewerKey>(metadata = NavDisplay.transitionSpec{…} + popTransitionSpec + predictivePopTransitionSpec)`. V3 는 `Modifier.swipeToDismiss`(확대 중 비활성, 220px 임계값). D6 은 그리드 `memoryCacheKey("thumb-<id>")` ↔ 상세보기 `placeholderMemoryCacheKey`. R1 은 Drive·업로드 목록 `animateItem`. R4 는 앨범 이동만 `ModalBottomSheet`(이름 변경은 짧은 입력이라 다이얼로그 유지, 기간 선택은 Material 달력 다이얼로그 유지). 실기기 확인은 `manual-tests/05` ANI-13~18.
 
-### 3단계 — 시그니처 모션 (측정 후 결정)
-V1 자체 히어로 오버레이 → G2 standard 모션 스킴 → Macrobenchmark·Baseline Profile 모듈.
-*1·2단계 후 릴리스 프레임·전력 수치가 안정된 뒤 착수.*
+### 3단계 — 시그니처 모션 ✅ 구현 (2026-09-08) / 측정은 기기 연결 후
+V1 자체 히어로 오버레이 ✅ → G2 standard 모션 스킴 ❌ → Macrobenchmark·Baseline Profile 모듈 ✅.
+
+- **V1**: 썸네일 탭 시 `onPlaced` 로 잡아둔 윈도우 좌표 + 원본 정보를 `MediaViewerKey.hero`(`HeroOrigin`) 로 넘기고, 상세보기 라우트가 `HeroOverlay` 를 그린다 — 메모리 캐시의 썸네일(`thumb-<id>`)을 시작 사각형에서 원본 비율로 맞춘 끝 사각형까지 250ms 확대(양쪽 모두 Crop 이라 끝에서 페이저 이미지와 정확히 겹침). 진행 중엔 페이저를 alpha 0 으로 숨기고, 전역 `transitionSpec` 은 히어로가 있을 때 확대 없이 페이드만 한다. 첫 진입 1회만(회전·복원 후 좌표 불일치 방지). **돌아갈 때의 역방향 히어로는 넣지 않았다** — 갤러리가 "현재 항목의 썸네일 위치"를 알려주고 그 자리로 스크롤해야 해서 비용이 크고, V2 의 축소 복귀로 충분하다고 판단.
+- **G2**: material3 **1.4.0 에서 `MotionScheme` 인터페이스·`MaterialTheme(motionScheme)` 오버로드가 internal** 이라 앱에서 접근할 수 없다(1.5 는 아직 alpha). 자체 스킴 구현도 불가. 1.5 안정화 후 재검토.
+- **측정 도구**: `:baselineprofile` 모듈(`com.android.test` + `androidx.baselineprofile` 1.5.0-rc02 — 1.4.x 는 AGP 9 미지원). `BaselineProfileGenerator`(콜드 스타트 + 갤러리 플링), `GalleryBenchmarks`(StartupTimingMetric 프로파일 유/무, FrameTimingMetric 플링). 앱에 `profileinstaller` 추가. 실행은 `manual-tests/05` PERF 절 참고 — 실기기(API 33+) 또는 GMD `pixel6Api34`.
 
 ## 8. 검증 방법
 

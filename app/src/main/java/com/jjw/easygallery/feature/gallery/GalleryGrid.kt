@@ -38,9 +38,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -68,7 +71,8 @@ internal fun GalleryGrid(
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
     modifier: Modifier = Modifier,
-    onOpenItem: (Long) -> Unit = {},
+    /** 탭한 항목과 그 썸네일의 윈도우 좌표(히어로 연출 시작점). 배치되기 전이면 null */
+    onOpenItem: (MediaItem, Rect?) -> Unit = { _, _ -> },
     /** false 면 항목 이동·등장 애니메이션 생략(필터 전환처럼 목록이 통째로 바뀔 때) */
     animateChanges: Boolean = true,
     /** Drive 에 올라간 항목 — 썸네일에 클라우드 체크 배지 */
@@ -139,7 +143,7 @@ internal fun GalleryGrid(
                     uploaded = item.id in uploadedIds,
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
-                    onOpen = { onOpenItem(item.id) },
+                    onOpen = { bounds -> onOpenItem(item, bounds) },
                     // 삭제·이동 후 남은 항목이 미끄러져 빈자리를 채운다
                     modifier = Modifier.animateItem(
                         fadeInSpec = fadeSpec,
@@ -226,10 +230,12 @@ private fun MediaThumbnail(
     uploaded: Boolean,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
-    onOpen: () -> Unit,
+    onOpen: (Rect?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val motion = LocalMotion.current
+    // 배치될 때마다 갱신되는 윈도우 좌표. 상태(State)가 아니라 재구성을 일으키지 않는다
+    val bounds = remember { arrayOfNulls<Rect>(1) }
     // 선택 시 살짝 축소 — padding 대신 graphicsLayer 라 레이아웃 재측정이 없다
     val imageScale by animateFloatAsState(
         targetValue = if (selected) SELECTED_SCALE else 1f,
@@ -240,9 +246,10 @@ private fun MediaThumbnail(
         modifier = modifier
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .onPlaced { bounds[0] = it.boundsInWindow() }
             // 길게 누르기·드래그 선택은 그리드(dragSelect)가 처리.
             // 선택 모드에서는 탭으로 토글, 아니면 상세보기로 진입
-            .clickable { if (selectionMode) onToggleSelection() else onOpen() },
+            .clickable { if (selectionMode) onToggleSelection() else onOpen(bounds[0]) },
     ) {
         AsyncImage(
             // 상세보기가 같은 키로 플레이스홀더를 꺼내 쓴다(썸네일 → 원본 2단계 로드)

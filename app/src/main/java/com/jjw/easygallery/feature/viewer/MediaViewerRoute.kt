@@ -1,12 +1,19 @@
 package com.jjw.easygallery.feature.viewer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,17 +68,30 @@ fun MediaViewerRoute(
         if (!uiState.isLoading && uiState.items.isEmpty()) onBackClick()
     }
 
-    MediaViewerScreen(
-        uiState = uiState,
-        snackbarHostState = snackbarHostState,
-        onBackClick = onBackClick,
-        onPageChanged = viewModel::onPageChanged,
-        onToggleFavorite = viewModel::toggleFavorite,
-        onTrash = viewModel::trash,
-        onDelete = viewModel::delete,
-        onRename = viewModel::rename,
-        onMove = viewModel::move,
-        onUpload = viewModel::upload,
-        onToggleInfo = viewModel::toggleInfo,
-    )
+    // 히어로 연출은 첫 진입 1회만. 회전·복원 후에는 좌표가 어긋날 수 있어 건너뛴다
+    var heroDone by rememberSaveable { mutableStateOf(key.hero == null) }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        MediaViewerScreen(
+            uiState = uiState,
+            snackbarHostState = snackbarHostState,
+            contentHidden = !heroDone,
+            onBackClick = onBackClick,
+            onPageChanged = viewModel::onPageChanged,
+            onToggleFavorite = viewModel::toggleFavorite,
+            onTrash = viewModel::trash,
+            onDelete = viewModel::delete,
+            onRename = viewModel::rename,
+            onMove = viewModel::move,
+            onUpload = viewModel::upload,
+            onToggleInfo = viewModel::toggleInfo,
+        )
+        val hero = key.hero
+        if (!heroDone && hero != null) {
+            HeroOverlay(origin = hero, mediaId = key.mediaId, onFinished = { heroDone = true })
+        }
+    }
 }

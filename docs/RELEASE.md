@@ -45,6 +45,12 @@ keytool -genkeypair -v -keystore ~/keys/easygallery-release.jks -alias easygalle
    - Retrofit 인터페이스(`DriveApi`)는 이름이 바뀌어도 되지만 `-keepattributes *Annotation*, Signature` 가 살아 있어야 한다.
 3. `docs/manual-tests/06-release-build.md` 의 실기기 항목 수행 — 특히 로그인·업로드·화면 복원은 R8 문제가 런타임에만 드러난다.
 
+## Baseline Profile
+
+`:baselineprofile` 모듈이 콜드 스타트·갤러리 플링 경로를 수집한다. `./gradlew :app:generateBaselineProfile` 로 만든
+`app/src/release/generated/baselineProfiles/baseline-prof.txt` 를 **커밋**하면 릴리스 빌드에 포함되고, `profileinstaller` 가 설치 시 ART 에 심는다.
+프로파일은 코드가 크게 바뀔 때(화면 추가·주요 라이브러리 업그레이드) 다시 생성한다.
+
 ## 버전
 
 `app/build.gradle.kts` 의 `versionCode`(정수, 매 업로드마다 증가) / `versionName`(표시용, `0.1.0`). 태그는 `v0.1.0` 형식.
