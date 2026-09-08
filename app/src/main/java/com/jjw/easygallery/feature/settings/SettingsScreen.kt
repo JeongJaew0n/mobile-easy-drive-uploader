@@ -67,6 +67,7 @@ fun SettingsRoute(
     onDriveClick: () -> Unit,
     onAutoBackupClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
+    onCategoriesClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -110,6 +111,7 @@ fun SettingsRoute(
         onDriveClick = onDriveClick,
         onAutoBackupClick = onAutoBackupClick,
         onDuplicatesClick = onDuplicatesClick,
+        onCategoriesClick = onCategoriesClick,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
         onVideoCompressionChange = viewModel::setVideoCompression,
@@ -139,6 +141,7 @@ internal fun SettingsScreen(
     onDriveClick: () -> Unit = {},
     onAutoBackupClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
+    onCategoriesClick: () -> Unit = {},
     /** null = 이 기기에서 지원 안 함(Android 11 이하) */
     manageMedia: Boolean? = null,
     onManageMediaClick: () -> Unit = {},
@@ -222,6 +225,11 @@ internal fun SettingsScreen(
                 icon = painterResource(R.drawable.ic_content_copy),
                 title = stringResource(R.string.duplicates_title),
                 onClick = onDuplicatesClick,
+            )
+            NavigationRow(
+                icon = painterResource(R.drawable.ic_label),
+                title = stringResource(R.string.settings_categories),
+                onClick = onCategoriesClick,
             )
             if (manageMedia != null) {
                 Column {

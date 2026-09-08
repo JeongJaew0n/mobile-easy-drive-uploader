@@ -16,6 +16,43 @@
     <string name="gallery_menu_trash">휴지통</string>
     <string name="gallery_menu_drive">Google Drive</string>
     <string name="gallery_menu_date_range">기간 선택</string>
+    <string name="gallery_menu_category">카테고리</string>
+    <string name="gallery_title_category_count">카테고리 %1$d개</string>
+    <string name="gallery_title_uncategorized">미분류</string>
+    <string name="category_title">카테고리</string>
+    <string name="category_manage">관리</string>
+    <string name="category_new">새 카테고리</string>
+    <string name="category_create">만들기</string>
+    <string name="category_name_hint">이름</string>
+    <string name="category_name_empty">이름을 입력하세요</string>
+    <string name="category_name_too_long">이름은 30자까지입니다</string>
+    <string name="category_name_duplicate">같은 이름의 카테고리가 있습니다</string>
+    <string name="category_color_label">색 %1$d</string>
+    <string name="category_filter_title">카테고리로 보기</string>
+    <string name="category_filter_uncategorized">미분류</string>
+    <string name="category_filter_clear">카테고리 해제</string>
+    <string name="category_filter_empty">카테고리가 없습니다. 항목을 선택해 카테고리를 지정해 보세요</string>
+    <string name="category_assign_title">카테고리 지정</string>
+    <string name="category_assign_empty">아직 카테고리가 없습니다. 아래에서 만들어 보세요</string>
+    <string name="category_row_count">%1$d/%2$d</string>
+    <string name="category_edit">이름·색 변경</string>
+    <string name="category_move_up">위로</string>
+    <string name="category_move_down">아래로</string>
+    <string name="category_empty">카테고리가 없습니다. + 로 만들어 보세요</string>
+    <string name="category_delete_title">\'%1$s\' 삭제</string>
+    <string name="settings_categories">카테고리 관리</string>
+    <plurals name="category_item_count">
+        <item quantity="other">%d개 항목</item>
+    </plurals>
+    <plurals name="category_delete_message">
+        <item quantity="other">%d개 항목에서 이 카테고리가 제거됩니다. 사진은 지워지지 않습니다.</item>
+    </plurals>
+    <plurals name="category_assign_items">
+        <item quantity="other">%d개 항목</item>
+    </plurals>
+    <plurals name="category_assigned">
+        <item quantity="other">%d개 항목의 카테고리를 변경했습니다</item>
+    </plurals>
     <string name="gallery_date_range_label">%1$s ~ %2$s</string>
     <string name="gallery_date_clear">기간 해제</string>
     <string name="gallery_date_empty">이 기간에 촬영한 항목이 없습니다</string>

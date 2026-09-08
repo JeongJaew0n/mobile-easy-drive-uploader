@@ -29,6 +29,7 @@ app/src/main/java/com/jjw/easygallery/
 └── feature/
     ├── gallery/               # GalleryRoute(권한·이벤트 배선) / GalleryScreen(Scaffold 조립) / GalleryTopBars / GalleryBanners
     │                          # GalleryGrid(+DragSelect), GalleryActions(하단 바·다이얼로그·메뉴), DateRangeSheet(+DateRangeSelection), GalleryViewModel, MediaPermission
+    ├── categories/            # CategoriesRoute/Screen/ViewModel(관리), CategoryPickerSheet(+CategoryPickerState tri-state), CategoryFilterSheet, CategoryDot
     ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)
     ├── trash/                 # 휴지통: 복원·완전 삭제·비우기 (GalleryGrid 재사용)
     ├── settings/              # 계정 연결/해제, 저장공간, 업로드 폴더·목록 진입, Wi-Fi/충전 제약 토글
@@ -144,6 +145,12 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
 - 앨범 이동 대상은 현재 목록의 `RELATIVE_PATH` 집합(`albumsFrom`) + 새 앨범(`Pictures/<이름>/`).
 - 이름 변경 시 확장자를 생략하면 원본 확장자를 유지(`normalizeDisplayName`).
 - `MANAGE_MEDIA`(API 31+) 를 사용자가 시스템 설정에서 허용하면 createXxxRequest 가 다이얼로그 없이 즉시 OK 로 돌아온다 — 코드 경로는 동일.
+
+## 카테고리 (feature/categories, core/data/category)
+
+- 설계 문서 `CATEGORIES.md`. Room v5 `category`(이름 대소문자 무시 유일, 색 인덱스, 순서) + `media_category`(mediaId ↔ categoryId, CASCADE). `CategoryRepository`(Room 구현 `RoomCategoryRepository`)가 CRUD·할당을 맡고, 할당 맵 `Map<Long, Set<Long>>` 은 `shareIn(replay = 1)` 로 갤러리·상세보기·관리 화면이 공유한다.
+- 갤러리: `Catalog` 결합에 카테고리 목록·할당·`CategoryFilter`(여러 개 OR, `Uncategorized`) 가 들어가고 메모리 필터 순서는 백업 → 카테고리 → 기간. 선택 모드 하단 바 "카테고리" → `CategoryPickerSheet`(전부/일부/없음 tri-state, 바뀐 행만 `AssignCategoriesUseCase` 로 반영, 시트 안에서 생성). ⋮ → 카테고리 → `CategoryFilterSheet`. 필터가 켜지면 제목·`CategoryFilterBar` 가 바뀌고 `MediaViewerKey.categoryIds/uncategorizedOnly` 로 상세보기 스와이프 범위도 같아진다.
+- 정합: 영구 삭제 완료(`onActionDone`) 시 할당 제거, `OrphanAssignmentCleaner` 가 **전체 접근 권한일 때만** 일반+휴지통 목록에 없는 항목의 할당을 2초 디바운스로 정리(일부 접근·빈 목록은 건너뜀 — 오판으로 전부 지우는 사고 방지).
 
 ## 상세보기 (feature/viewer)
 

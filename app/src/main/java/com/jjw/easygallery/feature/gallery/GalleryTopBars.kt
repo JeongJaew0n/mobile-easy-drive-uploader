@@ -32,12 +32,14 @@ internal fun GalleryTopBar(
     onDriveClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
     onPickDateRange: () -> Unit,
+    onPickCategory: () -> Unit = {},
+    categoryTitle: String? = null,
 ) {
     TopAppBar(
         title = {
             Column {
                 Text(
-                    stringResource(
+                    categoryTitle ?: stringResource(
                         when {
                             notBackedUpOnly -> R.string.gallery_title_not_backed_up
                             favoritesOnly -> R.string.gallery_title_favorites
@@ -72,6 +74,7 @@ internal fun GalleryTopBar(
                 onOpenDrive = onDriveClick,
                 onOpenDuplicates = onDuplicatesClick,
                 onPickDateRange = onPickDateRange,
+                onPickCategory = onPickCategory,
             )
         },
     )

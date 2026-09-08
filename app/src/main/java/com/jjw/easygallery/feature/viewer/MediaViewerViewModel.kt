@@ -3,12 +3,14 @@ package com.jjw.easygallery.feature.viewer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
+import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
@@ -40,12 +42,14 @@ class MediaViewerViewModel @Inject constructor(
     private val actionController: MediaActionController,
     private val enqueueUploads: EnqueueUploadsUseCase,
     uploadLedger: UploadLedgerRepository,
+    private val categoryRepository: CategoryRepository,
 ) : ViewModel() {
 
     private val uploadedIds = uploadLedger.observeUploadedIds()
 
     private val filter = MutableStateFlow<MediaFilter?>(null)
     private var dateRange: DateRange? = null
+    private var categoryFilter: CategoryFilter? = null
     private val currentId = MutableStateFlow<Long?>(null)
     private val details = MutableStateFlow<Map<Long, MediaDetails>>(emptyMap())
     private val showInfo = MutableStateFlow(false)
@@ -61,10 +65,11 @@ class MediaViewerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), MediaViewerUiState())
 
     /** 진입 시 한 번. 갤러리와 같은 필터로 목록을 다시 관찰해 좌우 스와이프를 지원한다. */
-    fun load(mediaId: Long, favoritesOnly: Boolean, range: DateRange? = null) {
+    fun load(mediaId: Long, favoritesOnly: Boolean, range: DateRange? = null, category: CategoryFilter? = null) {
         if (filter.value != null) return
         currentId.value = mediaId
         dateRange = range
+        categoryFilter = category
         filter.value = if (favoritesOnly) MediaFilter.Favorites else MediaFilter.All
     }
 
@@ -132,7 +137,7 @@ class MediaViewerViewModel @Inject constructor(
     }
 
     private fun contentFlow(mediaFilter: MediaFilter): Flow<MediaViewerUiState> = combine(
-        mediaRepository.observeMedia(mediaFilter).map { it.filterByDate(dateRange) },
+        filteredMedia(mediaFilter),
         currentId,
         details,
         combine(showInfo, uploadedIds) { info, uploaded -> info to uploaded },
@@ -163,6 +168,15 @@ class MediaViewerViewModel @Inject constructor(
     /** 현재 항목이 목록에서 사라졌을 때 유지할 인덱스 */
     private fun currentIndex(list: List<MediaItem>): Int =
         uiState.value.currentIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+
+    /** 갤러리와 같은 순서로 거른다: 카테고리 → 기간 */
+    private fun filteredMedia(mediaFilter: MediaFilter): Flow<List<MediaItem>> {
+        val base = mediaRepository.observeMedia(mediaFilter)
+        val category = categoryFilter ?: return base.map { it.filterByDate(dateRange) }
+        return combine(base, categoryRepository.observeAssignments()) { list, assignments ->
+            list.filter { category.matches(assignments[it.id]) }.filterByDate(dateRange)
+        }
+    }
 
     private fun loadDetailsIfNeeded(item: MediaItem) {
         if (item.isVideo || details.value.containsKey(item.id)) return

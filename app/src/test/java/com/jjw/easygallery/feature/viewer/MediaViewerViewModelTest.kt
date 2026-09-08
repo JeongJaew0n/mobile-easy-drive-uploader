@@ -145,6 +145,7 @@ class MediaViewerViewModelTest {
         actionController = MediaActionController(mockk<MediaActionRunner>()),
         enqueueUploads = enqueueUploads,
         uploadLedger = uploadLedger,
+        categoryRepository = mockk { every { observeAssignments() } returns MutableStateFlow(emptyMap()) },
     )
 
     private companion object {

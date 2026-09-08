@@ -23,7 +23,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
-import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
@@ -35,7 +34,8 @@ fun GalleryRoute(
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
-    onOpenItem: (item: MediaItem, favoritesOnly: Boolean, range: DateRange?, hero: HeroOrigin?) -> Unit,
+    onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit,
+    onManageCategories: () -> Unit = {},
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -68,7 +68,7 @@ fun GalleryRoute(
         events = viewModel.actionEvents,
         snackbarHostState = snackbarHostState,
         onConsentResult = viewModel::onConsentResult,
-        onActionDone = { viewModel.clearSelection() },
+        onActionDone = viewModel::onActionDone,
     )
 
     // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
@@ -93,6 +93,9 @@ fun GalleryRoute(
                     } else {
                         resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
+                )
+                is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
+                    resources.getQuantityString(R.plurals.category_assigned, event.count, event.count),
                 )
                 is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
@@ -120,6 +123,10 @@ fun GalleryRoute(
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,
+        onCategoryFilterChange = viewModel::setCategoryFilter,
+        onManageCategories = onManageCategories,
+        onCreateCategory = viewModel::createCategory,
+        onAssignCategories = viewModel::assignCategoriesToSelection,
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
         onDuplicatesClick = onDuplicatesClick,

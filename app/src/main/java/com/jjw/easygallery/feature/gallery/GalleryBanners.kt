@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -25,15 +27,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.Category
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.feature.categories.CategoryDot
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -193,3 +199,51 @@ internal fun PartialAccessBanner(
         }
     }
 }
+
+/** 카테고리 필터가 켜져 있을 때 기간 바 아래에 붙는 바. 색 점 + 이름들, X 로 해제 */
+@Composable
+internal fun CategoryFilterBar(
+    filter: CategoryFilter,
+    categories: List<Category>,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondaryContainer) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val selected = (filter as? CategoryFilter.Any)?.let { f -> categories.filter { it.id in f.ids } }.orEmpty()
+            if (filter is CategoryFilter.Uncategorized) {
+                Icon(
+                    painterResource(R.drawable.ic_label_off),
+                    contentDescription = null,
+                    modifier = Modifier.size(CATEGORY_BAR_ICON_DP.dp),
+                )
+            } else {
+                selected.take(MAX_CATEGORY_DOTS).forEach { category ->
+                    CategoryDot(colorIndex = category.colorIndex, size = CATEGORY_BAR_DOT_DP)
+                    Spacer(Modifier.width(4.dp))
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = when (filter) {
+                    CategoryFilter.Uncategorized -> stringResource(R.string.gallery_title_uncategorized)
+                    is CategoryFilter.Any -> selected.joinToString(", ") { it.name }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onClear) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.category_filter_clear))
+            }
+        }
+    }
+}
+
+private const val MAX_CATEGORY_DOTS = 3
+private const val CATEGORY_BAR_DOT_DP = 10
+private const val CATEGORY_BAR_ICON_DP = 16

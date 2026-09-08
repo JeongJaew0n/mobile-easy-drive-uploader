@@ -14,9 +14,11 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.motion.MotionSpecs
 import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
+import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
@@ -64,18 +66,24 @@ fun AppNavigation() {
                     onTrashClick = { backStack.add(TrashKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
-                    onOpenItem = { item, favoritesOnly, range, hero ->
+                    onOpenItem = { item, filters, hero ->
                         backStack.add(
                             MediaViewerKey(
                                 mediaId = item.id,
-                                favoritesOnly = favoritesOnly,
-                                startEpochDay = range?.start?.toEpochDay(),
-                                endEpochDay = range?.endInclusive?.toEpochDay(),
+                                favoritesOnly = filters.favoritesOnly,
+                                startEpochDay = filters.range?.start?.toEpochDay(),
+                                endEpochDay = filters.range?.endInclusive?.toEpochDay(),
+                                categoryIds = (filters.category as? CategoryFilter.Any)?.ids?.toList(),
+                                uncategorizedOnly = filters.category is CategoryFilter.Uncategorized,
                                 hero = hero,
                             ),
                         )
                     },
+                    onManageCategories = { backStack.add(CategoriesKey) },
                 )
+            }
+            entry<CategoriesKey> {
+                CategoriesRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<SettingsKey> {
                 SettingsRoute(
@@ -85,6 +93,7 @@ fun AppNavigation() {
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
+                    onCategoriesClick = { backStack.add(CategoriesKey) },
                 )
             }
             entry<DuplicatesKey> {

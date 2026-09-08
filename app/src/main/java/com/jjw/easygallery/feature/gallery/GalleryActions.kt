@@ -55,6 +55,7 @@ internal fun SelectionBottomBar(
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
+    onCategories: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BottomAppBar(modifier = modifier) {
@@ -86,6 +87,12 @@ internal fun SelectionBottomBar(
                 contentDescription = stringResource(R.string.action_move),
             )
         }
+        IconButton(onClick = onCategories, enabled = enabled) {
+            Icon(
+                painterResource(R.drawable.ic_label),
+                contentDescription = stringResource(R.string.category_assign_title),
+            )
+        }
     }
 }
 
@@ -101,6 +108,7 @@ internal fun GalleryOverflowMenu(
     onOpenDrive: () -> Unit,
     onOpenDuplicates: () -> Unit,
     onPickDateRange: () -> Unit,
+    onPickCategory: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
@@ -113,6 +121,14 @@ internal fun GalleryOverflowMenu(
             onClick = {
                 expanded = false
                 onPickDateRange()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.gallery_menu_category)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onPickCategory()
             },
         )
         DropdownMenuItem(

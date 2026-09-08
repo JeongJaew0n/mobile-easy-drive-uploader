@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
@@ -39,7 +40,12 @@ fun MediaViewerRoute(
         } else {
             null
         }
-        viewModel.load(key.mediaId, key.favoritesOnly, range)
+        val category = when {
+            key.uncategorizedOnly -> CategoryFilter.Uncategorized
+            !key.categoryIds.isNullOrEmpty() -> CategoryFilter.Any(key.categoryIds.toSet())
+            else -> null
+        }
+        viewModel.load(key.mediaId, key.favoritesOnly, range, category)
     }
 
     MediaActionEffect(

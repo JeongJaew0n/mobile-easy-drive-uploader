@@ -2,17 +2,24 @@ package com.jjw.easygallery.feature.gallery
 
 import android.net.Uri
 import app.cash.turbine.test
+import com.jjw.easygallery.core.data.category.CategoryRepository
+import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
+import com.jjw.easygallery.core.domain.model.Category
+import com.jjw.easygallery.core.domain.model.CategoryAssignments
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -44,6 +51,14 @@ class GalleryViewModelTest {
     }
     private val enqueueUploads: EnqueueUploadsUseCase = mockk()
     private val manageQueue: ManageUploadQueueUseCase = mockk()
+    private val categories = kotlinx.coroutines.flow.MutableStateFlow<List<Category>>(emptyList())
+    private val assignments = kotlinx.coroutines.flow.MutableStateFlow<CategoryAssignments>(emptyMap())
+    private val categoryRepository: CategoryRepository = mockk {
+        every { observeCategories() } returns categories
+        every { observeAssignments() } returns assignments
+        coEvery { removeMedia(any()) } returns Unit
+    }
+    private val assignCategories = AssignCategoriesUseCase(categoryRepository)
 
     // StandardTestDispatcher: 구독 전까지 upstream 이 실행되지 않아 상태 전이 순서를 관찰할 수 있다.
     private val testDispatcher = StandardTestDispatcher()
@@ -59,7 +74,17 @@ class GalleryViewModelTest {
     }
 
     private fun createViewModel() =
-        GalleryViewModel(repository, uploadQueue, uploadLedger, enqueueUploads, manageQueue, actionController)
+        GalleryViewModel(
+            repository,
+            uploadQueue,
+            uploadLedger,
+            enqueueUploads,
+            manageQueue,
+            actionController,
+            categoryRepository,
+            assignCategories,
+            OrphanAssignmentCleaner(repository, categoryRepository),
+        )
 
     @Test
     fun `stays Loading and does not query until permission status is known`() = runTest(testDispatcher) {
@@ -247,4 +272,30 @@ class GalleryViewModelTest {
         bucketId = 1,
         bucketName = "Camera",
     )
+
+    @Test
+    fun `category filter keeps only matching items and uncategorized shows the rest`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2), sampleItem(3)))
+        assignments.value = mapOf(1L to setOf(10L), 2L to setOf(20L))
+        categories.value = listOf(Category(10, "A", 0, 0), Category(20, "B", 1, 1))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+
+            viewModel.setCategoryFilter(CategoryFilter.Any(setOf(10L, 20L)))
+            val any = awaitItem() as GalleryUiState.Content
+            assertEquals(2, any.itemCount)
+            assertEquals(false, any.animateItemChanges)
+
+            viewModel.setCategoryFilter(CategoryFilter.Uncategorized)
+            val none = awaitItem() as GalleryUiState.Content
+            assertEquals(listOf(3L), none.sections.flatMap { it.items }.map { it.id })
+
+            viewModel.setCategoryFilter(null)
+            assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+        }
+    }
 }

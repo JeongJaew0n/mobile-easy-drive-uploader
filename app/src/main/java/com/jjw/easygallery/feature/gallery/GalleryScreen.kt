@@ -30,12 +30,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.Category
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
+import com.jjw.easygallery.feature.categories.CategoryFilterSheet
+import com.jjw.easygallery.feature.categories.CategoryPickerSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,11 +58,16 @@ internal fun GalleryScreen(
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
+    onCategoryFilterChange: (CategoryFilter?) -> Unit = {},
+    onManageCategories: () -> Unit = {},
+    onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
+        Result.failure(IllegalStateException("카테고리 생성이 연결되지 않았습니다"))
+    },
+    onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit = { _, _ -> },
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
-    onOpenItem: (item: MediaItem, favoritesOnly: Boolean, range: DateRange?, hero: HeroOrigin?) -> Unit =
-        { _, _, _, _ -> },
+    onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -68,6 +77,8 @@ internal fun GalleryScreen(
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
     var showDateRange by rememberSaveable { mutableStateOf(false) }
+    var showCategoryFilter by rememberSaveable { mutableStateOf(false) }
+    var showCategoryPicker by rememberSaveable { mutableStateOf(false) }
 
     // 선택 모드에서 뒤로가기는 선택 해제
     BackHandler(enabled = selectionMode, onBack = onClearSelection)
@@ -102,6 +113,8 @@ internal fun GalleryScreen(
                         onDriveClick = onDriveClick,
                         onDuplicatesClick = onDuplicatesClick,
                         onPickDateRange = { showDateRange = true },
+                        onPickCategory = { showCategoryFilter = true },
+                        categoryTitle = content?.let { categoryTitle(it.categoryFilter, it.categories) },
                     )
                 }
             }
@@ -124,6 +137,7 @@ internal fun GalleryScreen(
                         onToggleFavorite = actions.onToggleFavorite,
                         onRename = { showRename = true },
                         onMove = { showMove = true },
+                        onCategories = { showCategoryPicker = true },
                     )
                 }
             }
@@ -156,9 +170,10 @@ internal fun GalleryScreen(
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
                     onOpenItem = { item, bounds ->
-                        onOpenItem(item, uiState.favoritesOnly, uiState.dateRange, bounds?.toHeroOrigin(item))
+                        onOpenItem(item, uiState.viewerFilters(), bounds?.toHeroOrigin(item))
                     },
                     onClearDateRange = { onDateRangeChange(null) },
+                    onClearCategoryFilter = { onCategoryFilterChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -170,15 +185,20 @@ internal fun GalleryScreen(
         }
     }
 
-    if (showDateRange) {
-        DateRangeSheet(
-            current = content?.dateRange,
-            dayCounts = content?.dayCounts ?: emptyMap(),
-            onDismiss = { showDateRange = false },
-            onConfirm = { range ->
-                showDateRange = false
-                onDateRangeChange(range)
-            },
+    if (content != null) {
+        GallerySheets(
+            content = content,
+            showDateRange = showDateRange,
+            showFilter = showCategoryFilter,
+            showPicker = showCategoryPicker,
+            onDismissDateRange = { showDateRange = false },
+            onDismissFilter = { showCategoryFilter = false },
+            onDismissPicker = { showCategoryPicker = false },
+            onDateRangeChange = onDateRangeChange,
+            onCategoryFilterChange = onCategoryFilterChange,
+            onManageCategories = onManageCategories,
+            onCreateCategory = onCreateCategory,
+            onAssignCategories = onAssignCategories,
         )
     }
     if (content != null) {
@@ -189,6 +209,64 @@ internal fun GalleryScreen(
             onDismissRename = { showRename = false },
             onDismissMove = { showMove = false },
             actions = actions,
+        )
+    }
+}
+
+/** 기간 선택·카테고리 필터·카테고리 지정 바텀시트. 적용하면 닫힌다 */
+@Composable
+@Suppress("LongParameterList") // 시트 3개의 표시 상태·콜백 묶음
+private fun GallerySheets(
+    content: GalleryUiState.Content,
+    showDateRange: Boolean,
+    showFilter: Boolean,
+    showPicker: Boolean,
+    onDismissDateRange: () -> Unit,
+    onDismissFilter: () -> Unit,
+    onDismissPicker: () -> Unit,
+    onDateRangeChange: (DateRange?) -> Unit,
+    onCategoryFilterChange: (CategoryFilter?) -> Unit,
+    onManageCategories: () -> Unit,
+    onCreateCategory: suspend (String, Int) -> Result<Category>,
+    onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit,
+) {
+    if (showDateRange) {
+        DateRangeSheet(
+            current = content.dateRange,
+            dayCounts = content.dayCounts,
+            onDismiss = onDismissDateRange,
+            onConfirm = { range ->
+                onDismissDateRange()
+                onDateRangeChange(range)
+            },
+        )
+    }
+    if (showFilter) {
+        CategoryFilterSheet(
+            categories = content.categories,
+            current = content.categoryFilter,
+            onApply = { filter ->
+                onDismissFilter()
+                onCategoryFilterChange(filter)
+            },
+            onManage = {
+                onDismissFilter()
+                onManageCategories()
+            },
+            onDismiss = onDismissFilter,
+        )
+    }
+    if (showPicker) {
+        CategoryPickerSheet(
+            mediaIds = content.selectedIds,
+            categories = content.categories,
+            assignments = content.assignments,
+            onCreateCategory = onCreateCategory,
+            onApply = { add, remove ->
+                onDismissPicker()
+                onAssignCategories(add, remove)
+            },
+            onDismiss = onDismissPicker,
         )
     }
 }
@@ -234,6 +312,7 @@ private fun GalleryContent(
     onSelectionChange: (Set<Long>) -> Unit,
     onOpenItem: (MediaItem, Rect?) -> Unit,
     onClearDateRange: () -> Unit,
+    onClearCategoryFilter: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -272,12 +351,24 @@ private fun GalleryContent(
         ) {
             lastRange.value?.let { range -> DateRangeBar(range = range, onClear = onClearDateRange) }
         }
+        val lastCategory = remember { mutableStateOf(uiState.categoryFilter) }
+        if (uiState.categoryFilter != null) lastCategory.value = uiState.categoryFilter
+        AnimatedVisibility(
+            visible = uiState.categoryFilter != null,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
+            lastCategory.value?.let { filter ->
+                CategoryFilterBar(filter = filter, categories = uiState.categories, onClear = onClearCategoryFilter)
+            }
+        }
         if (uiState.sections.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(
                         when {
                             uiState.notBackedUpOnly -> R.string.gallery_not_backed_up_empty
+                            uiState.categoryFilter != null -> R.string.gallery_date_empty
                             uiState.dateRange != null -> R.string.gallery_date_empty
                             uiState.favoritesOnly -> R.string.gallery_favorites_empty
                             else -> R.string.gallery_empty
@@ -351,3 +442,23 @@ private fun Rect.toHeroOrigin(item: MediaItem) = HeroOrigin(
     imageWidth = item.width,
     imageHeight = item.height,
 )
+
+/** 상세보기가 갤러리와 같은 범위를 보도록 넘기는 필터 묶음 */
+data class ViewerFilters(
+    val favoritesOnly: Boolean,
+    val range: DateRange?,
+    val category: CategoryFilter?,
+)
+
+internal fun GalleryUiState.Content.viewerFilters() = ViewerFilters(favoritesOnly, dateRange, categoryFilter)
+
+/** 카테고리 필터가 켜져 있을 때의 상단 제목. 하나면 그 이름, 여럿이면 개수, 미분류면 전용 문구 */
+@Composable
+internal fun categoryTitle(filter: CategoryFilter?, categories: List<Category>): String? = when (filter) {
+    null -> null
+    CategoryFilter.Uncategorized -> stringResource(R.string.gallery_title_uncategorized)
+    is CategoryFilter.Any -> {
+        val selected = categories.filter { it.id in filter.ids }
+        selected.singleOrNull()?.name ?: stringResource(R.string.gallery_title_category_count, selected.size)
+    }
+}

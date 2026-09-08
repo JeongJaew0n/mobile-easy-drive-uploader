@@ -3,18 +3,25 @@ package com.jjw.easygallery.feature.gallery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
+import com.jjw.easygallery.core.data.category.CategoryRepository
+import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
+import com.jjw.easygallery.core.data.media.MediaActionEvent
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.Category
+import com.jjw.easygallery.core.domain.model.CategoryAssignments
+import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
+import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +35,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -38,7 +46,10 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
-@Suppress("TooGenericExceptionCaught") // UI 경계: 큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
+@Suppress(
+    "TooGenericExceptionCaught", // UI 경계: 큐 등록 실패는 종류를 가리지 않고 메시지로 보여준다
+    "TooManyFunctions", // 화면이 호출하는 API 표면(필터 4·선택 3·편집 7·카테고리 3). 내부 로직은 UseCase/컨트롤러에 있다
+)
 class GalleryViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     uploadQueue: UploadQueueRepository,
@@ -46,6 +57,9 @@ class GalleryViewModel @Inject constructor(
     private val enqueueUploads: EnqueueUploadsUseCase,
     private val manageQueue: ManageUploadQueueUseCase,
     private val actionController: MediaActionController,
+    private val categoryRepository: CategoryRepository,
+    private val assignCategories: AssignCategoriesUseCase,
+    orphanCleaner: OrphanAssignmentCleaner,
 ) : ViewModel() {
 
     // null = 아직 권한 상태를 확인하지 않음
@@ -53,6 +67,7 @@ class GalleryViewModel @Inject constructor(
     private val filter = MutableStateFlow(MediaFilter.All)
     private val dateRange = MutableStateFlow<DateRange?>(null)
     private val notBackedUpOnly = MutableStateFlow(false)
+    private val categoryFilter = MutableStateFlow<CategoryFilter?>(null)
     private val uploadedIds: Flow<Set<Long>> = uploadLedger.observeUploadedIds()
 
     /** 필터·기간이 바뀔 때마다 증가. 이 값이 바뀐 직후 첫 목록 갱신은 항목 이동 애니메이션을 끈다(수백 개 동시 이동 방지) */
@@ -78,6 +93,11 @@ class GalleryViewModel @Inject constructor(
             initialValue = GalleryUiState.Loading,
         )
 
+    init {
+        // 고아 할당 정리(전체 접근 권한일 때만). 근거: docs/CATEGORIES.md §6
+        orphanCleaner.start(viewModelScope, permissionStatus.map { it == MediaPermissionStatus.Full })
+    }
+
     /** UI 가 권한을 확인·요청한 결과를 알려준다. 화면 복귀 시마다 호출되어도 안전(StateFlow 중복 제거). */
     fun onPermissionStatusChanged(status: MediaPermissionStatus) {
         permissionStatus.value = status
@@ -101,6 +121,43 @@ class GalleryViewModel @Inject constructor(
         clearSelection()
         filterVersion++
         dateRange.value = range
+    }
+
+    /** null 이면 카테고리 제한 없음. 기존 필터와 AND, 여러 카테고리는 OR */
+    fun setCategoryFilter(filter: CategoryFilter?) {
+        clearSelection()
+        filterVersion++
+        categoryFilter.value = filter
+    }
+
+    // ---------- 카테고리 ----------
+
+    suspend fun createCategory(name: String, colorIndex: Int): Result<Category> =
+        categoryRepository.create(name, colorIndex)
+
+    /** 선택 항목에 [add] 를 붙이고 [remove] 를 뗀다. 선택은 유지(다른 작업을 이어서 할 수 있게) */
+    fun assignCategoriesToSelection(add: Set<Long>, remove: Set<Long>) {
+        val ids = selectedIds.value
+        if (ids.isEmpty() || (add.isEmpty() && remove.isEmpty())) return
+        viewModelScope.launch {
+            try {
+                assignCategories(ids, add, remove)
+                events.send(GalleryEvent.CategoriesAssigned(ids.size))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "assign categories failed")
+                events.send(GalleryEvent.Error(e.message ?: e.toString()))
+            }
+        }
+    }
+
+    /** 편집 완료 후처리: 선택 해제, 영구 삭제면 카테고리 할당도 제거 */
+    fun onActionDone(event: MediaActionEvent.Done) {
+        clearSelection()
+        if (event.action is MediaAction.Delete) {
+            viewModelScope.launch { categoryRepository.removeMedia(event.action.items.map { it.id }) }
+        }
     }
 
     fun toggleSelection(id: Long) {
@@ -190,32 +247,50 @@ class GalleryViewModel @Inject constructor(
         val notBackedUpOnly: Boolean,
         /** 기간 필터 이전 목록의 날짜별 개수 — 기간 선택 달력용 */
         val dayCounts: Map<LocalDate, Int>,
+        val categories: List<Category>,
+        val assignments: CategoryAssignments,
+        val categoryFilter: CategoryFilter?,
         val version: Int,
+    )
+
+    /** 메모리에서 거르는 조건 묶음(기간·백업·카테고리). combine 인자 수를 줄이기 위해 하나로 */
+    private data class MemoryFilters(
+        val range: DateRange?,
+        val notBackedUpOnly: Boolean,
+        val category: CategoryFilter?,
     )
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
         // 원장(uploadedIds)은 업로드가 끝날 때만 바뀌므로 여기서 결합해도 선택 토글과 무관하다.
+        val filters = combine(dateRange, notBackedUpOnly, categoryFilter) { range, pending, category ->
+            MemoryFilters(range, pending, category)
+        }
         val catalog = combine(
             mediaRepository.observeMedia(filter),
-            dateRange,
+            filters,
             uploadedIds,
-            notBackedUpOnly,
-        ) { all, range, uploaded, onlyPending ->
-            val base = if (onlyPending) all.filter { it.id !in uploaded } else all
-            val inRange = base.filterByDate(range)
-            val items = inRange
+            categoryRepository.observeCategories(),
+            categoryRepository.observeAssignments(),
+        ) { all, f, uploaded, categories, assignments ->
+            // 순서: 백업 → 카테고리 → 기간. 기간 달력(dayCounts)은 기간 직전 목록으로 센다
+            val pending = if (f.notBackedUpOnly) all.filter { it.id !in uploaded } else all
+            val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
+            val items = categorized.filterByDate(f.range)
             latestItems = items
             Catalog(
                 items = items,
                 sections = groupByDate(items),
                 albums = albumsFrom(items),
                 byId = items.associateBy { it.id },
-                range = range,
+                range = f.range,
                 uploadedIds = uploaded,
-                uploadedCount = inRange.count { it.id in uploaded },
-                notBackedUpOnly = onlyPending,
-                dayCounts = countByDay(base),
+                uploadedCount = items.count { it.id in uploaded },
+                notBackedUpOnly = f.notBackedUpOnly,
+                dayCounts = countByDay(categorized),
+                categories = categories,
+                assignments = assignments,
+                categoryFilter = f.category,
                 version = filterVersion,
             )
         }
@@ -237,6 +312,9 @@ class GalleryViewModel @Inject constructor(
                 uploadedCount = c.uploadedCount,
                 notBackedUpOnly = c.notBackedUpOnly,
                 dayCounts = c.dayCounts,
+                categories = c.categories,
+                assignments = c.assignments,
+                categoryFilter = c.categoryFilter,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -278,6 +356,11 @@ sealed interface GalleryUiState {
         val notBackedUpOnly: Boolean = false,
         /** 기간 필터 이전 목록의 날짜별 개수(기간 선택 달력에서 사진 있는 날 표시) */
         val dayCounts: Map<LocalDate, Int> = emptyMap(),
+        /** 사용자 카테고리(sortOrder 순, 항목 수 포함) */
+        val categories: List<Category> = emptyList(),
+        /** mediaId → 카테고리 ID. 썸네일 배지·피커 초기 상태 */
+        val assignments: CategoryAssignments = emptyMap(),
+        val categoryFilter: CategoryFilter? = null,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
@@ -293,5 +376,6 @@ sealed interface GalleryUiState {
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
+    data class CategoriesAssigned(val count: Int) : GalleryEvent
     data class Error(val message: String) : GalleryEvent
 }

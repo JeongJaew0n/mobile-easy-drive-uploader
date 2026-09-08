@@ -242,3 +242,8 @@ sealed interface CategoryFilter {
 - **업로드 연동**: 업로드 시 Drive 파일 `appProperties.categories` 에 이름 기록, 또는 카테고리별 Drive 하위 폴더.
 - **자동 백업 조건**: "이 카테고리만 자동 백업".
 - **스마트 제안**: 같은 앨범(bucket)·같은 날 항목에 일괄 제안. ML 분류는 하지 않는다(중복 탐지에서 유사 사진을 배제한 것과 같은 이유 — 오분류 위험).
+
+## 11. 진행 기록
+
+- 2026-09-09 1단계 완료(`f1e7b4c`): 엔티티·DAO·저장소·v5 마이그레이션·`AssignCategoriesUseCase`·`CategoryPickerState` + 테스트 10건.
+- 2026-09-09 2단계 완료: 선택 모드 피커, 필터 시트·바·제목, `Catalog` 결합, `MediaViewerKey` 전달, 관리 화면(생성·이름/색 변경·삭제·위/아래 이동 — 드래그 정렬은 보류), 설정 진입점, `OrphanAssignmentCleaner`(권한 전체 접근일 때만 구독; 초기 구현이 권한 전에 MediaStore 를 구독해 "권한 확인 전 조회 금지" 테스트가 잡아냈다). 남은 3단계: 상세보기 칩·편집, 썸네일 배지 + 설정 토글.
