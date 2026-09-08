@@ -20,7 +20,7 @@
 | 파일 | 영역 |
 |---|---|
 | `01-gallery-basics.md` | 갤러리 조회·권한·선택(드래그, 날짜 전체)·기간 필터 |
-| `02-google-drive.md` | GCP 등록, 로그인, Drive 탐색, 업로드 E2E·재개·알림 |
+| `02-google-drive.md` | GCP 등록, 로그인, Drive 탐색, 파일 CRUD·다중 선택·검색·기기에 저장, 업로드 E2E·재개·알림 |
 | `03-gallery-crud.md` | 삭제·휴지통·즐겨찾기·이름 변경·이동, MANAGE_MEDIA |
 | `04-viewer.md` | 상세보기: 확대, 영상 재생, 음량·배속·회전, 정보 패널 |
 | `05-animation-performance.md` | 애니메이션 체감 확인, 프레임·전력 측정 절차 |
@@ -29,7 +29,7 @@
 | `08-duplicates.md` | 완전 중복 탐지: 검사·그룹·기본 선택·휴지통 |
 | `09-video-compression.md` | 업로드 영상 압축: 프리셋·세로 영상·캐시·실패 처리 |
 | `10-categories.md` | 카테고리: 지정(tri-state)·필터·관리·배지·고아 정리 |
-| `11-remote-storage.md` | 다중 클라우드(S3 호환: Naver·KT·AWS)·NAS(WebDAV): 계정 추가·연결 테스트·탐색·CRUD·업로드·인증서 고정 |
+| `11-remote-storage.md` | 다중 클라우드(S3 호환: Naver·KT·AWS)·NAS(WebDAV Basic/Digest·SMB mDNS): 계정 추가/수정·연결 테스트·탐색·CRUD·업로드·인증서 고정·용량·다른 저장소로 업로드 |
 
 ## 실기기 연결
 
