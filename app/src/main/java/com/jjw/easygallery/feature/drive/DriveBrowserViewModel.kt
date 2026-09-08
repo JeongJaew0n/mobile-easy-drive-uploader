@@ -12,7 +12,9 @@ import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +43,7 @@ class DriveBrowserViewModel @Inject constructor(
     val eventFlow = events.receiveAsFlow()
 
     private var loaded = false
+    private var searchJob: Job? = null
 
     /**
      * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
@@ -84,6 +87,32 @@ class DriveBrowserViewModel @Inject constructor(
 
     fun refresh() {
         _uiState.update { it.copy(isLoading = true, error = null) }
+        fetchPage(reset = true)
+    }
+
+    // ---- 검색(`docs/DRIVE_FILE_CRUD.md` §8) ----
+
+    fun startSearch() = _uiState.update { it.copy(searchQuery = "", selectedIds = emptySet()) }
+
+    /** 입력마다 호출 — [SEARCH_DEBOUNCE_MILLIS] 뒤 조회. 빈 문자열은 결과를 비운다 */
+    fun search(query: String) {
+        _uiState.update { it.copy(searchQuery = query, selectedIds = emptySet()) }
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            _uiState.update { it.copy(entries = emptyList(), nextPageToken = null, isLoading = false, error = null) }
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MILLIS)
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            fetchPage(reset = true)
+        }
+    }
+
+    /** 검색 종료 → 원래 폴더 목록으로 */
+    fun exitSearch() {
+        searchJob?.cancel()
+        _uiState.update { it.copy(searchQuery = null, entries = emptyList(), nextPageToken = null, isLoading = true) }
         fetchPage(reset = true)
     }
 
@@ -324,7 +353,8 @@ class DriveBrowserViewModel @Inject constructor(
         val token = if (reset) null else _uiState.value.nextPageToken
         viewModelScope.launch {
             try {
-                val page = drive.listChildren(current.id, token)
+                val query = _uiState.value.searchQuery
+                val page = if (query != null) drive.search(query, token) else drive.listChildren(current.id, token)
                 _uiState.update { state ->
                     state.copy(
                         entries = if (reset) page.entries else state.entries + page.entries,
@@ -348,6 +378,7 @@ class DriveBrowserViewModel @Inject constructor(
 }
 
 private const val MOVE_INTO_SELF_MESSAGE = "폴더를 자기 자신 안으로 옮길 수 없습니다"
+private const val SEARCH_DEBOUNCE_MILLIS = 350L
 
 data class DriveBrowserUiState(
     val current: DriveFolder? = null,
@@ -358,6 +389,8 @@ data class DriveBrowserUiState(
     val isMutating: Boolean = false,
     /** 길게 눌러 고른 항목. 비어 있지 않으면 선택 모드 */
     val selectedIds: Set<String> = emptySet(),
+    /** null 이면 폴더 탐색, 아니면 검색 모드(빈 문자열 = 입력 대기). 검색 결과는 부모를 모르므로 이동 불가 */
+    val searchQuery: String? = null,
     /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
     val mutationProgress: MutationProgress? = null,
     val error: String? = null,
@@ -367,6 +400,7 @@ data class DriveBrowserUiState(
     val accountName: String? = null,
 ) {
     val isSelecting: Boolean get() = selectedIds.isNotEmpty()
+    val isSearching: Boolean get() = searchQuery != null
 }
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */

@@ -137,6 +137,27 @@ class DriveBrowserViewModelTest {
         }
 
     @Test
+    fun `search debounces, lists results across the drive and exit restores the folder`() = runTest(testDispatcher) {
+        coEvery { drive.search("a", null) } returns DrivePage(listOf(fileA), null)
+        val viewModel = loadedViewModel()
+
+        viewModel.startSearch()
+        assertTrue(viewModel.uiState.value.isSearching)
+        viewModel.search("a")
+        assertEquals(3, viewModel.uiState.value.entries.size) // 디바운스 전
+        advanceUntilIdle()
+        assertEquals(listOf("a.jpg"), viewModel.uiState.value.entries.map { it.name })
+
+        viewModel.search("")
+        assertTrue(viewModel.uiState.value.entries.isEmpty())
+
+        viewModel.exitSearch()
+        advanceUntilIdle()
+        assertTrue(!viewModel.uiState.value.isSearching)
+        assertEquals(listOf("Album", "a.jpg", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
+    }
+
+    @Test
     fun `move removes the entry and ignores moving into the current folder`() = runTest(testDispatcher) {
         coEvery { drive.move("f1", "root", "d1") } returns fileA
         val viewModel = loadedViewModel()

@@ -42,6 +42,10 @@ interface RemoteStorage {
 
     suspend fun rename(entryId: String, name: String): RemoteEntry
 
+    /** [Capability.SEARCH] 가 있을 때만. 저장소 전체에서 이름 부분 일치 */
+    suspend fun search(query: String, pageToken: String? = null): RemotePage =
+        throw UnsupportedOperationException("이 저장소는 검색을 지원하지 않습니다")
+
     suspend fun move(entryId: String, fromParentId: String, toParentId: String): RemoteEntry
 
     /** [Capability.TRASH] 가 있으면 휴지통으로, 없으면 영구 삭제(UI 가 먼저 확인한다) */

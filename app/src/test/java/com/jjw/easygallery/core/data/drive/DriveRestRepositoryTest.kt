@@ -89,6 +89,17 @@ class DriveRestRepositoryTest {
     }
 
     @Test
+    fun `search uses name contains across the drive and escapes quotes`() = runTest {
+        server.enqueue(json("""{"files":[{"id":"i1","name":"a'b.jpg","mimeType":"image/jpeg"}]}"""))
+
+        val page = repository.search(" a'b ")
+
+        assertEquals(listOf("a'b.jpg"), page.entries.map { it.name })
+        val q = server.takeRequest().url.queryParameter("q")!!
+        assertEquals("name contains 'a\\'b' and trashed = false", q)
+    }
+
+    @Test
     fun `listChildren passes pageToken for next page`() = runTest {
         server.enqueue(json("""{"files":[]}"""))
 

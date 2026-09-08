@@ -131,6 +131,7 @@
     <string name="gallery_selected_count">%1$d개 선택</string>
     <string name="gallery_section_select_all">이 날짜 전체 선택</string>
     <string name="action_select_all">전체 선택</string>
+    <string name="action_clear">지우기</string>
     <string name="gallery_section_deselect_all">이 날짜 선택 해제</string>
     <string name="gallery_uploading">업로드 중 (%1$d/%2$d) · %3$s</string>
     <plurals name="gallery_upload_enqueued">
@@ -252,6 +253,9 @@
     <string name="drive_batch_moved">%1$d개를 %2$s(으)로 옮겼습니다</string>
     <string name="drive_batch_failed">%1$d개는 처리하지 못했습니다</string>
     <string name="drive_batch_delete_title">%1$d개 항목 삭제</string>
+    <string name="drive_search_hint">Drive에서 파일 검색</string>
+    <string name="drive_search_prompt">파일 이름을 입력하세요. 휴지통을 제외한 전체 Drive에서 찾습니다.</string>
+    <string name="drive_search_empty">일치하는 파일이 없습니다</string>
     <string name="drive_restored">복원했습니다</string>
     <string name="action_undo">실행 취소</string>
 

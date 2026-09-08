@@ -58,7 +58,6 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 ## 6. 후보
 
 - Drive → 기기 다운로드(가져오기): `alt=media` 스트리밍을 `MediaStore` 로 저장하는 WorkManager 작업, 진행 알림, 원장에 `driveFileId` 가 있으면 "이미 기기에 있음" 표시.
-- 파일 검색(`name contains`).
 
 ## 7. 다중 선택 (2026-09-09 추가)
 
@@ -67,3 +66,11 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 - 휴지통 있는 저장소: 확인 없이 휴지통 → 스낵바 "n개를 휴지통으로 옮겼습니다 · 실행 취소"(`restoreAll` 순차 복원). 없는 저장소: "n개 항목 삭제" 확인 다이얼로그 후 영구 삭제.
 - 이동 대상이 선택된 폴더 자신이면 거부(하위 폴더로의 이동은 서버가 거부하고 그 항목만 실패로 남는다).
 - 테스트: `DriveBrowserViewModelTest` 일괄 휴지통(성공 1·실패 1), 자기 자신으로 이동 거부·전체 선택.
+
+## 8. 검색 (2026-09-09 추가)
+
+- `Capability.SEARCH`(Drive 만) → 상단바 검색 아이콘 → `DriveSearchTopBar`(텍스트 필드가 제목 자리, 자동 포커스). 입력마다 `search(query)`, ViewModel 이 350ms 디바운스 후 `RemoteStorage.search` — Drive 는 `q = name contains '<이스케이프>' and trashed = false`, 정렬 `folder,name_natural`, 페이징은 폴더 목록과 같은 `fetchPage`. 빈 문자열은 안내 문구, 결과 없음은 "일치하는 파일이 없습니다".
+- 검색은 **Drive 전체**(현재 폴더 한정 아님) — Drive 의 `contains` 는 접두어 토큰 매칭이라 "IMG_2026" 같은 앞부분 검색에 강하고 중간 문자열은 놓칠 수 있다(Drive 제약).
+- 검색 결과에는 부모 폴더 정보가 없어(`fields` 에 parents 를 넣어도 다중 부모·공유 항목이 있어 `removeParents` 가 애매) **이동은 숨긴다**(행 ⋮·다중 선택 상단바 모두). 이름 변경·휴지통·열기는 그대로. 하단 "업로드 폴더로 지정"도 숨김.
+- 뒤로 가기는 검색만 종료하고 원래 폴더를 다시 읽는다. S3·WebDAV·SMB 는 아이콘이 나오지 않는다(접두어 목록만 있음 — 폴더 내 필터는 후보).
+- 테스트: `DriveRestRepositoryTest` 검색 쿼리(공백 trim·따옴표 이스케이프), `DriveBrowserViewModelTest` 디바운스·결과·종료 복귀.

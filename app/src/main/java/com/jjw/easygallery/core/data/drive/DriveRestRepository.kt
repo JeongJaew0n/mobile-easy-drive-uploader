@@ -33,6 +33,14 @@ class DriveRestRepository @Inject constructor(
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
 
+    override suspend fun search(query: String, pageToken: String?): DrivePage {
+        val page = api.listFiles(
+            query = "name contains '${escape(query.trim())}' and trashed = false",
+            pageToken = pageToken,
+        )
+        return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
+    }
+
     override suspend fun rename(fileId: String, name: String): DriveEntry =
         api.updateFile(fileId, DriveFilePatch(name = name)).toEntry()
 

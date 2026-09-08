@@ -23,6 +23,7 @@ class GoogleDriveStorage @Inject constructor(
     )
 
     override val capabilities: Set<Capability> = setOf(
+        Capability.SEARCH,
         Capability.TRASH,
         Capability.RENAME,
         Capability.MOVE,
@@ -41,6 +42,8 @@ class GoogleDriveStorage @Inject constructor(
         drive.listChildren(parentId, pageToken, foldersOnly)
 
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder = drive.createFolder(name, parentId)
+
+    override suspend fun search(query: String, pageToken: String?): RemotePage = drive.search(query, pageToken)
 
     override suspend fun rename(entryId: String, name: String): RemoteEntry = drive.rename(entryId, name)
 

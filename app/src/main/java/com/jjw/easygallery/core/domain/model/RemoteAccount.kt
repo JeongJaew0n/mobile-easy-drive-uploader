@@ -57,6 +57,9 @@ enum class Capability {
     /** 중단된 업로드를 이어 올릴 수 있다 */
     RESUMABLE_UPLOAD,
 
+    /** 이름으로 저장소 전체를 검색할 수 있다(Drive `name contains`). 접두어 목록만 있는 S3·WebDAV·SMB 는 없음 */
+    SEARCH,
+
     /** 용량 정보를 준다 */
     QUOTA,
 

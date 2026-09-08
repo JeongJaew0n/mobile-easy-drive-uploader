@@ -16,6 +16,9 @@ interface DriveRepository {
 
     suspend fun createFolder(name: String, parentId: String): DriveFolder
 
+    /** 이름 부분 일치(대소문자 무시는 Drive 가 처리). 휴지통 제외, 폴더 먼저 */
+    suspend fun search(query: String, pageToken: String? = null): DrivePage
+
     /** 이름 변경. 확장자는 사용자가 쓴 그대로 */
     suspend fun rename(fileId: String, name: String): DriveEntry
 

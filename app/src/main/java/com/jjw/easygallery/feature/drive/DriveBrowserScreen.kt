@@ -5,6 +5,7 @@ import android.net.Uri
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -128,6 +130,9 @@ fun DriveBrowserRoute(
             onMove = viewModel::move,
             onTrash = viewModel::trash,
             loadFolders = viewModel::listFolders,
+            onStartSearch = viewModel::startSearch,
+            onSearch = viewModel::search,
+            onExitSearch = viewModel::exitSearch,
             onToggleSelect = viewModel::toggleSelection,
             onSelectAll = viewModel::selectAll,
             onClearSelection = viewModel::clearSelection,
@@ -144,6 +149,10 @@ internal data class DriveEntryActions(
     val onMove: (DriveEntry, DriveFolder) -> Unit = { _, _ -> },
     val onTrash: (DriveEntry) -> Unit = {},
     val loadFolders: suspend (parentId: String) -> List<DriveFolder> = { emptyList() },
+    // 검색
+    val onStartSearch: () -> Unit = {},
+    val onSearch: (String) -> Unit = {},
+    val onExitSearch: () -> Unit = {},
     // 다중 선택
     val onToggleSelect: (DriveEntry) -> Unit = {},
     val onSelectAll: () -> Unit = {},
@@ -173,7 +182,7 @@ internal fun DriveBrowserScreen(
     var movingSelection by rememberSaveable { mutableStateOf(false) }
     var deletingSelection by rememberSaveable { mutableStateOf(false) }
     val hasTrash = Capability.TRASH in uiState.capabilities
-    BackHandler(enabled = uiState.isSelecting) { entryActions.onClearSelection() }
+    BrowserBackHandlers(uiState, entryActions)
     val listState = rememberLazyListState()
     val motion = LocalMotion.current
 
@@ -199,17 +208,7 @@ internal fun DriveBrowserScreen(
                 entryActions = entryActions,
             )
         },
-        bottomBar = {
-            OutlinedButton(
-                onClick = onSelectAsUploadFolder,
-                enabled = uiState.current != null && !uiState.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            ) {
-                Text(stringResource(R.string.drive_use_as_upload_folder))
-            }
-        },
+        bottomBar = { UploadFolderButton(uiState, onSelectAsUploadFolder) },
     ) { innerPadding ->
         Box(
             Modifier
@@ -230,7 +229,7 @@ internal fun DriveBrowserScreen(
                 uiState.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
 
                 uiState.entries.isEmpty() -> Text(
-                    text = stringResource(R.string.drive_folder_empty),
+                    text = stringResource(emptyMessageRes(uiState)),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -248,7 +247,7 @@ internal fun DriveBrowserScreen(
                             selected = entry.id in uiState.selectedIds,
                             selecting = uiState.isSelecting,
                             enabled = !uiState.isMutating,
-                            menu = entryMenu(entry, uiState.capabilities),
+                            menu = entryMenu(entry, uiState.capabilities, allowMove = !uiState.isSearching),
                             onOpen = { entryActions.onOpen(entry) },
                             onRename = { renaming = entry },
                             onMove = { moving = entry },
@@ -317,7 +316,36 @@ internal fun DriveBrowserScreen(
     }
 }
 
-/** 일반 상단바 / 선택 모드 상단바 */
+/** 뒤로 가기: 선택 모드면 선택 해제, 검색 모드면 검색 종료(화면을 나가지 않는다) */
+@Composable
+private fun BrowserBackHandlers(uiState: DriveBrowserUiState, entryActions: DriveEntryActions) {
+    BackHandler(enabled = uiState.isSelecting) { entryActions.onClearSelection() }
+    BackHandler(enabled = uiState.isSearching && !uiState.isSelecting) { entryActions.onExitSearch() }
+}
+
+/** 하단 "이 폴더를 업로드 폴더로 지정" — 검색 결과에는 폴더 문맥이 없어 숨긴다 */
+@Composable
+private fun UploadFolderButton(uiState: DriveBrowserUiState, onClick: () -> Unit) {
+    if (uiState.isSearching) return
+    OutlinedButton(
+        onClick = onClick,
+        enabled = uiState.current != null && !uiState.isLoading,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+    ) {
+        Text(stringResource(R.string.drive_use_as_upload_folder))
+    }
+}
+
+@StringRes
+private fun emptyMessageRes(uiState: DriveBrowserUiState): Int = when {
+    uiState.searchQuery?.isBlank() == true -> R.string.drive_search_prompt
+    uiState.isSearching -> R.string.drive_search_empty
+    else -> R.string.drive_folder_empty
+}
+
+/** 일반 상단바 / 선택 모드 상단바 / 검색 상단바 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BrowserTopBar(
@@ -332,12 +360,20 @@ private fun BrowserTopBar(
     if (uiState.isSelecting) {
         DriveSelectionTopBar(
             count = uiState.selectedIds.size,
-            canMove = Capability.MOVE in uiState.capabilities,
+            canMove = Capability.MOVE in uiState.capabilities && !uiState.isSearching,
             enabled = !uiState.isMutating,
             onClose = entryActions.onClearSelection,
             onSelectAll = entryActions.onSelectAll,
             onMove = onMoveSelection,
             onDelete = onDeleteSelection,
+        )
+        return
+    }
+    if (uiState.searchQuery != null) {
+        DriveSearchTopBar(
+            query = uiState.searchQuery,
+            onQueryChange = entryActions.onSearch,
+            onExit = entryActions.onExitSearch,
         )
         return
     }
@@ -352,6 +388,11 @@ private fun BrowserTopBar(
             }
         },
         actions = {
+            if (Capability.SEARCH in uiState.capabilities) {
+                IconButton(onClick = entryActions.onStartSearch, enabled = !uiState.isMutating) {
+                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.drive_search_hint))
+                }
+            }
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
             }
@@ -391,12 +432,12 @@ internal data class EntryMenu(
     val deleteIsTrash: Boolean,
 )
 
-internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>): EntryMenu {
+internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>, allowMove: Boolean = true): EntryMenu {
     val folderOk = !entry.isFolder || Capability.FOLDER_MUTATION in capabilities
     return EntryMenu(
         open = !entry.isFolder && Capability.WEB_LINK in capabilities && entry.webViewLink != null,
         rename = Capability.RENAME in capabilities && folderOk,
-        move = Capability.MOVE in capabilities && folderOk,
+        move = allowMove && Capability.MOVE in capabilities && folderOk,
         delete = true,
         deleteIsTrash = Capability.TRASH in capabilities,
     )
