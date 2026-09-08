@@ -106,7 +106,7 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
 
 - 그리드에서 항목을 탭하면 `MediaViewerKey(mediaId, favoritesOnly)` 로 진입. 목록을 통째로 넘기지 않고 **갤러리와 같은 필터로 다시 관찰**해 좌우 스와이프 범위를 맞춘다(`mediaId` 로 인덱스를 찾음).
 - `HorizontalPager` + 공용 `ZoomState`: 핀치 확대·드래그 이동·두 번 탭 토글. 확대 중에는 `userScrollEnabled = false` 로 페이저와 팬 제스처가 충돌하지 않게 한다(확대 중엔 다른 페이지가 보이지 않으므로 상태 하나를 공유해도 정확).
-- 영상은 항목별 `ExoPlayer` + media3 `PlayerSurface`. 페이지를 벗어나면 `pause()`, 화면을 나가면 `release()`, 앱이 백그라운드로 가면 `LifecycleResumeEffect` 로 `pause()`(소리가 계속 나는 것 방지). 컨트롤(재생 버튼·탐색 바)은 상·하단 바와 같은 `chromeVisible` 로 묶여 재생 중 3초 뒤 자동으로 숨고, 화면을 탭하면 다시 나온다. 탐색 바는 드래그 중 `scrubFraction` 을 우선 표시하고 손을 떼면 `seekTo`. media3 의 `UnstableApi` 는 Java 마커라 `@androidx.annotation.OptIn` 이 필요하다(kotlin.OptIn 은 lint 가 인정하지 않음).
+- 영상은 항목별 `ExoPlayer` + media3 `PlayerSurface`. 페이지를 벗어나면 `pause()`, 화면을 나가면 `release()`, 앱이 백그라운드로 가면 `LifecycleResumeEffect` 로 `pause()`(소리가 계속 나는 것 방지). 컨트롤(재생 버튼·탐색 바)은 상·하단 바와 같은 `chromeVisible` 로 묶여 재생 중 3초 뒤 자동으로 숨고, 화면을 탭하면 다시 나온다. 탐색 바는 드래그 중 `scrubFraction` 을 우선 표시하고 손을 떼면 `seekTo`. 컨트롤 행에 음량 슬라이더(+음소거 토글, `player.volume`), 배속 메뉴(0.25~2배, `setPlaybackSpeed`), 가로 보기 토글이 있고 세 값은 화면 수준 `rememberSaveable` 이라 항목을 넘겨도 유지된다. 가로 보기는 `activity.requestedOrientation` 을 바꾸고 상세보기를 나갈 때 `UNSPECIFIED` 로 되돌린다 — 회전으로 재생 위치가 날아가지 않도록 `MainActivity` 에 `configChanges` 를 선언해 액티비티 재생성을 막았다. media3 의 `UnstableApi` 는 Java 마커라 `@androidx.annotation.OptIn` 이 필요하다(kotlin.OptIn 은 lint 가 인정하지 않음).
 - 정보 패널은 `MediaRepository.readDetails()` 로 EXIF(카메라·조리개·ISO·초점거리·좌표)를 읽는다. 위치가 지워지지 않은 원본은 `MediaStore.setRequireOriginal` + `ACCESS_MEDIA_LOCATION` 권한이 필요하며, 실패하면 빈 값으로 대체한다. 영상은 EXIF 를 읽지 않는다.
 - 현재 항목을 삭제하면 같은 인덱스(다음 항목)를 이어서 보여주고, 목록이 비면 화면을 닫는다.
 

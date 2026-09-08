@@ -1,5 +1,9 @@
 package com.jjw.easygallery.feature.viewer
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -18,6 +22,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -38,12 +43,14 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -157,6 +164,21 @@ internal fun MediaViewerScreen(
 
     var chromeVisible by rememberSaveable { mutableStateOf(true) }
     var videoPlaying by remember { mutableStateOf(false) }
+    // 항목을 넘겨도 유지되도록 화면 수준에서 들고 있는다
+    var playbackSpeed by rememberSaveable { mutableFloatStateOf(1f) }
+    var volume by rememberSaveable { mutableFloatStateOf(1f) }
+    var landscapeLocked by rememberSaveable { mutableStateOf(false) }
+
+    val activity = LocalContext.current.findActivity()
+    DisposableEffect(activity, landscapeLocked) {
+        activity?.requestedOrientation = if (landscapeLocked) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        // 상세보기를 나가면 앱 기본 회전 동작으로 되돌린다
+        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = uiState.currentIndex) { uiState.items.size }
@@ -238,6 +260,14 @@ internal fun MediaViewerScreen(
                         onPlayingChange = { playing ->
                             if (page == pagerState.settledPage) videoPlaying = playing
                         },
+                        settings = VideoSettings(
+                            speed = playbackSpeed,
+                            volume = volume,
+                            landscapeLocked = landscapeLocked,
+                            onSpeedChange = { playbackSpeed = it },
+                            onVolumeChange = { volume = it },
+                            onToggleRotation = { landscapeLocked = !landscapeLocked },
+                        ),
                     )
                 } else {
                     // 확대 중에는 스와이프가 막혀 다른 페이지가 보이지 않으므로 상태 하나를 공유해도 된다
@@ -306,6 +336,7 @@ private fun VideoPage(
     controlsVisible: Boolean,
     onToggleControls: () -> Unit,
     onPlayingChange: (Boolean) -> Unit,
+    settings: VideoSettings,
 ) {
     val context = LocalContext.current
     val player = remember(item.id) {
@@ -335,6 +366,8 @@ private fun VideoPage(
         }
     }
     LaunchedEffect(isPlaying) { onPlayingChange(isPlaying) }
+    LaunchedEffect(player, settings.speed) { player.setPlaybackSpeed(settings.speed) }
+    LaunchedEffect(player, settings.volume) { player.volume = settings.volume }
 
     Box(
         modifier = Modifier
@@ -382,16 +415,19 @@ private fun VideoPage(
 
         AnimatedVisibility(visible = controlsVisible, modifier = Modifier.align(Alignment.BottomCenter)) {
             val scrub = scrubFraction
-            VideoSeekBar(
-                positionMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis,
-                durationMillis = durationMillis,
-                fraction = scrub ?: fractionOf(positionMillis, durationMillis),
-                onScrub = { scrubFraction = it },
-                onScrubFinished = {
-                    scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
-                    scrubFraction = null
-                },
-            )
+            Column(Modifier.background(Color.Black.copy(alpha = OVERLAY_ALPHA))) {
+                VideoSettingsRow(settings = settings)
+                VideoSeekBar(
+                    positionMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis,
+                    durationMillis = durationMillis,
+                    fraction = scrub ?: fractionOf(positionMillis, durationMillis),
+                    onScrub = { scrubFraction = it },
+                    onScrubFinished = {
+                        scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
+                        scrubFraction = null
+                    },
+                )
+            }
         }
     }
 }
@@ -407,7 +443,6 @@ private fun VideoSeekBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -431,6 +466,94 @@ private fun VideoSeekBar(
             color = Color.White,
         )
     }
+}
+
+/** 영상 컨트롤 중 화면을 넘겨도 유지되는 설정 묶음 */
+internal data class VideoSettings(
+    val speed: Float,
+    val volume: Float,
+    val landscapeLocked: Boolean,
+    val onSpeedChange: (Float) -> Unit,
+    val onVolumeChange: (Float) -> Unit,
+    val onToggleRotation: () -> Unit,
+)
+
+@Composable
+private fun VideoSettingsRow(settings: VideoSettings) {
+    val muted = settings.volume <= 0f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = { settings.onVolumeChange(if (muted) 1f else 0f) }) {
+            Icon(
+                painter = painterResource(if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_up),
+                contentDescription = stringResource(if (muted) R.string.viewer_unmute else R.string.viewer_mute),
+                tint = Color.White,
+            )
+        }
+        Slider(
+            value = settings.volume,
+            onValueChange = settings.onVolumeChange,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp),
+        )
+        SpeedMenuButton(speed = settings.speed, onSpeedChange = settings.onSpeedChange)
+        IconButton(onClick = settings.onToggleRotation) {
+            Icon(
+                painter = painterResource(R.drawable.ic_screen_rotation),
+                contentDescription = stringResource(
+                    if (settings.landscapeLocked) R.string.viewer_rotate_auto else R.string.viewer_rotate_landscape,
+                ),
+                tint = if (settings.landscapeLocked) MaterialTheme.colorScheme.primary else Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpeedMenuButton(
+    speed: Float,
+    onSpeedChange: (Float) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text(
+                text = stringResource(R.string.viewer_speed_value, formatSpeed(speed)),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            PLAYBACK_SPEEDS.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.viewer_speed_value, formatSpeed(option))) },
+                    trailingIcon = {
+                        if (option == speed) Icon(Icons.Filled.Check, contentDescription = null)
+                    },
+                    onClick = {
+                        expanded = false
+                        onSpeedChange(option)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** 1.0 → "1", 1.25 → "1.25" */
+internal fun formatSpeed(speed: Float): String =
+    if (speed % 1f == 0f) speed.toInt().toString() else speed.toString().trimEnd('0').trimEnd('.')
+
+/** Compose 의 Context 는 ContextWrapper 로 감싸여 있을 수 있다 */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun fractionOf(positionMillis: Long, durationMillis: Long): Float =
@@ -653,5 +776,6 @@ private const val PROGRESS_POLL_MILLIS = 400L
 private const val CONTROLS_AUTO_HIDE_MILLIS = 3_000L
 private const val PLAY_BUTTON_SIZE_DP = 64
 private const val PLAY_ICON_SIZE_DP = 36
+private val PLAYBACK_SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private const val INFO_LABEL_WIDTH_DP = 92
 private const val INFO_ROW_HEIGHT_DP = 20
