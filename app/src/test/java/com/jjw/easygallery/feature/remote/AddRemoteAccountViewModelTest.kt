@@ -70,6 +70,12 @@ class AddRemoteAccountViewModelTest {
         assertEquals("", vm.uiState.value.endpoint)
         vm.update { copy(endpoint = "https://nas/photos") }
         assertTrue(vm.uiState.value.canSubmit) // WebDAV 는 버킷 불필요
+
+        vm.setKind(RemoteAccountKind.SMB)
+        vm.update { copy(endpoint = "nas.local") }
+        assertFalse(vm.uiState.value.canSubmit) // SMB 는 공유 이름 필수
+        vm.update { copy(bucketOrRoot = "photo") }
+        assertTrue(vm.uiState.value.canSubmit)
     }
 
     @Test

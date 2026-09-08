@@ -81,6 +81,7 @@ class AddRemoteAccountViewModel @Inject constructor(
             kind = kind,
             endpoint = if (kind == RemoteAccountKind.S3) preset.endpoint else "",
             region = if (kind == RemoteAccountKind.S3) preset.region else "",
+            bucketOrRoot = "", // 버킷(S3)·공유 이름(SMB) 은 의미가 달라 종류를 바꾸면 비운다
             testResult = null,
         )
     }

@@ -115,6 +115,9 @@ internal fun UploadQueueScreen(
                     items(uiState.tasks, key = { it.id }) { task ->
                         UploadTaskRow(
                             task = task,
+                            accountName = task.accountId?.let { id ->
+                                uiState.accountNames[id] ?: stringResource(R.string.upload_account_removed)
+                            },
                             onRemove = { onRemove(task.id) },
                             modifier = Modifier.animateItem(
                                 fadeInSpec = motion.quick(),
@@ -158,6 +161,7 @@ private fun QueueActions(
 @Composable
 private fun UploadTaskRow(
     task: UploadTask,
+    accountName: String?,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -186,7 +190,7 @@ private fun UploadTaskRow(
                 )
                 UploadState.COMPLETED -> stringResource(R.string.upload_state_completed, task.folderName.orEmpty())
                 UploadState.FAILED -> task.errorMessage ?: stringResource(R.string.upload_state_failed)
-            }
+            }.let { text -> if (accountName != null) "$accountName · $text" else text }
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,

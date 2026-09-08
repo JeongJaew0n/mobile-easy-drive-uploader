@@ -257,6 +257,7 @@
     <string name="upload_state_running">%1$s / %2$s</string>
     <string name="upload_state_completed">완료 · %1$s</string>
     <string name="upload_state_failed">실패</string>
+    <string name="upload_account_removed">연결 해제된 저장소</string>
 
     <!-- 알림 -->
     <string name="notification_channel_upload">클라우드 업로드</string>

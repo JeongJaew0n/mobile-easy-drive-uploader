@@ -13,6 +13,7 @@
 | RS-07 | KT Cloud 프리셋 | endpoint 는 콘솔의 S3 API 주소로 고쳐 입력, 리전 `kr-central-1` | ⬜ | endpoint 프리셋은 기본값일 뿐 |
 | RS-08 | Google 로그인 없이 S3 만 연결한 상태에서 업로드 | 로그인 요구 없이 큐 등록·업로드 | ⬜ | `UserPreferences.canUpload` |
 | RS-09 | 계정 ⋮ → 연결 해제 | 목록에서 제거, 업로드 대상이었으면 "Google Drive · 기본"으로 복귀, 비밀 삭제 | ⬜ | |
+| RS-10 | S3/SMB 계정으로 업로드 후 설정 → 업로드 목록 | 행 부제가 "계정 이름 · 상태". Drive 업로드 행은 계정 없이 상태만. 계정을 연결 해제하면 "연결 해제된 저장소 · 완료" | ⬜ | `accountNames` |
 | RS-10 | 앱 재시작 후 | 계정·비밀 유지(Keystore 복호화) | ⬜ | |
 | NAS-01 | 저장소 추가 → WebDAV, Synology `https://nas:5006/photos`, 사용자/비밀번호 → 연결 테스트 | "연결 성공". 401 이면 "연결 실패: … (401)" | ⬜ | `PROPFIND` Depth 0 |
 | NAS-02 | 탐색 | 폴더·파일, 한글 폴더 이름 정상, 크기·수정일 | ⬜ | |
