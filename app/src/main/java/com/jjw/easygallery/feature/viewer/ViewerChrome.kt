@@ -5,9 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -166,7 +171,11 @@ internal fun ViewerBottomBar(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = OVERLAY_ALPHA)),
+            .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
+            // edge-to-edge: 시스템 내비게이션 바(하단·가로 모드의 측면) 위로 올린다
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+            ),
     ) {
         if (showInfo) {
             InfoPanel(item = item, details = details)

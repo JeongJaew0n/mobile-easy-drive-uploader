@@ -18,17 +18,27 @@ enum class MediaPermissionStatus {
 /** SDK 버전별로 달라지는 미디어 읽기 권한을 한곳에서 다룬다. */
 object MediaPermission {
 
+    /**
+     * 읽기 권한과 함께 [Manifest.permission.ACCESS_MEDIA_LOCATION] 을 같이 요청한다.
+     * 별도 대화상자 없이 읽기 권한과 함께 부여되며, 없으면 EXIF 위치 원본 요청이
+     * `UnsupportedOperationException` 으로 실패한다.
+     */
     fun required(): Array<String> = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
             Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
         )
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
         )
-        else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        else -> arrayOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
+        )
     }
 
     fun status(context: Context): MediaPermissionStatus {

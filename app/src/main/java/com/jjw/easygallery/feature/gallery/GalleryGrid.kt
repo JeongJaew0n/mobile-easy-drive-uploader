@@ -56,6 +56,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
 import java.time.LocalDate
@@ -256,6 +257,7 @@ private fun MediaThumbnail(
             model = ImageRequest.Builder(LocalPlatformContext.current)
                 .data(item.uri)
                 .memoryCacheKey(thumbnailCacheKey(item))
+                .mediaStoreThumbnail()
                 .build(),
             contentDescription = item.displayName,
             contentScale = ContentScale.Crop,

@@ -7,10 +7,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -34,17 +39,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.ContentFrame
+import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.gallery.formatDuration
 import kotlinx.coroutines.delay
@@ -59,6 +71,8 @@ internal fun VideoPage(
     onToggleControls: () -> Unit,
     onPlayingChange: (Boolean) -> Unit,
     settings: VideoSettings,
+    /** Scaffold 하단 바 높이. 컨트롤이 하단 바·시스템 바 뒤에 깔리지 않게 그만큼 띄운다 */
+    controlsBottomPadding: Dp = 0.dp,
 ) {
     val context = LocalContext.current
     val motion = LocalMotion.current
@@ -113,7 +127,17 @@ internal fun VideoPage(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        PlayerSurface(player = player, modifier = Modifier.fillMaxSize())
+        // ContentFrame 이 영상 크기(PresentationState.videoSizeDp)에 맞춰 표면을 Fit 으로 배치한다 — PlayerSurface 를
+        // fillMaxSize 로 두면 영상이 화면 비율로 늘어난다. TextureView 라야 페이저 이동·스와이프 닫기의 graphicsLayer
+        // 변형이 표면에도 적용된다(SurfaceView 는 별도 윈도우 레이어). 첫 프레임 전에는 그리드 썸네일을 셔터로 보여준다.
+        ContentFrame(
+            player = player,
+            modifier = Modifier.fillMaxSize(),
+            surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
+            contentScale = ContentScale.Fit,
+            keepContentOnReset = false,
+            shutter = { VideoShutter(item) },
+        )
 
         AnimatedVisibility(
             visible = controlsVisible,
@@ -159,7 +183,13 @@ internal fun VideoPage(
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             val scrub = scrubFraction
-            Column(Modifier.background(Color.Black.copy(alpha = OVERLAY_ALPHA))) {
+            Column(
+                Modifier
+                    .padding(bottom = controlsBottomPadding)
+                    .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
+                    // 가로 모드에서 측면 시스템 바·컷아웃을 피한다(하단은 Scaffold 의 하단 바가 이미 소비)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+            ) {
                 VideoSettingsRow(settings = settings)
                 VideoSeekBar(
                     positionMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis,
@@ -174,6 +204,22 @@ internal fun VideoPage(
             }
         }
     }
+}
+
+/** 첫 프레임이 나오기 전까지 보여주는 썸네일. 그리드와 같은 캐시 키라 디코딩 없이 바로 뜬다 */
+@Composable
+private fun VideoShutter(item: MediaItem) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalPlatformContext.current)
+            .data(item.uri)
+            .memoryCacheKey(thumbnailCacheKey(item))
+            .placeholderMemoryCacheKey(thumbnailCacheKey(item))
+            .mediaStoreThumbnail()
+            .build(),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 @Composable

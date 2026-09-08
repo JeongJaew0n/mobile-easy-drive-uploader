@@ -1,9 +1,5 @@
 package com.jjw.easygallery.feature.viewer
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
@@ -20,7 +16,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -34,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.gallery.MoveDialog
 import com.jjw.easygallery.feature.gallery.RenameDialog
@@ -74,16 +68,7 @@ internal fun MediaViewerScreen(
     var volume by rememberSaveable { mutableFloatStateOf(1f) }
     var landscapeLocked by rememberSaveable { mutableStateOf(false) }
 
-    val activity = LocalContext.current.findActivity()
-    DisposableEffect(activity, landscapeLocked) {
-        activity?.requestedOrientation = if (landscapeLocked) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-        // 상세보기를 나가면 앱 기본 회전 동작으로 되돌린다
-        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
-    }
+    OrientationLockEffect(landscapeLocked)
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = uiState.currentIndex) { uiState.items.size }
@@ -183,6 +168,8 @@ internal fun MediaViewerScreen(
                         item = item,
                         isCurrent = page == pagerState.settledPage,
                         controlsVisible = chromeVisible,
+                        // 컨트롤을 하단 바 위에 놓는다(페이저 자체는 바 뒤까지 전체 화면)
+                        controlsBottomPadding = innerPadding.calculateBottomPadding(),
                         onToggleControls = { chromeVisible = !chromeVisible },
                         onPlayingChange = { playing ->
                             if (page == pagerState.settledPage) videoPlaying = playing
@@ -235,13 +222,6 @@ internal fun MediaViewerScreen(
             },
         )
     }
-}
-
-/** Compose 의 Context 는 ContextWrapper 로 감싸여 있을 수 있다 */
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 /** 재생 중에는 잠시 뒤 컨트롤을 숨기고, 항목이 바뀌면 재생 상태와 컨트롤을 초기화한다 */

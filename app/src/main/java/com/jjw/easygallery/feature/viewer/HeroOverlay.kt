@@ -25,6 +25,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.jjw.easygallery.core.navigation.HeroOrigin
+import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -77,6 +78,7 @@ internal fun HeroOverlay(
                     .data(origin.uri.toUri())
                     .memoryCacheKey(thumbnailCacheKey(mediaId))
                     .placeholderMemoryCacheKey(thumbnailCacheKey(mediaId))
+                    .mediaStoreThumbnail()
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,

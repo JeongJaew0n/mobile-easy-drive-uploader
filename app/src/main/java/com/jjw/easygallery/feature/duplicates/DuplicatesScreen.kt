@@ -48,9 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DuplicateGroup
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 
 @Composable
@@ -303,7 +306,10 @@ private fun DuplicateThumbnail(
             .clickable(onClick = onToggle),
     ) {
         AsyncImage(
-            model = item.uri,
+            model = ImageRequest.Builder(LocalPlatformContext.current)
+                .data(item.uri)
+                .mediaStoreThumbnail()
+                .build(),
             contentDescription = item.displayName,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

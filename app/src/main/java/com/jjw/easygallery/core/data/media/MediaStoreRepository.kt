@@ -1,10 +1,12 @@
 package com.jjw.easygallery.core.data.media
 
+import android.Manifest
 import android.app.RecoverableSecurityException
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.database.Cursor
 import android.net.Uri
@@ -14,6 +16,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
@@ -98,8 +101,9 @@ class MediaStoreRepository @Inject constructor(
     override suspend fun readDetails(item: MediaItem): MediaDetails = withContext(ioDispatcher) {
         if (item.isVideo) return@withContext MediaDetails()
         try {
-            // 위치 정보가 지워지지 않은 원본을 요청한다 (ACCESS_MEDIA_LOCATION 권한 필요)
-            val uri = runCatching { MediaStore.setRequireOriginal(item.uri) }.getOrDefault(item.uri)
+            // 위치 정보가 지워지지 않은 원본은 ACCESS_MEDIA_LOCATION 이 있을 때만 요청한다.
+            // 권한 없이 setRequireOriginal 을 쓰면 openInputStream 이 UnsupportedOperationException 을 던진다.
+            val uri = if (hasMediaLocationPermission) MediaStore.setRequireOriginal(item.uri) else item.uri
             resolver.openInputStream(uri)?.use { stream ->
                 val exif = ExifInterface(stream)
                 val latLong = FloatArray(2)
@@ -121,8 +125,15 @@ class MediaStoreRepository @Inject constructor(
         } catch (e: SecurityException) {
             Timber.w(e, "EXIF 원본 접근 거부: %s", item.displayName)
             MediaDetails()
+        } catch (e: UnsupportedOperationException) {
+            Timber.w(e, "EXIF 원본 접근 불가: %s", item.displayName)
+            MediaDetails()
         }
     }
+
+    private val hasMediaLocationPermission: Boolean
+        get() = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_MEDIA_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
     // ---------- 편집 ----------
 
@@ -261,6 +272,7 @@ class MediaStoreRepository @Inject constructor(
         add(MediaStore.Files.FileColumns.MEDIA_TYPE)
         add(MediaStore.MediaColumns.WIDTH)
         add(MediaStore.MediaColumns.HEIGHT)
+        add(MediaStore.MediaColumns.ORIENTATION)
         add(MediaStore.MediaColumns.DURATION)
         if (isApi30) {
             add(MediaStore.MediaColumns.IS_FAVORITE)
@@ -282,11 +294,20 @@ class MediaStoreRepository @Inject constructor(
         private val typeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
         private val widthCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.WIDTH)
         private val heightCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.HEIGHT)
+        private val orientationCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.ORIENTATION)
         private val durationCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
         private val favoriteCol = optionalColumn(hasApi30Columns, MediaStore.MediaColumns.IS_FAVORITE)
         private val trashedCol = optionalColumn(hasApi30Columns, MediaStore.MediaColumns.IS_TRASHED)
 
         private fun optionalColumn(present: Boolean, name: String) = if (present) cursor.getColumnIndex(name) else -1
+
+        /** WIDTH/HEIGHT 는 회전 전 픽셀 크기. 90°/270° 면 화면에 보이는 대로 교환한다(히어로 비율·정보 패널) */
+        private fun displayedSize(): Pair<Int, Int> {
+            val width = cursor.getInt(widthCol)
+            val height = cursor.getInt(heightCol)
+            val rotated = cursor.getInt(orientationCol) % HALF_TURN_DEGREES != 0
+            return if (rotated) height to width else width to height
+        }
 
         fun read(): MediaItem? {
             val type = when (cursor.getInt(typeCol)) {
@@ -302,6 +323,7 @@ class MediaStoreRepository @Inject constructor(
             }
             val dateAdded = cursor.getLong(addedCol)
             val dateTaken = cursor.getLong(takenCol).takeIf { it > 0 } ?: dateAdded * MILLIS_PER_SECOND
+            val (width, height) = displayedSize()
 
             return MediaItem(
                 id = id,
@@ -316,8 +338,8 @@ class MediaStoreRepository @Inject constructor(
                 bucketId = cursor.getLong(bucketIdCol),
                 bucketName = cursor.getString(bucketNameCol) ?: "",
                 relativePath = cursor.getString(relativePathCol) ?: "",
-                width = cursor.getInt(widthCol),
-                height = cursor.getInt(heightCol),
+                width = width,
+                height = height,
                 durationMillis = if (type == MediaType.VIDEO) cursor.getLong(durationCol) else null,
                 isFavorite = favoriteCol >= 0 && cursor.getInt(favoriteCol) == 1,
                 isTrashed = trashedCol >= 0 && cursor.getInt(trashedCol) == 1,
@@ -329,5 +351,6 @@ class MediaStoreRepository @Inject constructor(
         const val UNSUPPORTED_MESSAGE = "휴지통·즐겨찾기는 Android 11 이상에서만 지원됩니다"
         const val CHANGE_DEBOUNCE_MILLIS = 300L
         const val MILLIS_PER_SECOND = 1_000L
+        const val HALF_TURN_DEGREES = 180
     }
 }

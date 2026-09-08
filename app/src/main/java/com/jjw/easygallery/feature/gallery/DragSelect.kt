@@ -1,6 +1,8 @@
 package com.jjw.easygallery.feature.gallery
 
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
@@ -14,6 +16,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
@@ -56,28 +62,48 @@ internal fun Modifier.dragSelect(
     }
 
     return this.pointerInput(Unit) {
-        detectDragGesturesAfterLongPress(
-            onDragStart = { offset ->
-                val index = state.indexAt(offset) ?: return@detectDragGesturesAfterLongPress
-                val id = currentEntryIds.getOrNull(index) ?: return@detectDragGesturesAfterLongPress
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                session.start(index, id, currentSelected)
-                session.update(state, offset, currentEntryIds, currentSelected, currentOnChange)
-            },
-            onDrag = { change, _ ->
-                if (!session.isActive) return@detectDragGesturesAfterLongPress
-                session.update(state, change.position, currentEntryIds, currentSelected, currentOnChange)
-                autoScrollSpeed = edgeScrollSpeed(change.position.y, size.height)
-            },
-            onDragEnd = {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val press = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            val index = state.indexAt(press.position) ?: return@awaitEachGesture
+            val id = currentEntryIds.getOrNull(index) ?: return@awaitEachGesture
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            session.start(index, id, currentSelected)
+            session.update(state, press.position, currentEntryIds, currentSelected, currentOnChange)
+            try {
+                // 롱프레스 이후의 이동·UP 을 전부 소비한다. 그래야 썸네일의 clickable 이 손을 뗄 때
+                // onClick(토글 해제 또는 상세보기 열기)을 실행하지 않는다 — 기본 detectDragGesturesAfterLongPress 는
+                // 움직임 없는 UP 을 소비하지 않아 롱프레스만 했을 때 선택이 바로 풀렸다.
+                trackAfterLongPress(press.id) { change ->
+                    session.update(state, change.position, currentEntryIds, currentSelected, currentOnChange)
+                    autoScrollSpeed = edgeScrollSpeed(change.position.y, size.height)
+                }
+            } finally {
                 session.stop()
                 autoScrollSpeed = 0f
-            },
-            onDragCancel = {
-                session.stop()
-                autoScrollSpeed = 0f
-            },
-        )
+            }
+        }
+    }
+}
+
+/**
+ * 포인터가 떨어질 때까지 같은 포인터의 변화를 소비하며 위치가 바뀔 때마다 [onMove] 를 부른다.
+ * 자식(썸네일 clickable)보다 먼저 받는 Initial 패스에서 소비해야 자식이 UP 을 탭으로 처리하지 않는다.
+ */
+private suspend fun AwaitPointerEventScope.trackAfterLongPress(
+    pointerId: PointerId,
+    onMove: (PointerInputChange) -> Unit,
+) {
+    var lastPosition: Offset? = null
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: return
+        change.consume()
+        if (!change.pressed) return
+        if (change.position != lastPosition) {
+            lastPosition = change.position
+            onMove(change)
+        }
     }
 }
 

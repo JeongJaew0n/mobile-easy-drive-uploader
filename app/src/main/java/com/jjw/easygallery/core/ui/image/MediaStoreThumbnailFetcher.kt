@@ -21,9 +21,10 @@ import timber.log.Timber
 import java.io.IOException
 
 /**
- * MediaStore content URI 는 시스템이 캐시한 썸네일([ContentResolver.loadThumbnail])을 우선 사용한다.
+ * [mediaStoreThumbnail] 로 표시된 MediaStore content URI 요청을 시스템이 캐시한 썸네일([ContentResolver.loadThumbnail])로 처리한다.
  * 원본을 디코딩하는 것보다 훨씬 빠르고, 영상도 프레임 추출 없이 썸네일을 얻는다.
  * 실패하면 원본 스트림을 넘겨 Coil 기본 디코더가 처리하게 한다.
+ * 표시가 없는 요청(상세보기 원본)은 건드리지 않는다 — 시스템 썸네일은 요청 크기와 무관하게 작아서 화질이 깨진다.
  */
 class MediaStoreThumbnailFetcher(
     private val uri: Uri,
@@ -54,6 +55,7 @@ class MediaStoreThumbnailFetcher(
     class Factory : Fetcher.Factory<Uri> {
         override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? {
             if (data.scheme != ContentResolver.SCHEME_CONTENT || data.authority != MediaStore.AUTHORITY) return null
+            if (!options.isMediaStoreThumbnail) return null
             return MediaStoreThumbnailFetcher(data, options)
         }
     }
