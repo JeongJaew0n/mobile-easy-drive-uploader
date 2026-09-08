@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageFactory
+import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.remote.fetchServerCertificateSha256
 import com.jjw.easygallery.core.data.remote.isTlsFailure
 import com.jjw.easygallery.core.data.remote.s3.PlainHttpClient
@@ -57,9 +58,15 @@ data class AddRemoteAccountUiState(
     /** SMB "네트워크에서 찾기" 결과(mDNS `_smb._tcp`) */
     val discoveredHosts: List<DiscoveredHost> = emptyList(),
     val isDiscovering: Boolean = false,
+    /** 수정 중인 계정 id. null 이면 새 계정 */
+    val editingId: String? = null,
 ) {
+    val isEditing: Boolean get() = editingId != null
+
+    /** 수정 중에는 비밀을 비워 둘 수 있다(기존 값 유지) */
     val canSubmit: Boolean
-        get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() && secret.isNotBlank() &&
+        get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() &&
+            (secret.isNotBlank() || isEditing) &&
             (kind == RemoteAccountKind.WEBDAV || bucketOrRoot.isNotBlank())
 }
 
@@ -76,9 +83,39 @@ class AddRemoteAccountViewModel @Inject constructor(
     @PlainHttpClient private val httpClient: OkHttpClient,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
     private val hostDiscovery: HostDiscovery,
+    private val storages: StorageRegistry,
 ) : ViewModel() {
 
     private var discoveryJob: Job? = null
+    private var loaded = false
+
+    /** 수정 모드에서 비밀을 비워 둔 채 연결 테스트할 때 쓰는 저장된 비밀 */
+    private var storedSecret: String? = null
+
+    /** 수정 모드 진입 — 저장된 계정으로 폼을 채운다(비밀은 비움). 한 번만 */
+    fun load(accountId: String?) {
+        if (loaded || accountId == null) return
+        loaded = true
+        viewModelScope.launch {
+            val account = accounts.get(accountId) ?: return@launch
+            storedSecret = accounts.secretOf(account)
+            _uiState.update {
+                it.copy(
+                    kind = account.kind,
+                    preset = S3Preset.CUSTOM,
+                    displayName = account.displayName,
+                    endpoint = account.endpoint,
+                    region = account.region.orEmpty(),
+                    bucketOrRoot = account.bucketOrRoot.orEmpty(),
+                    username = account.username.orEmpty(),
+                    secret = "",
+                    certSha256 = account.certSha256,
+                    editingId = account.id,
+                    testResult = null,
+                )
+            }
+        }
+    }
 
     private val _uiState = MutableStateFlow(AddRemoteAccountUiState())
     val uiState: StateFlow<AddRemoteAccountUiState> = _uiState.asStateFlow()
@@ -115,7 +152,7 @@ class AddRemoteAccountViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true) }
             val result = try {
-                val storage = factory.create(state.toAccount(id = "test"), state.secret)
+                val storage = factory.create(state.toAccount(id = "test"), state.effectiveSecret())
                 storage.listChildren(storage.rootId, foldersOnly = true)
                 Result.success(Unit)
             } catch (e: CancellationException) {
@@ -188,7 +225,13 @@ class AddRemoteAccountViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true) }
             try {
-                accounts.add(state.toAccount(id = ""), state.secret)
+                val editingId = state.editingId
+                if (editingId != null) {
+                    accounts.update(state.toAccount(id = editingId), state.secret.ifBlank { null })
+                    storages.evict(editingId) // 바뀐 자격 증명으로 다시 만들도록
+                } else {
+                    accounts.add(state.toAccount(id = ""), state.secret)
+                }
                 _events.value = AddRemoteAccountEvent.Saved
             } catch (e: CancellationException) {
                 throw e
@@ -205,6 +248,8 @@ class AddRemoteAccountViewModel @Inject constructor(
         const val DISCOVERY_MILLIS = 8_000L
         const val SMB_DEFAULT_PORT = 445
     }
+
+    private fun AddRemoteAccountUiState.effectiveSecret(): String = secret.ifBlank { storedSecret.orEmpty() }
 
     private fun AddRemoteAccountUiState.toAccount(id: String) = RemoteAccount(
         id = id,

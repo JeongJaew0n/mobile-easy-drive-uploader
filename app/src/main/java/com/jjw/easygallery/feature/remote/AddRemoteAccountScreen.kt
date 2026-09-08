@@ -58,8 +58,10 @@ import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 @Composable
 fun AddRemoteAccountRoute(
     onBackClick: () -> Unit,
+    accountId: String? = null,
     viewModel: AddRemoteAccountViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(accountId) { viewModel.load(accountId) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val event by viewModel.events.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -143,7 +145,7 @@ internal fun AddRemoteAccountScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.remote_add)) },
+                title = { Text(stringResource(if (uiState.isEditing) R.string.remote_edit else R.string.remote_add)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -164,7 +166,7 @@ internal fun AddRemoteAccountScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (uiState.isBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            KindChips(uiState.kind, onKindChange)
+            if (!uiState.isEditing) KindChips(uiState.kind, onKindChange)
             if (uiState.kind == RemoteAccountKind.S3) PresetDropdown(uiState.preset, onPresetChange)
             OutlinedTextField(
                 value = uiState.displayName,
@@ -203,7 +205,10 @@ internal fun AddRemoteAccountScreen(
                     Text(stringResource(res))
                 },
                 visualTransformation = PasswordVisualTransformation(),
-                supportingText = { Text(stringResource(R.string.remote_secret_note)) },
+                supportingText = {
+                    val res = if (uiState.isEditing) R.string.remote_secret_keep_hint else R.string.remote_secret_note
+                    Text(stringResource(res))
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

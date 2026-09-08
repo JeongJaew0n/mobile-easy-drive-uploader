@@ -128,4 +128,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 `Capability.SEARCH`(Drive 만)·`Capability.DOWNLOAD`(네 제공자) 추가 — `DRIVE_FILE_CRUD.md` §8·§9.
 - 2026-09-09 설정 "연결된 저장소" 행에 용량(`about()`, QUOTA 능력 — WebDAV `quota-used/available-bytes`) 표시. 계정 목록이 바뀔 때 한 번씩 읽고 실패는 조용히 건너뛴다.
 - 2026-09-09 갤러리 선택 상단바 ⋮ "다른 저장소로 업로드"(저장소가 둘 이상일 때) — 이번 배치만 고른 계정으로(`EnqueueUploadsUseCase.toAccount`; 기본 대상과 같으면 설정 폴더, 아니면 루트), 설정의 기본 대상은 바뀌지 않는다. 기본 대상에 ✓ 표시.
+- 2026-09-09 계정 **수정**: 설정 행 ⋮ "수정" → 같은 폼(`AddRemoteAccountKey(accountId)`)이 저장된 값으로 채워진다(종류는 잠금, 비밀은 비움 — 비워 두면 유지). 저장 시 `RemoteAccountRepository.update` + `StorageRegistry.evict` 로 바뀐 자격 증명이 즉시 반영된다.
 - 남은 것: Dropbox/OneDrive.

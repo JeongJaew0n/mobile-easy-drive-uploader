@@ -95,12 +95,13 @@ fun AppNavigation() {
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
                     onCategoriesClick = { backStack.add(CategoriesKey) },
-                    onAddRemoteAccountClick = { backStack.add(AddRemoteAccountKey) },
+                    onAddRemoteAccountClick = { backStack.add(AddRemoteAccountKey()) },
+                    onEditRemoteAccount = { accountId -> backStack.add(AddRemoteAccountKey(accountId)) },
                     onOpenRemoteAccount = { accountId -> backStack.add(DriveBrowserKey(accountId = accountId)) },
                 )
             }
-            entry<AddRemoteAccountKey> {
-                AddRemoteAccountRoute(onBackClick = { backStack.removeLastOrNull() })
+            entry<AddRemoteAccountKey> { key ->
+                AddRemoteAccountRoute(accountId = key.accountId, onBackClick = { backStack.removeLastOrNull() })
             }
             entry<DuplicatesKey> {
                 DuplicatesRoute(onBackClick = { backStack.removeLastOrNull() })

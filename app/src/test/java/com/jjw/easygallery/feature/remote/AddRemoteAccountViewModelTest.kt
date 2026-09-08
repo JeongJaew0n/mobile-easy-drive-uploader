@@ -3,6 +3,7 @@ package com.jjw.easygallery.feature.remote
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageFactory
+import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
 import com.jjw.easygallery.core.data.remote.smb.HostDiscovery
 import com.jjw.easygallery.core.domain.model.RemoteAccount
@@ -12,6 +13,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -58,7 +60,44 @@ class AddRemoteAccountViewModelTest {
         OkHttpClient(),
         testDispatcher,
         discovery,
+        storages,
     )
+
+    private val storages: StorageRegistry = mockk(relaxed = true)
+
+    @Test
+    fun `editing loads the stored account, keeps the secret when left blank and evicts the cached storage`() =
+        runTest(testDispatcher) {
+            val stored = RemoteAccount(
+                id = "acc-1",
+                kind = RemoteAccountKind.WEBDAV,
+                displayName = "NAS",
+                endpoint = "https://nas/dav",
+                username = "user",
+                certSha256 = "ab",
+            )
+            coEvery { accounts.get("acc-1") } returns stored
+            every { accounts.secretOf(stored) } returns "old-pw"
+            coEvery { accounts.update(any(), any()) } returns Unit
+            val vm = viewModel()
+
+            vm.load("acc-1")
+            advanceUntilIdle()
+            assertEquals("NAS", vm.uiState.value.displayName)
+            assertEquals("", vm.uiState.value.secret)
+            assertTrue(vm.uiState.value.isEditing)
+            assertTrue(vm.uiState.value.canSubmit) // 비밀 없이도 저장 가능
+
+            vm.update { copy(displayName = "집 NAS") }
+            vm.save()
+            advanceUntilIdle()
+
+            coVerify {
+                accounts.update(match { it.id == "acc-1" && it.displayName == "집 NAS" && it.certSha256 == "ab" }, null)
+            }
+            verify { storages.evict("acc-1") }
+            assertEquals(AddRemoteAccountEvent.Saved, vm.events.value)
+        }
 
     @Test
     fun `discovering smb hosts lists them and picking one fills endpoint and name`() = runTest(testDispatcher) {

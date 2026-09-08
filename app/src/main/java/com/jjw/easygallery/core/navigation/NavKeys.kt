@@ -68,6 +68,6 @@ data class DriveBrowserKey(
     val accountId: String? = null,
 ) : AppNavKey
 
-/** 저장소 계정 추가(S3 호환 / WebDAV) */
+/** 저장소 계정 추가(S3 호환 / WebDAV / SMB). [accountId] 가 있으면 그 계정 수정 */
 @Serializable
-data object AddRemoteAccountKey : AppNavKey
+data class AddRemoteAccountKey(val accountId: String? = null) : AppNavKey

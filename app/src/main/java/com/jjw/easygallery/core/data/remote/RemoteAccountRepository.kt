@@ -33,6 +33,13 @@ class RemoteAccountRepository @Inject constructor(
 
     suspend fun rename(id: String, name: String) = dao.rename(id, name.trim())
 
+    /** 기존 계정 수정. [secret] 이 null 이면 저장된 비밀을 유지한다. 생성 시각은 보존 */
+    suspend fun update(account: RemoteAccount, secret: String?) {
+        val existing = dao.getById(account.id) ?: return
+        if (secret != null) secrets.put(account.id, secret)
+        dao.upsert(account.copy(createdAt = existing.createdAt).toEntity())
+    }
+
     suspend fun remove(id: String) {
         dao.delete(id)
         secrets.remove(id)

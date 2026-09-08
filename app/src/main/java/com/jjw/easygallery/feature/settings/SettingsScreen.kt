@@ -80,6 +80,7 @@ fun SettingsRoute(
     onCategoriesClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
+    onEditRemoteAccount: (accountId: String) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -129,6 +130,7 @@ fun SettingsRoute(
         onCategoriesClick = onCategoriesClick,
         onAddRemoteAccountClick = onAddRemoteAccountClick,
         onOpenRemoteAccount = onOpenRemoteAccount,
+        onEditRemoteAccount = onEditRemoteAccount,
         onRemoveRemoteAccount = viewModel::removeRemoteAccount,
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
@@ -164,6 +166,7 @@ internal fun SettingsScreen(
     onCategoriesClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
+    onEditRemoteAccount: (accountId: String) -> Unit = {},
     onRemoveRemoteAccount: (accountId: String) -> Unit = {},
     /** null = 이 기기에서 지원 안 함(Android 11 이하) */
     manageMedia: Boolean? = null,
@@ -207,6 +210,7 @@ internal fun SettingsScreen(
                 onOpenDrive = onDriveClick,
                 onAdd = onAddRemoteAccountClick,
                 onOpen = onOpenRemoteAccount,
+                onEdit = onEditRemoteAccount,
                 onRemove = onRemoveRemoteAccount,
             )
             if (uiState.canUpload) {
@@ -588,6 +592,7 @@ private fun RemoteAccountsSection(
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onEdit: (String) -> Unit = {},
 ) {
     var removing by remember { mutableStateOf<RemoteAccount?>(null) }
     Column {
@@ -619,6 +624,7 @@ private fun RemoteAccountsSection(
                 onOpen = { onOpen(account.id) },
                 onRemove = { removing = account },
                 usage = remoteInfos[account.id],
+                onEdit = { onEdit(account.id) },
             )
         }
         TextButton(onClick = onAdd) {
@@ -657,6 +663,7 @@ private fun RemoteAccountRow(
     onOpen: () -> Unit,
     onRemove: (() -> Unit)?,
     usage: RemoteAccountInfo? = null,
+    onEdit: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -710,6 +717,15 @@ private fun RemoteAccountRow(
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        if (onEdit != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remote_edit_menu)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onEdit()
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.remote_remove)) },
                             onClick = {
