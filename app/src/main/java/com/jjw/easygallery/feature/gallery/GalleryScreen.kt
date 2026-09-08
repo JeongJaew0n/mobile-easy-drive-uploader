@@ -60,9 +60,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun GalleryRoute(
@@ -70,7 +72,7 @@ fun GalleryRoute(
     onUploadQueueClick: () -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
-    onOpenItem: (mediaId: Long, favoritesOnly: Boolean) -> Unit,
+    onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit,
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -153,6 +155,7 @@ fun GalleryRoute(
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
+        onDateRangeChange = viewModel::setDateRange,
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
         onOpenItem = onOpenItem,
@@ -190,9 +193,10 @@ internal fun GalleryScreen(
     modifier: Modifier = Modifier,
     onSelectionChange: (Set<Long>) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
+    onDateRangeChange: (DateRange?) -> Unit = {},
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
-    onOpenItem: (mediaId: Long, favoritesOnly: Boolean) -> Unit = { _, _ -> },
+    onOpenItem: (mediaId: Long, favoritesOnly: Boolean, range: DateRange?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
@@ -200,6 +204,7 @@ internal fun GalleryScreen(
     val selectionMode = content?.isSelectionMode == true
     var showRename by rememberSaveable { mutableStateOf(false) }
     var showMove by rememberSaveable { mutableStateOf(false) }
+    var showDateRange by rememberSaveable { mutableStateOf(false) }
 
     // 선택 모드에서 뒤로가기는 선택 해제
     BackHandler(enabled = selectionMode, onBack = onClearSelection)
@@ -223,6 +228,7 @@ internal fun GalleryScreen(
                     onFavoritesOnlyChange = onFavoritesOnlyChange,
                     onTrashClick = onTrashClick,
                     onDriveClick = onDriveClick,
+                    onPickDateRange = { showDateRange = true },
                 )
             }
         },
@@ -268,7 +274,8 @@ internal fun GalleryScreen(
                     uiState = uiState,
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
-                    onOpenItem = { mediaId -> onOpenItem(mediaId, uiState.favoritesOnly) },
+                    onOpenItem = { mediaId -> onOpenItem(mediaId, uiState.favoritesOnly, uiState.dateRange) },
+                    onClearDateRange = { onDateRangeChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -280,6 +287,16 @@ internal fun GalleryScreen(
         }
     }
 
+    if (showDateRange) {
+        DateRangeDialog(
+            current = content?.dateRange,
+            onDismiss = { showDateRange = false },
+            onConfirm = { range ->
+                showDateRange = false
+                onDateRangeChange(range)
+            },
+        )
+    }
     if (content != null) {
         GalleryDialogs(
             content = content,
@@ -332,6 +349,7 @@ private fun GalleryContent(
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
     onOpenItem: (Long) -> Unit,
+    onClearDateRange: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -345,11 +363,18 @@ private fun GalleryContent(
         if (uiState.isPartialAccess) {
             PartialAccessBanner(onManageSelection = onRequestPermission)
         }
+        uiState.dateRange?.let { range ->
+            DateRangeBar(range = range, onClear = onClearDateRange)
+        }
         if (uiState.sections.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(
-                        if (uiState.favoritesOnly) R.string.gallery_favorites_empty else R.string.gallery_empty,
+                        when {
+                            uiState.dateRange != null -> R.string.gallery_date_empty
+                            uiState.favoritesOnly -> R.string.gallery_favorites_empty
+                            else -> R.string.gallery_empty
+                        },
                     ),
                 )
             }
@@ -376,6 +401,7 @@ private fun GalleryTopBar(
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
+    onPickDateRange: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -400,6 +426,7 @@ private fun GalleryTopBar(
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
                 onOpenTrash = onTrashClick,
                 onOpenDrive = onDriveClick,
+                onPickDateRange = onPickDateRange,
             )
         },
     )
@@ -520,6 +547,39 @@ private fun PermissionRequiredContent(
         }
         TextButton(onClick = onOpenAppSettings) {
             Text(stringResource(R.string.gallery_permission_open_settings))
+        }
+    }
+}
+
+/** 적용 중인 기간을 보여주고 한 번에 해제한다 */
+@Composable
+private fun DateRangeBar(
+    range: DateRange,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy.MM.dd") }
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.tertiaryContainer) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (range.isSingleDay) {
+                    formatter.format(range.start)
+                } else {
+                    stringResource(
+                        R.string.gallery_date_range_label,
+                        formatter.format(range.start),
+                        formatter.format(range.endInclusive),
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onClear) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.gallery_date_clear))
+            }
         }
     }
 }

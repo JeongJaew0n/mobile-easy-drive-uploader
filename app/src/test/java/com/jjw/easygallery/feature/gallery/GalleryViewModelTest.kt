@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
+import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import com.jjw.easygallery.core.domain.model.UploadSummary
@@ -132,6 +133,33 @@ class GalleryViewModelTest {
 
             viewModel.setSelection(setOf(1L, 2L))
             assertEquals(setOf(1L, 2L), (awaitItem() as GalleryUiState.Content).selectedIds)
+        }
+    }
+
+    @Test
+    fun `date range keeps only items taken in that period`() = runTest(testDispatcher) {
+        val zone = java.time.ZoneId.systemDefault()
+        fun at(date: java.time.LocalDate) =
+            date.atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli()
+        val older = sampleItem(1).copy(dateTakenMillis = at(java.time.LocalDate.of(2026, 1, 1)))
+        val inRange = sampleItem(2).copy(dateTakenMillis = at(java.time.LocalDate.of(2026, 9, 7)))
+        every { repository.observeMedia(any()) } returns flowOf(listOf(inRange, older))
+        val viewModel = GalleryViewModel(repository, uploadQueue, enqueueUploads, manageQueue, actionController)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(2, (awaitItem() as GalleryUiState.Content).itemCount)
+
+            val range = DateRange(java.time.LocalDate.of(2026, 9, 1), java.time.LocalDate.of(2026, 9, 30))
+            viewModel.setDateRange(range)
+            val filtered = awaitItem() as GalleryUiState.Content
+            assertEquals(1, filtered.itemCount)
+            assertEquals(listOf(inRange), filtered.sections.single().items)
+            assertEquals(range, filtered.dateRange)
+
+            viewModel.setDateRange(null)
+            assertEquals(2, (awaitItem() as GalleryUiState.Content).itemCount)
         }
     }
 

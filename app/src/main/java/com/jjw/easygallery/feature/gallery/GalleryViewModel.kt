@@ -9,9 +9,11 @@ import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.albumsFrom
+import com.jjw.easygallery.core.domain.model.filterByDate
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,6 +49,7 @@ class GalleryViewModel @Inject constructor(
     // null = 아직 권한 상태를 확인하지 않음
     private val permissionStatus = MutableStateFlow<MediaPermissionStatus?>(null)
     private val filter = MutableStateFlow(MediaFilter.All)
+    private val dateRange = MutableStateFlow<DateRange?>(null)
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
@@ -73,6 +76,12 @@ class GalleryViewModel @Inject constructor(
     fun setFavoritesOnly(enabled: Boolean) {
         clearSelection()
         filter.value = if (enabled) MediaFilter.Favorites else MediaFilter.All
+    }
+
+    /** null 이면 기간 제한 없음 */
+    fun setDateRange(range: DateRange?) {
+        clearSelection()
+        dateRange.value = range
     }
 
     fun toggleSelection(id: Long) {
@@ -150,9 +159,13 @@ class GalleryViewModel @Inject constructor(
     }
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
-        val media = mediaRepository.observeMedia(filter).onEach { latestItems = it }
+        // 기간 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다
+        val media = combine(mediaRepository.observeMedia(filter), dateRange) { all, range ->
+            all.filterByDate(range) to range
+        }.onEach { (items, _) -> latestItems = items }
+
         return combine(media, selectedIds, uploadSummary, actionController.isMutating) {
-                items, selected, summary, mutating ->
+                (items, range), selected, summary, mutating ->
             GalleryUiState.Content(
                 sections = groupByDate(items),
                 itemCount = items.size,
@@ -160,6 +173,7 @@ class GalleryViewModel @Inject constructor(
                 selectedIds = selected,
                 upload = summary,
                 favoritesOnly = filter == MediaFilter.Favorites,
+                dateRange = range,
                 albums = albumsFrom(items),
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && items.filter { it.id in selected }.all { it.isFavorite },
@@ -192,6 +206,7 @@ sealed interface GalleryUiState {
         val selectedIds: Set<Long> = emptySet(),
         val upload: UploadSummary = UploadSummary(),
         val favoritesOnly: Boolean = false,
+        val dateRange: DateRange? = null,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,

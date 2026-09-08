@@ -32,8 +32,15 @@ fun AppNavigation() {
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onTrashClick = { backStack.add(TrashKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
-                    onOpenItem = { mediaId, favoritesOnly ->
-                        backStack.add(MediaViewerKey(mediaId, favoritesOnly))
+                    onOpenItem = { mediaId, favoritesOnly, range ->
+                        backStack.add(
+                            MediaViewerKey(
+                                mediaId = mediaId,
+                                favoritesOnly = favoritesOnly,
+                                startEpochDay = range?.start?.toEpochDay(),
+                                endEpochDay = range?.endInclusive?.toEpochDay(),
+                            ),
+                        )
                     },
                 )
             }

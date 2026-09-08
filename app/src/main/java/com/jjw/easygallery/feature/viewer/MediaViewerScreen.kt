@@ -76,6 +76,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.PlayerSurface
 import coil3.compose.AsyncImage
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.navigation.MediaViewerKey
@@ -97,7 +98,14 @@ fun MediaViewerRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
 
-    LaunchedEffect(key) { viewModel.load(key.mediaId, key.favoritesOnly) }
+    LaunchedEffect(key) {
+        val range = if (key.startEpochDay != null && key.endEpochDay != null) {
+            DateRange.of(key.startEpochDay, key.endEpochDay)
+        } else {
+            null
+        }
+        viewModel.load(key.mediaId, key.favoritesOnly, range)
+    }
 
     MediaActionEffect(
         events = viewModel.actionEvents,

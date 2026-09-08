@@ -92,12 +92,21 @@ internal fun GalleryOverflowMenu(
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onOpenTrash: () -> Unit,
     onOpenDrive: () -> Unit,
+    onPickDateRange: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.gallery_menu_date_range)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_date_range), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onPickDateRange()
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.gallery_menu_drive)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_insert_drive_file), contentDescription = null) },

@@ -8,9 +8,11 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.albumsFrom
+import com.jjw.easygallery.core.domain.model.filterByDate
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.feature.gallery.normalizeDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,6 +41,7 @@ class MediaViewerViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val filter = MutableStateFlow<MediaFilter?>(null)
+    private var dateRange: DateRange? = null
     private val currentId = MutableStateFlow<Long?>(null)
     private val details = MutableStateFlow<Map<Long, MediaDetails>>(emptyMap())
     private val showInfo = MutableStateFlow(false)
@@ -53,9 +57,10 @@ class MediaViewerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), MediaViewerUiState())
 
     /** 진입 시 한 번. 갤러리와 같은 필터로 목록을 다시 관찰해 좌우 스와이프를 지원한다. */
-    fun load(mediaId: Long, favoritesOnly: Boolean) {
+    fun load(mediaId: Long, favoritesOnly: Boolean, range: DateRange? = null) {
         if (filter.value != null) return
         currentId.value = mediaId
+        dateRange = range
         filter.value = if (favoritesOnly) MediaFilter.Favorites else MediaFilter.All
     }
 
@@ -123,7 +128,7 @@ class MediaViewerViewModel @Inject constructor(
     }
 
     private fun contentFlow(mediaFilter: MediaFilter): Flow<MediaViewerUiState> = combine(
-        mediaRepository.observeMedia(mediaFilter),
+        mediaRepository.observeMedia(mediaFilter).map { it.filterByDate(dateRange) },
         currentId,
         details,
         showInfo,

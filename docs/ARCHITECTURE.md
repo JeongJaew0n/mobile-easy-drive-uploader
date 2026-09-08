@@ -98,6 +98,7 @@ UI: StartIntentSenderForResult 실행 → RESULT_OK → ViewModel.onConsentResul
 - `MediaActionController`(ViewModel 마다 새 인스턴스) 가 `pendingAction`·`isMutating`·이벤트를 들고 있고, UI 쪽은 `MediaActionEffect` 가 동의 실행과 결과 스낵바를 담당한다 → 갤러리·휴지통·상세보기가 같은 부품을 쓴다.
 - 동의 다이얼로그가 떠 있는 동안 `isMutating` 으로 액션 버튼을 잠근다.
 - 조회 필터: `MediaFilter.All / Favorites(IS_FAVORITE=1) / Trashed(QUERY_ARG_MATCH_TRASHED=MATCH_ONLY)`. API 29 는 All 만.
+- **기간 필터**(`DateRange`, 양 끝 날짜 포함)는 MediaStore 를 다시 조회하지 않고 메모리 리스트에서 거른다(`filterByDate`) — 전체 로드 구조라 즉시 반영되고 즐겨찾기 필터와도 조합된다. 경계는 로컬 타임존 기준 `[시작일 00:00, 종료일+1 00:00)`. Material `DateRangePicker` 는 UTC 자정 밀리초를 주므로 `DateRangeDialog` 에서 로컬 날짜로 변환한다. 상세보기로 넘어갈 때 `MediaViewerKey` 에 `startEpochDay/endEpochDay` 로 실어 스와이프 범위를 갤러리와 일치시킨다.
 - 앨범 이동 대상은 현재 목록의 `RELATIVE_PATH` 집합(`albumsFrom`) + 새 앨범(`Pictures/<이름>/`).
 - 이름 변경 시 확장자를 생략하면 원본 확장자를 유지(`normalizeDisplayName`).
 - `MANAGE_MEDIA`(API 31+) 를 사용자가 시스템 설정에서 허용하면 createXxxRequest 가 다이얼로그 없이 즉시 OK 로 돌아온다 — 코드 경로는 동일.
