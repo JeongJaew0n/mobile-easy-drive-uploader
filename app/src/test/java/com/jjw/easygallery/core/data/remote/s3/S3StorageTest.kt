@@ -1,10 +1,15 @@
 package com.jjw.easygallery.core.data.remote.s3
 
 import android.content.Context
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import com.jjw.easygallery.core.data.upload.SessionStatus
+import com.jjw.easygallery.core.data.upload.UploadEvent
+import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -17,10 +22,16 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
+import java.io.ByteArrayInputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class S3StorageTest {
+
+    private companion object {
+        const val PART = 1_024L
+    }
 
     private lateinit var server: MockWebServer
     private lateinit var storage: S3Storage
@@ -39,7 +50,7 @@ class S3StorageTest {
             bucketOrRoot = "photos",
             username = "AKIA",
         )
-        storage = S3Storage(context, account, "secret", OkHttpClient(), UnconfinedTestDispatcher())
+        storage = S3Storage(context, account, "secret", OkHttpClient(), UnconfinedTestDispatcher(), partSize = PART)
     }
 
     @After
@@ -148,6 +159,74 @@ class S3StorageTest {
 
         assertTrue(error is com.jjw.easygallery.core.data.remote.RemoteStorageException)
         assertEquals(403, (error as com.jjw.easygallery.core.data.remote.RemoteStorageException).httpCode)
+    }
+
+    @Test
+    fun `multipart session starts with uploads query and resumes from listed parts`() = runTest {
+        val uploader = storage.uploader()
+        val source = UploadSource(1, Uri.parse("content://media/1"), "big.bin", "application/octet-stream", PART * 3)
+        server.enqueue(xml("<InitiateMultipartUploadResult><UploadId>u-1</UploadId></InitiateMultipartUploadResult>"))
+
+        val session = uploader.startSession(source, "2026/", PART * 3)
+
+        assertEquals("mpu|u-1|2026/big.bin", session)
+        val start = server.takeRequest()
+        assertEquals("POST", start.method)
+        assertEquals("", start.url.queryParameter("uploads"))
+
+        // 파트 1·2 가 이미 올라감 → 다음 오프셋은 PART*2
+        server.enqueue(
+            xml(
+                """<ListPartsResult>
+                  <Part><PartNumber>1</PartNumber><Size>$PART</Size><ETag>"e1"</ETag></Part>
+                  <Part><PartNumber>2</PartNumber><Size>$PART</Size><ETag>"e2"</ETag></Part>
+                </ListPartsResult>""",
+            ),
+        )
+        val status = uploader.queryStatus(session, PART * 3)
+        assertEquals(SessionStatus.Incomplete(PART * 2), status)
+        assertEquals("u-1", server.takeRequest().url.queryParameter("uploadId"))
+
+        // 사라진 업로드는 Expired
+        server.enqueue(MockResponse(code = 404))
+        assertEquals(SessionStatus.Expired, uploader.queryStatus(session, PART * 3))
+        server.takeRequest()
+    }
+
+    @Test
+    fun `multipart upload puts remaining parts then completes with all etags`() = runTest {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val uri = Uri.parse("content://media/2")
+        val bytes = ByteArray((PART * 3).toInt()) { (it % 251).toByte() }
+        Shadows.shadowOf(context.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
+        val source = UploadSource(2, uri, "big.bin", "application/octet-stream", bytes.size.toLong())
+        // ListParts(기존 파트 1) → PUT part2 → PUT part3 → Complete
+        server.enqueue(
+            xml(
+                """<ListPartsResult>
+                  <Part><PartNumber>1</PartNumber><Size>$PART</Size><ETag>"e1"</ETag></Part>
+                </ListPartsResult>""",
+            ),
+        )
+        server.enqueue(MockResponse.Builder().code(200).setHeader("ETag", "\"e2\"").build())
+        server.enqueue(MockResponse.Builder().code(200).setHeader("ETag", "\"e3\"").build())
+        server.enqueue(xml("<CompleteMultipartUploadResult><Key>2026/big.bin</Key></CompleteMultipartUploadResult>"))
+
+        val events = storage.uploader().upload(source, "mpu|u-1|2026/big.bin", PART, bytes.size.toLong()).toList()
+
+        assertEquals(UploadEvent.Completed("2026/big.bin"), events.last())
+        server.takeRequest() // ListParts
+        val part2 = server.takeRequest()
+        assertEquals("2", part2.url.queryParameter("partNumber"))
+        assertEquals(PART, part2.bodySize)
+        val part3 = server.takeRequest()
+        assertEquals("3", part3.url.queryParameter("partNumber"))
+        val complete = server.takeRequest()
+        assertEquals("POST", complete.method)
+        assertEquals("u-1", complete.url.queryParameter("uploadId"))
+        val body = complete.body!!.utf8()
+        assertTrue(body, body.contains("<PartNumber>1</PartNumber><ETag>\"e1\"</ETag>"))
+        assertTrue(body, body.contains("<PartNumber>3</PartNumber><ETag>\"e3\"</ETag>"))
     }
 
     private fun xml(body: String) =

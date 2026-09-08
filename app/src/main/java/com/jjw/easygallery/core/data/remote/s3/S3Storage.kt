@@ -5,6 +5,7 @@ import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
 import com.jjw.easygallery.core.data.remote.RemotePage
 import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.remote.awaitResponse
@@ -42,6 +43,8 @@ class S3Storage(
     secretKey: String,
     baseClient: OkHttpClient,
     private val ioDispatcher: CoroutineDispatcher,
+    /** 이 크기 이상이면 멀티파트(파트 크기도 같음). 테스트에서 작게 준다 */
+    private val partSize: Long = DEFAULT_PART_SIZE,
 ) : RemoteStorage {
 
     private val bucket = requireNotNull(account.bucketOrRoot) { "S3 계정에 버킷이 없습니다" }
@@ -52,7 +55,7 @@ class S3Storage(
     private val bucketUrl: HttpUrl =
         account.endpoint.trimEnd('/').toHttpUrl().newBuilder().addPathSegment(bucket).build()
 
-    override val capabilities: Set<Capability> = setOf(Capability.RENAME, Capability.MOVE)
+    override val capabilities: Set<Capability> = setOf(Capability.RENAME, Capability.MOVE, Capability.RESUMABLE_UPLOAD)
 
     /** 루트는 빈 접두어 */
     override val rootId: String get() = ""
@@ -169,21 +172,46 @@ class S3Storage(
             }
         }
 
-    /** 단일 PUT. 재개 없음 — 상태 조회는 대상 오브젝트가 같은 크기로 존재하면 완료, 아니면 처음부터 */
+    /**
+     * [partSize] 미만은 단일 PUT(재개 없음). 그 이상은 멀티파트 — 세션 = `mpu|uploadId|key`,
+     * 상태 조회는 ListParts 로 받은 파트를 세어 다음 바이트를 돌려주고, 이어 올리기는 그 파트부터 PUT 한 뒤 Complete.
+     */
     private inner class S3Uploader : RemoteUploader {
         override suspend fun resolveLength(source: UploadSource): Long = withContext(ioDispatcher) {
             runCatching { context.contentResolver.openAssetFileDescriptor(source.uri, "r")?.use { it.length } }
                 .getOrNull()?.takeIf { it >= 0 } ?: source.sizeBytes
         }
 
-        override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String =
-            folderId + source.displayName
+        override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String {
+            val key = folderId + source.displayName
+            if (length < partSize) return key
+            val request = Request.Builder()
+                .url(keyUrl(key).newBuilder().addQueryParameter("uploads", "").build())
+                .header("Content-Type", source.mimeType.ifBlank { DEFAULT_MEDIA_TYPE.toString() })
+                .post(ByteArray(0).toRequestBody(null))
+                .build()
+            val uploadId = execute(request, "멀티파트 시작") { S3Xml.parseUploadId(it) }
+                ?: throw RemoteStorageException("멀티파트 UploadId 가 없습니다")
+            return "$MPU_PREFIX$uploadId|$key"
+        }
 
         override suspend fun queryStatus(sessionUri: String, length: Long): SessionStatus = withContext(ioDispatcher) {
-            client.newCall(Request.Builder().url(keyUrl(sessionUri)).head().build()).awaitResponse().use { response ->
+            val mpu = parseMpu(sessionUri) ?: return@withContext singleStatus(sessionUri, length)
+            val response = client.newCall(Request.Builder().url(mpu.listPartsUrl()).get().build()).awaitResponse()
+            response.use {
+                when {
+                    it.code == HTTP_NOT_FOUND -> SessionStatus.Expired
+                    !it.isSuccessful -> throw RemoteStorageException("파트 조회 실패 (${it.code})", it.code)
+                    else -> SessionStatus.Incomplete(contiguousBytes(S3Xml.parseListParts(it.body.string())))
+                }
+            }
+        }
+
+        private suspend fun singleStatus(key: String, length: Long): SessionStatus {
+            client.newCall(Request.Builder().url(keyUrl(key)).head().build()).awaitResponse().use { response ->
                 val remoteLength = response.header("Content-Length")?.toLongOrNull()
-                if (response.isSuccessful && remoteLength == length) {
-                    SessionStatus.Complete(sessionUri)
+                return if (response.isSuccessful && remoteLength == length) {
+                    SessionStatus.Complete(key)
                 } else {
                     SessionStatus.Expired
                 }
@@ -192,25 +220,115 @@ class S3Storage(
 
         override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
             channelFlow {
-                send(UploadEvent.Progress(0, length))
-                val body = ContentUriRequestBody(
-                    resolver = context.contentResolver,
-                    uri = source.uri,
-                    mediaType = source.mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
-                    offset = 0,
-                    totalLength = length,
-                ) { sent -> trySend(UploadEvent.Progress(sent, length)) }
-                val request = Request.Builder().url(keyUrl(sessionUri)).put(body).build()
-                client.newCall(request).awaitResponse().requireSuccess("업로드").close()
-                Timber.d("uploaded %s -> s3://%s/%s", source.displayName, bucket, sessionUri)
-                send(UploadEvent.Completed(sessionUri))
+                val mpu = parseMpu(sessionUri)
+                if (mpu == null) {
+                    putWhole(source, sessionUri, length) { trySend(it) }
+                    send(UploadEvent.Completed(sessionUri))
+                } else {
+                    uploadParts(mpu, source, offset, length) { trySend(it) }
+                    send(UploadEvent.Completed(mpu.key))
+                }
             }.flowOn(ioDispatcher)
+
+        private suspend fun putWhole(source: UploadSource, key: String, length: Long, emit: (UploadEvent) -> Unit) {
+            emit(UploadEvent.Progress(0, length))
+            val body = requestBody(source, 0, length, length, emit)
+            client.newCall(Request.Builder().url(keyUrl(key)).put(body).build()).awaitResponse()
+                .requireSuccess("업로드").close()
+            Timber.d("uploaded %s -> s3://%s/%s", source.displayName, bucket, key)
+        }
+
+        private suspend fun uploadParts(
+            mpu: Mpu,
+            source: UploadSource,
+            offset: Long,
+            length: Long,
+            emit: (UploadEvent) -> Unit,
+        ) {
+            // 앞서 올라간 파트의 ETag 는 Complete 에 필요하다
+            val etags = HashMap<Int, String>()
+            if (offset > 0) {
+                val listed = client.newCall(Request.Builder().url(mpu.listPartsUrl()).get().build()).awaitResponse()
+                    .requireSuccess("파트 조회").use { S3Xml.parseListParts(it.body.string()) }
+                listed.forEach { etags[it.partNumber] = it.eTag }
+            }
+            emit(UploadEvent.Progress(offset, length))
+            var start = offset
+            while (start < length) {
+                val end = minOf(start + partSize, length)
+                val partNumber = (start / partSize).toInt() + 1
+                val url = keyUrl(mpu.key).newBuilder()
+                    .addQueryParameter("partNumber", partNumber.toString())
+                    .addQueryParameter("uploadId", mpu.uploadId)
+                    .build()
+                val body = requestBody(source, start, end, length, emit)
+                val etag = client.newCall(Request.Builder().url(url).put(body).build()).awaitResponse()
+                    .requireSuccess("파트 업로드").use { it.header("ETag") }
+                    ?: throw RemoteStorageException("파트 $partNumber 의 ETag 가 없습니다")
+                etags[partNumber] = etag
+                start = end
+            }
+            val completeXml = buildString {
+                append("<CompleteMultipartUpload>")
+                etags.toSortedMap().forEach { (n, tag) ->
+                    append("<Part><PartNumber>$n</PartNumber><ETag>$tag</ETag></Part>")
+                }
+                append("</CompleteMultipartUpload>")
+            }
+            val completeUrl = keyUrl(mpu.key).newBuilder().addQueryParameter("uploadId", mpu.uploadId).build()
+            val result = client.newCall(
+                Request.Builder().url(completeUrl).post(completeXml.toRequestBody(XML_MEDIA_TYPE)).build(),
+            ).awaitResponse().requireSuccess("멀티파트 완료").use { it.body.string() }
+            S3Xml.errorCode(result)?.let { throw RemoteStorageException("멀티파트 완료 실패: $it") }
+            Timber.d("uploaded %s -> s3://%s/%s (%d parts)", source.displayName, bucket, mpu.key, etags.size)
+        }
+
+        private fun requestBody(
+            source: UploadSource,
+            start: Long,
+            end: Long,
+            total: Long,
+            emit: (UploadEvent) -> Unit,
+        ) = ContentUriRequestBody(
+            resolver = context.contentResolver,
+            uri = source.uri,
+            mediaType = source.mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
+            offset = start,
+            totalLength = end,
+        ) { sent -> emit(UploadEvent.Progress(sent, total)) }
+
+        /** 1번부터 이어지는 파트의 바이트 합 = 다음에 올릴 오프셋 */
+        private fun contiguousBytes(parts: List<S3Part>): Long {
+            var expected = 1
+            var bytes = 0L
+            for (part in parts) {
+                if (part.partNumber != expected) break
+                bytes += part.size
+                expected++
+            }
+            return bytes
+        }
+
+        private fun Mpu.listPartsUrl(): HttpUrl =
+            keyUrl(key).newBuilder().addQueryParameter("uploadId", uploadId).build()
+    }
+
+    private data class Mpu(val uploadId: String, val key: String)
+
+    private fun parseMpu(sessionUri: String): Mpu? {
+        if (!sessionUri.startsWith(MPU_PREFIX)) return null
+        val rest = sessionUri.removePrefix(MPU_PREFIX)
+        return Mpu(uploadId = rest.substringBefore('|'), key = rest.substringAfter('|'))
     }
 
     private companion object {
         const val DEFAULT_REGION = "us-east-1"
         const val PAGE_SIZE = 200
+        const val DEFAULT_PART_SIZE = 8L * 1024 * 1024
+        const val MPU_PREFIX = "mpu|"
+        const val HTTP_NOT_FOUND = 404
         val DEFAULT_MEDIA_TYPE = "application/octet-stream".toMediaTypeOrNull()!!
+        val XML_MEDIA_TYPE = "application/xml".toMediaTypeOrNull()!!
 
         fun guessMimeType(name: String): String =
             URLConnection.guessContentTypeFromName(name) ?: "application/octet-stream"
