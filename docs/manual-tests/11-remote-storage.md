@@ -14,6 +14,7 @@
 | RS-08 | Google 로그인 없이 S3 만 연결한 상태에서 업로드 | 로그인 요구 없이 큐 등록·업로드 | ⬜ | `UserPreferences.canUpload` |
 | RS-09 | 계정 ⋮ → 연결 해제 | 목록에서 제거, 업로드 대상이었으면 "Google Drive · 기본"으로 복귀, 비밀 삭제 | ⬜ | |
 | RS-11 | WebDAV 계정이 있는 상태로 설정 진입 | 계정 행 부제 아래 "x / y 사용"(Nextcloud·Synology 가 quota 를 주는 경우). S3·SMB 행에는 없음 | ⬜ | `Capability.QUOTA` |
+| RS-12 | Drive 로그인 + S3(또는 NAS) 계정 있는 상태에서 갤러리 사진 선택 → 상단 ⋮ → "…(으)로 업로드" | 목록에 Google Drive·연결 계정, 기본 대상에 ✓. 고른 계정으로만 이번 배치 업로드(업로드 목록 부제에 계정 이름), 설정의 업로드 대상은 그대로. 저장소가 하나뿐이면 ⋮ 없음 | ⬜ | `toAccount` |
 | RS-10 | S3/SMB 계정으로 업로드 후 설정 → 업로드 목록 | 행 부제가 "계정 이름 · 상태". Drive 업로드 행은 계정 없이 상태만. 계정을 연결 해제하면 "연결 해제된 저장소 · 완료" | ⬜ | `accountNames` |
 | RS-10 | 앱 재시작 후 | 계정·비밀 유지(Keystore 복호화) | ⬜ | |
 | NAS-01 | 저장소 추가 → WebDAV, Synology `https://nas:5006/photos`, 사용자/비밀번호 → 연결 테스트 | "연결 성공". 401 이면 "연결 실패: … (401)" | ⬜ | `PROPFIND` Depth 0 |

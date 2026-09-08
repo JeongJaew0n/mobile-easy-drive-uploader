@@ -344,6 +344,8 @@
     <string name="action_retry">다시 시도</string>
     <string name="action_clear_selection">선택 해제</string>
     <string name="action_upload_to_drive">Drive에 업로드</string>
+    <string name="gallery_upload_to">다른 저장소로 업로드</string>
+    <string name="gallery_upload_to_item">%1$s(으)로 업로드</string>
     <string name="action_view">보기</string>
     <string name="action_more">더보기</string>
     <string name="action_trash">휴지통으로 이동</string>

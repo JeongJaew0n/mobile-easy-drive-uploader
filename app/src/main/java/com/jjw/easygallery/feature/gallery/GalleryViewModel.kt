@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.media.MediaActionEvent
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
@@ -64,7 +65,23 @@ class GalleryViewModel @Inject constructor(
     private val assignCategories: AssignCategoriesUseCase,
     orphanCleaner: OrphanAssignmentCleaner,
     private val prefs: UserPreferencesRepository,
+    remoteAccounts: RemoteAccountRepository,
 ) : ViewModel() {
+
+    /** 선택 상단바 "다른 저장소로 업로드" 메뉴 — 로그인된 Drive + 연결된 저장소. 하나뿐이면 메뉴를 숨긴다 */
+    val uploadTargets: StateFlow<List<UploadTargetOption>> = combine(
+        prefs.preferences,
+        remoteAccounts.observeAccounts(),
+    ) { p, accounts ->
+        buildList {
+            if (p.isSignedIn) {
+                add(UploadTargetOption(null, GOOGLE_DRIVE_LABEL, isDefault = p.uploadAccountId == null))
+            }
+            accounts.forEach { acc ->
+                add(UploadTargetOption(acc.id, acc.displayName, isDefault = acc.id == p.uploadAccountId))
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     private val showCategoryBadges: Flow<Boolean> = prefs.preferences.map { it.showCategoryBadges }
 
@@ -187,12 +204,19 @@ class GalleryViewModel @Inject constructor(
     // ---------- 업로드 ----------
 
     /** 선택 항목을 업로드 큐에 넣는다. 실제 전송은 WorkManager 가 백그라운드에서 수행. */
-    fun uploadSelected() {
+    fun uploadSelected() = uploadSelected(target = null)
+
+    /** 이번만 [target] 계정으로(설정은 바꾸지 않는다). null 이면 기본 대상 */
+    fun uploadSelected(target: UploadTargetOption?) {
         val items = selectedItems()
         if (items.isEmpty()) return
         viewModelScope.launch {
             try {
-                val added = enqueueUploads(items)
+                val added = if (target == null) {
+                    enqueueUploads(items)
+                } else {
+                    enqueueUploads.toAccount(items, target.accountId)
+                }
                 clearSelection()
                 events.send(GalleryEvent.Enqueued(added = added, skipped = items.size - added))
             } catch (e: AuthException) {
@@ -385,6 +409,11 @@ sealed interface GalleryUiState {
     }
     data class Error(val throwable: Throwable) : GalleryUiState
 }
+
+/** 업로드 대상 후보(accountId null = Google Drive) */
+data class UploadTargetOption(val accountId: String?, val name: String, val isDefault: Boolean)
+
+private const val GOOGLE_DRIVE_LABEL = "Google Drive"
 
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent

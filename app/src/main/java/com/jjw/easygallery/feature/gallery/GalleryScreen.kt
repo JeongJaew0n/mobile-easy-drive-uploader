@@ -51,6 +51,8 @@ internal fun GalleryScreen(
     onToggleSelection: (Long) -> Unit,
     onClearSelection: () -> Unit,
     onUploadSelected: () -> Unit,
+    uploadTargets: List<UploadTargetOption> = emptyList(),
+    onUploadSelectedTo: (UploadTargetOption) -> Unit = {},
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -98,6 +100,8 @@ internal fun GalleryScreen(
                         selectedCount = content.selectedIds.size,
                         onClear = onClearSelection,
                         onUpload = onUploadSelected,
+                        uploadTargets = uploadTargets,
+                        onUploadTo = onUploadSelectedTo,
                     )
                 } else {
                     GalleryTopBar(

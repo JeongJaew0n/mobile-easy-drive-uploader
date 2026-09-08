@@ -9,6 +9,7 @@ import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Category
@@ -52,6 +53,8 @@ class GalleryViewModelTest {
         every { observeUploadedIds(any()) } returns uploadedIds
     }
     private val enqueueUploads: EnqueueUploadsUseCase = mockk()
+    private val remoteAccounts: RemoteAccountRepository =
+        mockk { every { observeAccounts() } returns flowOf(emptyList()) }
     private val manageQueue: ManageUploadQueueUseCase = mockk()
     private val categories = kotlinx.coroutines.flow.MutableStateFlow<List<Category>>(emptyList())
     private val assignments = kotlinx.coroutines.flow.MutableStateFlow<CategoryAssignments>(emptyMap())
@@ -90,6 +93,7 @@ class GalleryViewModelTest {
             assignCategories,
             OrphanAssignmentCleaner(repository, categoryRepository),
             prefs,
+            remoteAccounts,
         )
 
     @Test

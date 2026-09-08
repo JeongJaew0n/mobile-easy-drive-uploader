@@ -1,10 +1,14 @@
 package com.jjw.easygallery.feature.gallery
 
 import android.provider.Settings
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -12,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -86,7 +94,10 @@ internal fun SelectionTopBar(
     selectedCount: Int,
     onClear: () -> Unit,
     onUpload: () -> Unit,
+    uploadTargets: List<UploadTargetOption> = emptyList(),
+    onUploadTo: (UploadTargetOption) -> Unit = {},
 ) {
+    var targetMenuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
         title = { Text(stringResource(R.string.gallery_selected_count, selectedCount)) },
         navigationIcon = {
@@ -100,6 +111,28 @@ internal fun SelectionTopBar(
                     painterResource(R.drawable.ic_cloud_upload),
                     contentDescription = stringResource(R.string.action_upload_to_drive),
                 )
+            }
+            // 저장소가 둘 이상이면 이번만 다른 곳으로 올릴 수 있다(설정은 그대로)
+            if (uploadTargets.size > 1) {
+                Box {
+                    IconButton(onClick = { targetMenuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gallery_upload_to))
+                    }
+                    DropdownMenu(expanded = targetMenuExpanded, onDismissRequest = { targetMenuExpanded = false }) {
+                        uploadTargets.forEach { target ->
+                            DropdownMenuItem(
+                                text = {
+                                    val label = stringResource(R.string.gallery_upload_to_item, target.name)
+                                    Text(if (target.isDefault) "$label ✓" else label)
+                                },
+                                onClick = {
+                                    targetMenuExpanded = false
+                                    onUploadTo(target)
+                                },
+                            )
+                        }
+                    }
+                }
             }
         },
     )

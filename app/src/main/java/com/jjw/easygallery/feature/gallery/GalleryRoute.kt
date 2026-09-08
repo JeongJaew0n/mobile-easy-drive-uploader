@@ -14,6 +14,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -49,19 +50,23 @@ fun GalleryRoute(
     ) { viewModel.onPermissionStatusChanged(MediaPermission.status(context)) }
 
     // 업로드 진행 알림을 위해 13+ 에서는 알림 권한을 먼저 묻고, 결과와 무관하게 큐에 넣는다
+    var pendingTarget by remember { mutableStateOf<UploadTargetOption?>(null) }
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { viewModel.uploadSelected() }
-    val startUpload = {
+    ) { viewModel.uploadSelected(pendingTarget) }
+    val startUploadTo: (UploadTargetOption?) -> Unit = { target ->
+        pendingTarget = target
         val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         if (needsNotificationPermission) {
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            viewModel.uploadSelected()
+            viewModel.uploadSelected(target)
         }
     }
+    val startUpload = { startUploadTo(null) }
+    val uploadTargets by viewModel.uploadTargets.collectAsStateWithLifecycle()
 
     // 편집 동의 다이얼로그 + 결과 스낵바 (공용)
     MediaActionEffect(
@@ -118,6 +123,8 @@ fun GalleryRoute(
         onSelectionChange = viewModel::setSelection,
         onClearSelection = viewModel::clearSelection,
         onUploadSelected = startUpload,
+        uploadTargets = uploadTargets,
+        onUploadSelectedTo = { startUploadTo(it) },
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
