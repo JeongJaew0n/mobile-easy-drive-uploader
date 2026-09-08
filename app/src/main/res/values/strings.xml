@@ -250,11 +250,11 @@
     <string name="upload_state_failed">실패</string>
 
     <!-- 알림 -->
-    <string name="notification_channel_upload">Drive 업로드</string>
-    <string name="notification_channel_upload_description">Google Drive 업로드 진행 상황</string>
-    <string name="notification_upload_title">Drive에 업로드 중 (%1$d/%2$d)</string>
+    <string name="notification_channel_upload">클라우드 업로드</string>
+    <string name="notification_channel_upload_description">클라우드·NAS 업로드 진행 상황</string>
+    <string name="notification_upload_title">업로드 중 (%1$d/%2$d)</string>
     <string name="notification_compress_title">영상 압축 중 (%1$d/%2$d)</string>
-    <string name="notification_upload_summary_title">Drive 업로드 완료</string>
+    <string name="notification_upload_summary_title">업로드 완료</string>
     <plurals name="notification_upload_done">
         <item quantity="other">%1$d개 항목을 업로드했습니다</item>
     </plurals>
@@ -268,7 +268,7 @@
     <string name="auto_backup_title">자동 백업</string>
     <string name="auto_backup_enable">새 사진·영상 자동 백업</string>
     <string name="auto_backup_enable_description">선택한 앨범에 새로 추가되는 항목을 업로드 대기열에 자동으로 넣습니다. 켠 이후 항목부터 대상이며 Wi-Fi·충전 설정을 따릅니다.</string>
-    <string name="auto_backup_requires_sign_in">먼저 Google 계정을 연결하세요</string>
+    <string name="auto_backup_requires_sign_in">먼저 Google 계정을 연결하거나 설정에서 저장소를 추가해 업로드 폴더를 지정하세요</string>
     <string name="auto_backup_include_videos">영상 포함</string>
     <string name="auto_backup_include_videos_description">끄면 사진만 백업합니다</string>
     <string name="auto_backup_albums">백업할 앨범</string>

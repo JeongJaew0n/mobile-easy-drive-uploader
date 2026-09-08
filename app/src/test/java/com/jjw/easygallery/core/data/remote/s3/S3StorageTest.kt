@@ -229,6 +229,33 @@ class S3StorageTest {
         assertTrue(body, body.contains("<PartNumber>3</PartNumber><ETag>\"e3\"</ETag>"))
     }
 
+    @Test
+    fun `renaming a folder copies every object under the prefix then removes the old marker`() = runTest {
+        server.enqueue(
+            xml(
+                """<ListBucketResult>
+                  <Contents><Key>old/</Key></Contents><Contents><Key>old/a.jpg</Key></Contents>
+                </ListBucketResult>""",
+            ),
+        )
+        server.enqueue(MockResponse(code = 200)) // copy a.jpg
+        server.enqueue(MockResponse(code = 204)) // delete old/a.jpg
+        server.enqueue(MockResponse(code = 204)) // delete old/ marker
+        server.enqueue(MockResponse(code = 200)) // put new/ marker
+
+        val entry = storage.rename("old/", "new")
+
+        assertEquals("new/", entry.id)
+        assertTrue(entry.isFolder)
+        server.takeRequest() // list
+        val copy = server.takeRequest()
+        assertEquals("/photos/new/a.jpg", copy.url.encodedPath)
+        assertEquals("/photos/old/a.jpg", copy.headers["x-amz-copy-source"])
+        assertEquals("/photos/old/a.jpg", server.takeRequest().url.encodedPath)
+        assertEquals("/photos/old/", server.takeRequest().url.encodedPath)
+        assertEquals("/photos/new/", server.takeRequest().url.encodedPath)
+    }
+
     private fun xml(body: String) =
         MockResponse.Builder().code(200).setHeader("Content-Type", "application/xml").body(body.trimIndent()).build()
 }

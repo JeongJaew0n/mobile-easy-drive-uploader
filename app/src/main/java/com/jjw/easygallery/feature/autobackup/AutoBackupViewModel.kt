@@ -42,7 +42,7 @@ class AutoBackupViewModel @Inject constructor(
         isBusy,
     ) { p, albums, busy ->
         AutoBackupUiState(
-            isSignedIn = p.isSignedIn,
+            isSignedIn = p.canUpload,
             enabled = p.autoBackupEnabled,
             albums = albums,
             selectedPaths = p.autoBackupPaths,
@@ -107,6 +107,7 @@ class AutoBackupViewModel @Inject constructor(
 }
 
 data class AutoBackupUiState(
+    /** Drive 로그인 또는 다른 저장소가 업로드 대상이면 true(자동 백업 가능) */
     val isSignedIn: Boolean = false,
     val enabled: Boolean = false,
     val albums: List<Album> = emptyList(),

@@ -41,7 +41,7 @@ class AutoBackupUseCase internal constructor(
     /** 기준 시점 이후 추가된 항목을 큐에 넣고 기준 시점을 앞으로 옮긴다. 꺼져 있거나 로그인 전이면 아무것도 하지 않는다. */
     suspend fun scanAndEnqueue(): Result {
         val p = prefs.current()
-        if (!p.autoBackupEnabled || !p.isSignedIn || p.autoBackupPaths.isEmpty()) return Result.Skipped
+        if (!p.autoBackupEnabled || !p.canUpload || p.autoBackupPaths.isEmpty()) return Result.Skipped
         val since = p.autoBackupSinceSeconds.takeIf { it > 0 } ?: (clock() / MILLIS_PER_SECOND)
         val candidates = media.queryAddedSince(since, p.autoBackupPaths, p.autoBackupIncludeVideos)
         val result = enqueueNew(candidates, p.uploadFolder(), p.uploadAccountId)

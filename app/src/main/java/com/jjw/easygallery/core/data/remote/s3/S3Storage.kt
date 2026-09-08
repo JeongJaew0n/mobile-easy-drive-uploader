@@ -55,7 +55,8 @@ class S3Storage(
     private val bucketUrl: HttpUrl =
         account.endpoint.trimEnd('/').toHttpUrl().newBuilder().addPathSegment(bucket).build()
 
-    override val capabilities: Set<Capability> = setOf(Capability.RENAME, Capability.MOVE, Capability.RESUMABLE_UPLOAD)
+    override val capabilities: Set<Capability> =
+        setOf(Capability.RENAME, Capability.MOVE, Capability.FOLDER_MUTATION, Capability.RESUMABLE_UPLOAD)
 
     /** 루트는 빈 접두어 */
     override val rootId: String get() = ""
@@ -111,14 +112,50 @@ class S3Storage(
     }
 
     override suspend fun rename(entryId: String, name: String): RemoteEntry {
-        if (entryId.endsWith("/")) throw UnsupportedOperationException("S3 폴더 이름 변경은 지원하지 않습니다")
-        val newKey = entryId.substringBeforeLast('/', "").let { if (it.isEmpty()) name else "$it/$name" }
-        return copyThenDelete(entryId, newKey)
+        val parent = entryId.trimEnd('/').substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }
+        return if (entryId.endsWith("/")) {
+            movePrefix(entryId, "$parent${name.trim()}/")
+        } else {
+            copyThenDelete(entryId, parent + name)
+        }
     }
 
     override suspend fun move(entryId: String, fromParentId: String, toParentId: String): RemoteEntry {
-        if (entryId.endsWith("/")) throw UnsupportedOperationException("S3 폴더 이동은 지원하지 않습니다")
-        return copyThenDelete(entryId, toParentId + entryId.substringAfterLast('/'))
+        val baseName = entryId.trimEnd('/').substringAfterLast('/')
+        return if (entryId.endsWith("/")) {
+            movePrefix(entryId, "$toParentId$baseName/")
+        } else {
+            copyThenDelete(entryId, toParentId + baseName)
+        }
+    }
+
+    /**
+     * 폴더(접두어) 이동 = 아래 오브젝트 전부 복사 후 삭제. S3 에 이동이 없어 오브젝트 수에 비례해 느리다 —
+     * 진행 표시는 후속(`docs/MULTI_CLOUD.md` §4).
+     */
+    private suspend fun movePrefix(fromPrefix: String, toPrefix: String): RemoteEntry {
+        if (toPrefix.startsWith(fromPrefix)) throw UnsupportedOperationException("폴더를 자기 자신 아래로 옮길 수 없습니다")
+        forEachKeyUnder(fromPrefix) { key -> copyThenDelete(key, toPrefix + key.removePrefix(fromPrefix)) }
+        // 마커 오브젝트(있으면) 정리, 새 마커 생성
+        runCatching { deleteKey(fromPrefix) }
+        execute(Request.Builder().url(keyUrl(toPrefix)).put(ByteArray(0).toRequestBody(null)).build(), "폴더 생성") { }
+        val name = toPrefix.removeSuffix("/").substringAfterLast('/')
+        return RemoteEntry(toPrefix, name, RemoteEntry.FOLDER_MIME_TYPE, null, System.currentTimeMillis(), null)
+    }
+
+    private suspend fun forEachKeyUnder(prefix: String, action: suspend (String) -> Unit) {
+        var token: String? = null
+        do {
+            val url = bucketUrl.newBuilder()
+                .addQueryParameter("list-type", "2")
+                .addQueryParameter("prefix", prefix)
+                .addQueryParameter("max-keys", PAGE_SIZE.toString())
+                .apply { if (token != null) addQueryParameter("continuation-token", token) }
+                .build()
+            val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
+            result.objects.filter { it.key != prefix }.forEach { action(it.key) }
+            token = result.nextContinuationToken
+        } while (token != null)
     }
 
     override suspend fun delete(entryId: String) {
@@ -126,19 +163,8 @@ class S3Storage(
             deleteKey(entryId)
             return
         }
-        // 폴더: 접두어 아래 오브젝트를 전부 지운다(구분자 없이 나열)
-        var token: String? = null
-        do {
-            val url = bucketUrl.newBuilder()
-                .addQueryParameter("list-type", "2")
-                .addQueryParameter("prefix", entryId)
-                .addQueryParameter("max-keys", PAGE_SIZE.toString())
-                .apply { if (token != null) addQueryParameter("continuation-token", token) }
-                .build()
-            val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
-            result.objects.forEach { deleteKey(it.key) }
-            token = result.nextContinuationToken
-        } while (token != null)
+        // 폴더: 접두어 아래 오브젝트를 전부 지운다(구분자 없이 나열), 마지막에 마커
+        forEachKeyUnder(entryId) { deleteKey(it) }
         deleteKey(entryId)
     }
 
