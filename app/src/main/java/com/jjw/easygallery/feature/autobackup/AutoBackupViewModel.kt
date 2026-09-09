@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.upload.work.AutoBackupScheduler
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.domain.model.albumsFrom
@@ -30,6 +31,7 @@ class AutoBackupViewModel @Inject constructor(
     mediaRepository: MediaRepository,
     private val autoBackup: AutoBackupUseCase,
     private val scheduler: AutoBackupScheduler,
+    remoteAccounts: RemoteAccountRepository,
 ) : ViewModel() {
 
     private val isBusy = MutableStateFlow(false)
@@ -40,9 +42,15 @@ class AutoBackupViewModel @Inject constructor(
         prefs.preferences,
         mediaRepository.observeMedia(MediaFilter.All).map { albumsFrom(it) },
         isBusy,
-    ) { p, albums, busy ->
+        remoteAccounts.observeAccounts(),
+    ) { p, albums, busy, accounts ->
         AutoBackupUiState(
             isSignedIn = p.canUpload,
+            targetAccountName = when (val id = p.uploadAccountId) {
+                null -> if (p.isSignedIn) GOOGLE_DRIVE_LABEL else null
+                else -> accounts.firstOrNull { it.id == id }?.displayName
+            },
+            targetFolderName = p.uploadFolderName,
             enabled = p.autoBackupEnabled,
             albums = albums,
             selectedPaths = p.autoBackupPaths,
@@ -106,9 +114,14 @@ class AutoBackupViewModel @Inject constructor(
     }
 }
 
+private const val GOOGLE_DRIVE_LABEL = "Google Drive"
+
 data class AutoBackupUiState(
     /** Drive 로그인 또는 다른 저장소가 업로드 대상이면 true(자동 백업 가능) */
     val isSignedIn: Boolean = false,
+    /** 백업이 올라가는 저장소 이름·폴더(설정의 업로드 대상). 화면 상단에 보여 어디로 가는지 알려 준다 */
+    val targetAccountName: String? = null,
+    val targetFolderName: String? = null,
     val enabled: Boolean = false,
     val albums: List<Album> = emptyList(),
     val selectedPaths: Set<String> = emptySet(),

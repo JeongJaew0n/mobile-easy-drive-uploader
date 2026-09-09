@@ -175,6 +175,9 @@ internal fun AutoBackupScreen(
                     onCheckedChange = onEnabledChange,
                 )
             }
+            item(key = "target") {
+                TargetRow(accountName = uiState.targetAccountName, folderName = uiState.targetFolderName)
+            }
             item(key = "videos") {
                 SwitchRow(
                     title = stringResource(R.string.auto_backup_include_videos),
@@ -219,6 +222,22 @@ internal fun AutoBackupScreen(
             }
         }
     }
+}
+
+/** 어디로 백업되는지 — 설정 "업로드 대상"을 그대로 읽어 보여 준다(여기서 바꾸지는 않음) */
+@Composable
+private fun TargetRow(accountName: String?, folderName: String?) {
+    val text = when {
+        accountName == null -> stringResource(R.string.auto_backup_target_none)
+        folderName != null -> stringResource(R.string.auto_backup_target, "$accountName · $folderName")
+        else -> stringResource(R.string.auto_backup_target, accountName)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 @Composable

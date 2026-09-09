@@ -305,6 +305,8 @@
     <string name="auto_backup_enable_description">선택한 앨범에 새로 추가되는 항목을 업로드 대기열에 자동으로 넣습니다. 켠 이후 항목부터 대상이며 Wi-Fi·충전 설정을 따릅니다.</string>
     <string name="auto_backup_requires_sign_in">먼저 Google 계정을 연결하거나 설정에서 저장소를 추가해 업로드 폴더를 지정하세요</string>
     <string name="auto_backup_include_videos">영상 포함</string>
+    <string name="auto_backup_target">백업 대상: %1$s (설정 › 업로드 대상에서 변경)</string>
+    <string name="auto_backup_target_none">백업 대상이 없습니다. 설정에서 Google 계정을 연결하거나 저장소를 추가하세요.</string>
     <string name="auto_backup_include_videos_description">끄면 사진만 백업합니다</string>
     <string name="auto_backup_albums">백업할 앨범</string>
     <string name="auto_backup_no_albums">앨범 정보를 불러오는 중이거나 사진이 없습니다</string>
