@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.download
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
@@ -32,6 +33,16 @@ class DownloadWorker @AssistedInject constructor(
     private val notifications: UploadNotifications,
 ) : CoroutineWorker(appContext, params) {
 
+    /**
+     * 신속 작업은 API 30 이하에서 포그라운드 서비스로 돌아가므로 WorkManager 가 시작 전에 이 값을 요구한다.
+     * 구현하지 않으면 워커가 바로 실패한다(minSdk 29).
+     */
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        notifications.ensureChannel()
+        val entryId = inputData.getString(KEY_ENTRY_ID).orEmpty()
+        return notifications.downloadForegroundInfo(entryId, inputData.getString(KEY_NAME) ?: entryId, 0f)
+    }
+
     override suspend fun doWork(): Result {
         val entryId = inputData.getString(KEY_ENTRY_ID) ?: return Result.failure()
         val name = inputData.getString(KEY_NAME) ?: entryId
@@ -39,7 +50,7 @@ class DownloadWorker @AssistedInject constructor(
         val size = inputData.getLong(KEY_SIZE, -1L)
         val accountId = inputData.getString(KEY_ACCOUNT_ID)
         notifications.ensureChannel()
-        updateForeground(name, 0f)
+        updateForeground(entryId, name, 0f)
         return try {
             val storage = storages.storage(accountId)
             val copiedBytes = MutableStateFlow(0L)
@@ -47,7 +58,7 @@ class DownloadWorker @AssistedInject constructor(
                 // 저장기는 블로킹 콜백만 주므로, 진행 알림은 별도 코루틴이 상태를 보고 갱신한다
                 val progressJob = launch {
                     copiedBytes.collect { copied ->
-                        if (size > 0) updateForeground(name, (copied.toFloat() / size).coerceIn(0f, 1f))
+                        if (size > 0) updateForeground(entryId, name, (copied.toFloat() / size).coerceIn(0f, 1f))
                     }
                 }
                 withContext(Dispatchers.IO) {
@@ -63,29 +74,29 @@ class DownloadWorker @AssistedInject constructor(
                 }
                 progressJob.cancel()
             }
-            notifications.showDownloadResult(name, success = true)
+            notifications.showDownloadResult(entryId, name, success = true)
             Result.success()
         } catch (e: CancellationException) {
             throw e
         } catch (e: RemoteStorageException) {
-            fail(name, e, retry = e.httpCode == null || e.httpCode >= HTTP_SERVER_ERROR)
+            fail(entryId, name, e, retry = e.httpCode == null || e.httpCode >= HTTP_SERVER_ERROR)
         } catch (e: IOException) {
-            fail(name, e, retry = true)
+            fail(entryId, name, e, retry = true)
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            fail(name, e, retry = false)
+            fail(entryId, name, e, retry = false)
         }
     }
 
-    private fun fail(name: String, e: Exception, retry: Boolean): Result {
+    private fun fail(key: String, name: String, e: Exception, retry: Boolean): Result {
         Timber.w(e, "download failed: %s (attempt %d)", name, runAttemptCount)
         if (retry && runAttemptCount < MAX_ATTEMPTS) return Result.retry()
-        notifications.showDownloadResult(name, success = false)
+        notifications.showDownloadResult(key, name, success = false)
         return Result.failure()
     }
 
-    private suspend fun updateForeground(name: String, fraction: Float) {
+    private suspend fun updateForeground(key: String, name: String, fraction: Float) {
         try {
-            setForeground(notifications.downloadForegroundInfo(name, fraction))
+            setForeground(notifications.downloadForegroundInfo(key, name, fraction))
         } catch (e: IllegalStateException) {
             Timber.w(e, "setForeground rejected")
         }

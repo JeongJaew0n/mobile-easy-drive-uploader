@@ -88,4 +88,5 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 - 저장은 `MediaStoreSaver`: `IS_PENDING=1` 로 삽입 → 스트림 복사 → `IS_PENDING=0`. 이미지 `Pictures/Easy Gallery`, 영상 `Movies/Easy Gallery`, 그 외 `Download/Easy Gallery`. 실패하면 만든 항목을 지운다. 갤러리(MediaStore 관찰)에 자동으로 나타난다.
 - 알림은 업로드 채널을 공유(포그라운드 ID 1004, 결과 1005). 진행률은 워커가 `StateFlow` 로 받아 별도 코루틴에서 `setForeground` — 저장기 콜백은 블로킹 I/O 스레드라 suspend 를 못 부른다.
 - 재시도 판단: `RemoteStorageException` 은 5xx/코드 없음이면 재시도, 4xx 는 즉시 실패. `IOException` 은 재시도.
+- **버그 수정(2026-09-09)**: 워커가 신속 작업(`setExpedited`)인데 `getForegroundInfo` 를 구현하지 않아, API 30 이하(minSdk 29)에서 WorkManager 가 시작 직전에 워커를 실패시켰다 — 구현을 추가했다. 알림 ID 도 파일 키로 흩었다(고정 ID 를 쓰면 동시에 여러 개를 받을 때 한 워커가 끝나며 다른 워커의 진행 알림까지 지운다).
 - 테스트: `DriveRestRepositoryTest` `alt=media`, `DriveBrowserViewModelTest` 선택 다운로드(폴더 제외·선택 해제·이벤트). MediaStore 저장은 실기기 DRV-23.

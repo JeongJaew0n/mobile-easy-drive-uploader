@@ -74,8 +74,12 @@ class UploadNotifications @Inject constructor(
         }
     }
 
-    /** 다운로드 진행 — 업로드와 같은 채널, 파일당 알림 하나가 아니라 워커 포그라운드 하나 */
-    fun downloadForegroundInfo(name: String, fraction: Float): ForegroundInfo {
+    /**
+     * 다운로드 진행 — 업로드와 같은 채널. 여러 파일이 동시에 내려올 수 있어 [key] 로 알림을 구분한다
+     * (같은 ID 를 쓰면 한 워커가 끝날 때 다른 워커의 알림까지 사라진다).
+     */
+    fun downloadForegroundInfo(key: String, name: String, fraction: Float): ForegroundInfo {
+        val id = downloadId(key)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_file_download)
             .setContentTitle(context.getString(R.string.notification_download_title))
@@ -86,16 +90,20 @@ class UploadNotifications @Inject constructor(
             .setContentIntent(openAppIntent())
             .build()
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ForegroundInfo(DOWNLOAD_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            ForegroundInfo(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
-            ForegroundInfo(DOWNLOAD_ID, notification)
+            ForegroundInfo(id, notification)
         }
     }
 
-    fun showDownloadResult(name: String, success: Boolean) {
+    /** 다운로드 알림 ID: 파일 키를 [DOWNLOAD_ID_SLOTS] 개 슬롯에 흩어 다른 알림과 겹치지 않게 한다 */
+    private fun downloadId(key: String): Int =
+        DOWNLOAD_ID_BASE + (key.hashCode().mod(DOWNLOAD_ID_SLOTS))
+
+    fun showDownloadResult(key: String, name: String, success: Boolean) {
         val textRes = if (success) R.string.notification_download_done else R.string.notification_download_failed
         notify(
-            DOWNLOAD_RESULT_ID,
+            DOWNLOAD_RESULT_ID_BASE + key.hashCode().mod(DOWNLOAD_ID_SLOTS),
             context.getString(textRes, name),
             context.getString(R.string.notification_download_title),
         )
@@ -143,8 +151,9 @@ class UploadNotifications @Inject constructor(
         const val PROGRESS_ID = 1001
         const val SUMMARY_ID = 1002
         const val SCAN_ID = 1003
-        const val DOWNLOAD_ID = 1004
-        const val DOWNLOAD_RESULT_ID = 1005
+        const val DOWNLOAD_ID_BASE = 2000
+        const val DOWNLOAD_RESULT_ID_BASE = 3000
+        private const val DOWNLOAD_ID_SLOTS = 500
         private const val PROGRESS_MAX = 100
     }
 }
