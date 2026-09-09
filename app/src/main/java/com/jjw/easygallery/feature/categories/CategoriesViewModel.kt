@@ -36,7 +36,12 @@ class CategoriesViewModel @Inject constructor(
         viewModelScope.launch { repository.delete(id) }
     }
 
-    /** 위/아래 한 칸 이동. 드래그 정렬은 3단계에서 */
+    /** 드래그 정렬이 끝났을 때 최종 순서를 저장한다 */
+    fun reorder(orderedIds: List<Long>) {
+        viewModelScope.launch { repository.reorder(orderedIds) }
+    }
+
+    /** 메뉴의 위/아래 한 칸 이동(접근성·정밀 조정용). 드래그는 [reorder] */
     fun move(id: Long, offset: Int) {
         val content = uiState.value as? CategoriesUiState.Content ?: return
         val ids = content.categories.map { it.id }.toMutableList()

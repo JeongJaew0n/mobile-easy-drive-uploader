@@ -212,7 +212,7 @@ sealed interface CategoryFilter {
 |---|---|---|
 | 1 | 엔티티·DAO·Repository·v5 마이그레이션, `AssignCategoriesUseCase`, `CategoryPickerState` | Robolectric Room 인메모리 DAO 테스트(CASCADE·유니크·개수 JOIN), 피커 tri-state 단위 테스트, `5.json` 커밋, v4 설치 위에 업데이트(CAT-01) |
 | 2 | 선택 모드 "카테고리" + 피커 시트, 갤러리 필터 시트·바, Catalog 결합, 고아 정리 | `GalleryViewModelTest`(필터 AND/OR·미분류·필터 전환 시 애니메이션 생략), 실기기 CAT-02~08 |
-| 3 | 관리 화면(생성·이름/색 변경·삭제·드래그 정렬), 설정 진입, 상세보기 칩·편집, 썸네일 배지·설정 토글 | `CategoriesViewModelTest`, 실기기 CAT-09~15 |
+| 3 | 관리 화면(생성·이름/색 변경·삭제·드래그 정렬 §12), 설정 진입, 상세보기 칩·편집, 썸네일 배지·설정 토글 | `CategoriesViewModelTest`, `CategoryReorderTest`, 실기기 CAT-09~17 |
 
 로컬 검증은 매 단계 `detekt` + `testDebugUnitTest`(+ 마이그레이션이 있는 1단계는 `assembleRelease` 로 `$$serializer`/Room 스키마 R8 확인). 실기기는 사용자 지시가 있을 때만.
 
@@ -248,3 +248,11 @@ sealed interface CategoryFilter {
 - 2026-09-09 1단계 완료(`f1e7b4c`): 엔티티·DAO·저장소·v5 마이그레이션·`AssignCategoriesUseCase`·`CategoryPickerState` + 테스트 10건.
 - 2026-09-09 2단계 완료: 선택 모드 피커, 필터 시트·바·제목, `Catalog` 결합, `MediaViewerKey` 전달, 관리 화면(생성·이름/색 변경·삭제·위/아래 이동 — 드래그 정렬은 보류), 설정 진입점, `OrphanAssignmentCleaner`(권한 전체 접근일 때만 구독; 초기 구현이 권한 전에 MediaStore 를 구독해 "권한 확인 전 조회 금지" 테스트가 잡아냈다). 남은 3단계: 상세보기 칩·편집, 썸네일 배지 + 설정 토글.
 - 2026-09-09 3단계 완료: 썸네일 오른쪽 위 색 점 배지(최대 3, 즐겨찾기 별과 한 줄) + 설정 "썸네일에 카테고리 색 점 표시" 토글(`showCategoryBadges`, 기본 켬), 상세보기 정보 패널 "카테고리" 칩 행 + ⋮ "카테고리 편집"(같은 피커, 항목 하나). 보류: 관리 화면 드래그 정렬(위/아래 이동으로 대체), 필터 중인 카테고리 삭제 시 자동 해제(CAT-11 확인 후 결정).
+
+## 12. 드래그 정렬 (2026-09-09 구현)
+
+- 관리 화면 행 왼쪽에 ≡ 손잡이. **손잡이에서만** 끌 수 있고(`detectDragGestures` + `change.consume()`), 행 전체를 끌면 목록 스크롤과 충돌하므로 그렇게 하지 않았다. 메뉴의 위/아래 한 칸 이동은 접근성·정밀 조정용으로 남겼다.
+- 드래그 중에는 화면 순서를 **로컬 상태**로 들고, 끌고 있는 행만 `graphicsLayer { translationY }` 로 손가락을 따라가며 `zIndex` 로 위에 뜬다. 나머지 행은 `animateItem(placementSpec = motion.settle())` 로 미끄러진다.
+- 자리바꿈 판정과 목록 재배열은 순수 함수(`CategoryReorder.step`/`moved`)로 뽑아 단위 테스트한다 — 행 높이만큼 누적될 때마다 한 칸, 목록 끝을 넘어가면 그대로 머물고 누적량을 깎지 않는다(끝에서 다시 위로 끌면 바로 반응).
+- 저장은 손을 뗄 때 한 번(`CategoryReorder.changedOrder` 가 실제로 바뀐 경우에만 `reorder(orderedIds)`) — 드래그 중 Room 쓰기를 반복하지 않는다.
+- 검증: `CategoryReorderTest`(이동·한 칸 판정·끝 경계·행 높이 0·변경 없음). 손맛은 실기기 CAT-17.

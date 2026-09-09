@@ -36,6 +36,7 @@
     <string name="category_assign_empty">아직 카테고리가 없습니다. 아래에서 만들어 보세요</string>
     <string name="category_row_count">%1$d/%2$d</string>
     <string name="category_edit">이름·색 변경</string>
+    <string name="category_drag_handle">끌어서 순서 바꾸기</string>
     <string name="category_move_up">위로</string>
     <string name="category_move_down">아래로</string>
     <string name="category_empty">카테고리가 없습니다. + 로 만들어 보세요</string>

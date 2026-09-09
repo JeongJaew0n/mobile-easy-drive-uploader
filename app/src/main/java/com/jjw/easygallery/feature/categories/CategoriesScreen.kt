@@ -1,10 +1,14 @@
 package com.jjw.easygallery.feature.categories
 
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
@@ -33,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,15 +46,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.CategoryError
 import com.jjw.easygallery.core.ui.motion.LocalMotion
+import com.jjw.easygallery.feature.categories.CategoryReorder.moved
 import kotlinx.coroutines.launch
 
 @Composable
@@ -66,6 +77,7 @@ fun CategoriesRoute(
         onRecolor = viewModel::recolor,
         onDelete = viewModel::delete,
         onMove = viewModel::move,
+        onReorder = viewModel::reorder,
     )
 }
 
@@ -80,6 +92,7 @@ internal fun CategoriesScreen(
     onRecolor: (Long, Int) -> Unit,
     onDelete: (Long) -> Unit,
     onMove: (Long, Int) -> Unit,
+    onReorder: (List<Long>) -> Unit = {},
 ) {
     var editing by remember { mutableStateOf<CategoryEditTarget?>(null) }
     var deleting by remember { mutableStateOf<Category?>(null) }
@@ -133,6 +146,7 @@ internal fun CategoriesScreen(
                         onEdit = { editing = CategoryEditTarget.Existing(it) },
                         onDelete = { deleting = it },
                         onMove = onMove,
+                        onReorder = onReorder,
                     )
                 }
             }
@@ -178,19 +192,50 @@ private fun CategoryList(
     onEdit: (Category) -> Unit,
     onDelete: (Category) -> Unit,
     onMove: (Long, Int) -> Unit,
+    onReorder: (List<Long>) -> Unit,
 ) {
     val motion = LocalMotion.current
+    // 드래그 중에는 화면에 보이는 순서를 로컬로 들고 있다가, 손을 떼면 한 번만 저장한다
+    var order by remember(categories) { mutableStateOf(categories) }
+    var draggingId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var rowHeight by remember { mutableIntStateOf(0) }
+
     LazyColumn(Modifier.fillMaxSize()) {
-        items(categories, key = { it.id }) { category ->
+        items(order, key = { it.id }) { category ->
+            val isDragging = draggingId == category.id
             CategoryRow(
                 category = category,
-                canMoveUp = categories.first().id != category.id,
-                canMoveDown = categories.last().id != category.id,
+                canMoveUp = order.first().id != category.id,
+                canMoveDown = order.last().id != category.id,
+                isDragging = isDragging,
                 onEdit = { onEdit(category) },
                 onDelete = { onDelete(category) },
                 onMove = { onMove(category.id, it) },
-                // 순서를 바꾸면 행이 미끄러져 자리를 바꾼다
-                modifier = Modifier.animateItem(placementSpec = motion.settle()),
+                onDragStart = {
+                    draggingId = category.id
+                    dragOffset = 0f
+                },
+                onDrag = { delta ->
+                    val index = order.indexOfFirst { it.id == category.id }
+                    dragOffset += delta
+                    val step = CategoryReorder.step(index, dragOffset, rowHeight, order.size)
+                    if (step.index != index) {
+                        order = order.moved(index, step.index)
+                        dragOffset = step.offset
+                    }
+                },
+                onDragEnd = {
+                    draggingId = null
+                    dragOffset = 0f
+                    CategoryReorder.changedOrder(categories, order)?.let(onReorder)
+                },
+                modifier = Modifier
+                    .onSizeChanged { size -> if (rowHeight == 0) rowHeight = size.height }
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
+                    // 순서를 바꾸면 행이 미끄러져 자리를 바꾼다(끌고 있는 행은 손가락을 따라가므로 제외)
+                    .then(if (isDragging) Modifier else Modifier.animateItem(placementSpec = motion.settle())),
             )
         }
     }
@@ -201,15 +246,26 @@ private fun LazyItemScope.CategoryRow(
     category: Category,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
+    isDragging: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onMove: (Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     ListItem(
         modifier = modifier,
-        leadingContent = { CategoryDot(colorIndex = category.colorIndex, size = ROW_DOT_DP) },
+        tonalElevation = if (isDragging) DRAG_ELEVATION_DP else 0.dp,
+        leadingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DragHandle(onDragStart = onDragStart, onDrag = onDrag, onDragEnd = onDragEnd)
+                Spacer(Modifier.width(HANDLE_GAP_DP))
+                CategoryDot(colorIndex = category.colorIndex, size = ROW_DOT_DP)
+            }
+        },
         headlineContent = { Text(category.name) },
         supportingContent = {
             Text(pluralStringResource(R.plurals.category_item_count, category.itemCount, category.itemCount))
@@ -323,3 +379,28 @@ private fun CategoryEditDialog(
 }
 
 private const val ROW_DOT_DP = 16
+
+/** 이 손잡이에서만 끌어 순서를 바꾼다 — 행 전체를 끌면 목록 스크롤과 겹친다 */
+@Composable
+private fun DragHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
+    Icon(
+        painter = painterResource(R.drawable.ic_drag_handle),
+        contentDescription = stringResource(R.string.category_drag_handle),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.pointerInput(Unit) {
+            detectDragGestures(
+                onDragStart = { onDragStart() },
+                onDragEnd = onDragEnd,
+                onDragCancel = onDragEnd,
+                onDrag = { change, amount ->
+                    // 소비하지 않으면 LazyColumn 이 같이 스크롤된다
+                    change.consume()
+                    onDrag(amount.y)
+                },
+            )
+        },
+    )
+}
+
+private val DRAG_ELEVATION_DP = 8.dp
+private val HANDLE_GAP_DP = 12.dp
