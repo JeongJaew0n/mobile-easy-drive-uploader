@@ -28,6 +28,7 @@ import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -134,6 +135,8 @@ class SmbStorage(
                     runCatching { connection.close() }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             runCatching { connection.close() }
             throw e.toStorageException()
@@ -177,6 +180,8 @@ class SmbStorage(
                 }
             }
         } catch (e: RemoteStorageException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             // smbj 는 SMBApiException(상태 코드)·SocketException 등 다양한 예외를 던진다 → 하나로 감싼다
@@ -264,8 +269,9 @@ class SmbStorage(
             channelFlow {
                 send(UploadEvent.Progress(offset, length))
                 withShare { share ->
+                    // 이어 쓰기인데 파일이 사라졌다면 새로 만들지 않는다 — 만들면 앞 offset 바이트가 0 으로 남는다
                     val disposition =
-                        if (offset > 0) SMB2CreateDisposition.FILE_OPEN_IF else SMB2CreateDisposition.FILE_OVERWRITE_IF
+                        if (offset > 0) SMB2CreateDisposition.FILE_OPEN else SMB2CreateDisposition.FILE_OVERWRITE_IF
                     val path = SmbPaths.toSmb(sessionUri)
                     val file = share.openFile(
                         path,

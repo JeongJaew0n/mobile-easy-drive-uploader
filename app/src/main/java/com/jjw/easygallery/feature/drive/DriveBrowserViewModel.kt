@@ -322,12 +322,12 @@ class DriveBrowserViewModel @Inject constructor(
         viewModelScope.launch {
             val failed = ArrayList<DriveEntry>()
             entries.forEachIndexed { index, entry ->
-                _uiState.update { it.copy(mutationProgress = MutationProgress(index, entries.size)) }
                 runCatching { drive.restore(entry.id) }.onFailure { e ->
                     if (e is CancellationException) throw e
                     Timber.e(e, "restore failed %s", entry.id)
                     failed += entry
                 }
+                _uiState.update { it.copy(mutationProgress = MutationProgress(index + 1, entries.size)) }
             }
             batchInProgress = false
             _uiState.update { state ->
@@ -368,7 +368,6 @@ class DriveBrowserViewModel @Inject constructor(
             val done = ArrayList<DriveEntry>()
             val failed = ArrayList<DriveEntry>()
             targets.forEachIndexed { index, entry ->
-                _uiState.update { it.copy(mutationProgress = MutationProgress(index, targets.size)) }
                 runCatching { action(entry) }
                     .onSuccess { done += entry }
                     .onFailure { e ->
@@ -376,6 +375,7 @@ class DriveBrowserViewModel @Inject constructor(
                         Timber.e(e, "batch mutation failed %s", entry.id)
                         failed += entry
                     }
+                _uiState.update { it.copy(mutationProgress = MutationProgress(index + 1, targets.size)) }
             }
             batchInProgress = false
             _uiState.update { state ->

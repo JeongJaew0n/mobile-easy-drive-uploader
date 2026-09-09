@@ -17,6 +17,7 @@ import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -99,6 +100,8 @@ class SftpStorage(
                 runCatching { sftp.close() }
                 runCatching { ssh.disconnect() }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             runCatching { ssh.disconnect() }
             throw asStorageException(e)
@@ -137,6 +140,8 @@ class SftpStorage(
             ssh.newSFTPClient().use(block)
         } catch (e: RemoteStorageException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             throw asStorageException(e)
         } finally {
@@ -154,6 +159,8 @@ class SftpStorage(
         try {
             ssh.connect(host, port)
             ssh.authPassword(account.username.orEmpty(), password)
+        } catch (e: CancellationException) {
+            throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             runCatching { ssh.disconnect() }
             throw asStorageException(e)
@@ -222,8 +229,9 @@ class SftpStorage(
             channelFlow {
                 send(UploadEvent.Progress(offset, length))
                 withSftp { sftp ->
-                    val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT)
-                    if (offset == 0L) modes.add(OpenMode.TRUNC)
+                    // 이어 쓰기인데 파일이 사라졌다면 새로 만들지 않는다 — 만들면 앞 offset 바이트가 0 으로 남는다
+                    val modes = EnumSet.of(OpenMode.WRITE)
+                    if (offset == 0L) modes.addAll(listOf(OpenMode.CREAT, OpenMode.TRUNC))
                     val written = sftp.open(absolute(sessionUri), modes).use { file ->
                         val input = context.contentResolver.openInputStream(source.uri)
                             ?: throw FileNotFoundException(source.uri.toString())

@@ -151,6 +151,8 @@ class S3Storage(
      */
     private suspend fun movePrefix(fromPrefix: String, toPrefix: String): RemoteEntry {
         if (toPrefix.startsWith(fromPrefix)) throw UnsupportedOperationException("폴더를 자기 자신 아래로 옮길 수 없습니다")
+        // 대상이 이미 있으면 조용히 합쳐지고 같은 이름 오브젝트는 덮어써진다 — WebDAV 처럼 먼저 막는다
+        if (prefixExists(toPrefix)) throw RemoteStorageException("이미 같은 이름의 폴더가 있습니다")
         forEachKeyUnder(fromPrefix) { key -> copyThenDelete(key, toPrefix + key.removePrefix(fromPrefix)) }
         // 마커 오브젝트(있으면) 정리, 새 마커 생성
         runCatching { deleteKey(fromPrefix) }
@@ -174,6 +176,17 @@ class S3Storage(
         } finally {
             _mutationProgress.value = null
         }
+    }
+
+    /** 접두어 아래에 오브젝트나 마커가 하나라도 있는지 */
+    private suspend fun prefixExists(prefix: String): Boolean {
+        val url = bucketUrl.newBuilder()
+            .addQueryParameter("list-type", "2")
+            .addQueryParameter("prefix", prefix)
+            .addQueryParameter("max-keys", "1")
+            .build()
+        val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
+        return result.objects.isNotEmpty() || result.commonPrefixes.isNotEmpty()
     }
 
     private suspend fun keysUnder(prefix: String): List<String> {

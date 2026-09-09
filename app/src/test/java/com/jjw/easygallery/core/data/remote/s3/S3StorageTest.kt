@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.remote.s3
 import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
@@ -234,6 +235,7 @@ class S3StorageTest {
 
     @Test
     fun `renaming a folder copies every object under the prefix then removes the old marker`() = runTest {
+        server.enqueue(xml("<ListBucketResult></ListBucketResult>")) // 대상 접두어 없음 확인
         server.enqueue(
             xml(
                 """<ListBucketResult>
@@ -251,6 +253,7 @@ class S3StorageTest {
         assertEquals("new/", entry.id)
         assertTrue(entry.isFolder)
         assertNull(storage.mutationProgress.value) // 끝나면 진행 표시를 지운다
+        server.takeRequest() // 대상 존재 확인
         server.takeRequest() // list
         val copy = server.takeRequest()
         assertEquals("/photos/new/a.jpg", copy.url.encodedPath)
@@ -258,6 +261,16 @@ class S3StorageTest {
         assertEquals("/photos/old/a.jpg", server.takeRequest().url.encodedPath)
         assertEquals("/photos/old/", server.takeRequest().url.encodedPath)
         assertEquals("/photos/new/", server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `renaming a folder onto an existing one is rejected instead of silently merging`() = runTest {
+        server.enqueue(xml("""<ListBucketResult><Contents><Key>new/x.jpg</Key></Contents></ListBucketResult>"""))
+
+        val error = runCatching { storage.rename("old/", "new") }.exceptionOrNull()
+
+        assertTrue(error is RemoteStorageException)
+        assertEquals(1, server.requestCount) // 아무것도 복사하지 않는다
     }
 
     @Test
