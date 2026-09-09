@@ -85,5 +85,6 @@ class NsdHostDiscovery(context: Context) : HostDiscovery {
 
     companion object {
         const val SMB_SERVICE = "_smb._tcp."
+        const val SFTP_SERVICE = "_sftp-ssh._tcp."
     }
 }

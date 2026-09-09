@@ -10,7 +10,7 @@ app/src/main/java/com/jjw/easygallery/
 │   ├── common/di/             # Dispatcher qualifier, DispatchersModule
 │   ├── data/auth/             # AuthRepository/TokenProvider, GoogleAuthRepository(AuthorizationClient)
 │   ├── data/drive/            # DriveApi(Retrofit), DTO, AuthInterceptor/TokenAuthenticator, DriveRestRepository
-│   ├── data/remote/           # RemoteStorage/RemoteUploader 제공자 추상화, GoogleDriveStorage 어댑터, s3/(SigV4·S3Storage), webdav/(WebDavStorage), smb/(SmbStorage·SmbPaths, smbj),
+│   ├── data/remote/           # RemoteStorage/RemoteUploader 제공자 추상화, GoogleDriveStorage 어댑터, s3/(SigV4·S3Storage), webdav/(WebDavStorage), smb/(SmbStorage·SmbPaths, smbj), sftp/(SftpStorage·호스트 키 고정, sshj), RemotePaths(공용 경로 규칙),
 │   │                          # RemoteAccountRepository(Room remote_account) + KeystoreSecretStore, StorageRegistry(accountId → 제공자) — MULTI_CLOUD.md / NAS_STORAGE.md
 │   ├── data/duplicates/       # MediaHasher(SHA-256), DuplicateRepository(크기 충돌만 해시·캐시·그룹), DuplicateScanWorker/Scheduler
 │   ├── data/media/            # MediaRepository(조회+편집+EXIF) / MediaStoreRepository
@@ -93,7 +93,7 @@ Compose Screen  ──events──▶  ViewModel  ──calls──▶  Reposito
 
 ## 다중 클라우드 / NAS (core/data/remote)
 
-- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS)·SMB(NAS·Windows 공유, smbj) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK·SEARCH·DOWNLOAD)으로 화면 메뉴가 달라진다. 선택적 `ReportsMutationProgress`(S3 폴더 이동 진행)도 여기.
+- 설계 `MULTI_CLOUD.md`, `NAS_STORAGE.md`. `RemoteStorage`(목록·폴더·이름 변경·이동·삭제·복원·`uploader()`) 와 `RemoteUploader`(세션 시작 → 상태 조회 → 이어 올리기) 두 인터페이스로 Google Drive(어댑터)·S3 호환(Naver Cloud·KT Cloud·AWS·R2·MinIO)·WebDAV(NAS)·SMB(NAS·Windows 공유, smbj)·SFTP(sshj) 를 같은 표면에 둔다. `Capability` 집합(TRASH·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD·QUOTA·WEB_LINK·SEARCH·DOWNLOAD)으로 화면 메뉴가 달라진다. 선택적 `ReportsMutationProgress`(S3 폴더 이동 진행)도 여기.
 - 계정은 Room `remote_account`(비밀 제외) + `KeystoreSecretStore`(AES-GCM, Android Keystore). `StorageRegistry` 가 `accountId`(null = Drive) → 제공자 인스턴스를 만들고 캐시한다. 종류별 구현은 Hilt `@IntoMap @RemoteKindKey` 팩토리로 등록.
 - 업로드 대상은 `UserPreferences.uploadAccountId` + 폴더. 큐·원장에 `accountId` 가 있고 `UploadWorker` 는 태스크의 계정으로 `RemoteUploader` 를 고른다. Drive 만 로그인이 필요하고(`canUpload`), S3(단일 PUT)·WebDAV 는 재개가 없어 상태 조회가 `Expired` 를 돌려 처음부터 다시 올리며, SMB 는 원격 파일 크기에서 이어 쓴다.
 - S3 는 AWS SDK 없이 `S3Signer`(SigV4, UNSIGNED-PAYLOAD) 로 서명하고 XML 은 `XmlPullParser` 로 읽는다. 폴더 = 접두어, 폴더 이름 변경·이동은 오브젝트 복사 후 삭제(진행 표시), 삭제는 영구.

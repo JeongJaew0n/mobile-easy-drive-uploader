@@ -148,6 +148,11 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.kizitonwose.calendar.compose)
     implementation(libs.smbj)
+    // sshj: bcpkix 는 PEM 개인키를 읽을 때만 필요한데 우리는 비밀번호 인증만 쓴다.
+    // 게다가 bcpkix 가 끌어오는 bcutil 이 최신 bcprov 와 클래스가 겹쳐 빌드가 깨진다(docs/NAS_STORAGE.md §7).
+    implementation(libs.sshj) {
+        exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+    }
 
     // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)

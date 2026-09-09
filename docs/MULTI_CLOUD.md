@@ -12,7 +12,7 @@
 | **KT Cloud Object Storage** | **S3 호환 API**(ktcloud S3 endpoint, Access/Secret Key) | S3 제공자로 지원 |
 | AWS S3 / Cloudflare R2 / Backblaze B2 / Wasabi / MinIO(자가 호스팅) | S3 호환 | 같은 제공자에서 endpoint·region 만 다름 |
 | Dropbox / OneDrive / Box | 각자 OAuth REST | **후보**(§8). 제공자 인터페이스만 맞추면 추가 가능 |
-| NAS(Synology·QNAP·Nextcloud·일반 서버·Windows 공유) | WebDAV, SMB(smbj) | `NAS_STORAGE.md` |
+| NAS(Synology·QNAP·Nextcloud·일반 서버·Windows 공유) | WebDAV, SMB(smbj), SFTP(sshj) | `NAS_STORAGE.md` |
 
 즉 S3 호환 하나로 Naver·KT·AWS·R2·MinIO 를 모두 덮는다. "다른 클라우드"는 이 제공자에 endpoint 프리셋으로 추가하는 것부터 시작한다.
 
@@ -129,4 +129,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 설정 "연결된 저장소" 행에 용량(`about()`, QUOTA 능력 — WebDAV `quota-used/available-bytes`) 표시. 계정 목록이 바뀔 때 한 번씩 읽고 실패는 조용히 건너뛴다.
 - 2026-09-09 갤러리 선택 상단바 ⋮ "다른 저장소로 업로드"(저장소가 둘 이상일 때) — 이번 배치만 고른 계정으로(`EnqueueUploadsUseCase.toAccount`; 기본 대상과 같으면 설정 폴더, 아니면 루트), 설정의 기본 대상은 바뀌지 않는다. 기본 대상에 ✓ 표시.
 - 2026-09-09 계정 **수정**: 설정 행 ⋮ "수정" → 같은 폼(`AddRemoteAccountKey(accountId)`)이 저장된 값으로 채워진다(종류는 잠금, 비밀은 비움 — 비워 두면 유지). 저장 시 `RemoteAccountRepository.update` + `StorageRegistry.evict` 로 바뀐 자격 증명이 즉시 반영된다.
-- 남은 것: Dropbox/OneDrive.
+- 2026-09-09 SFTP 제공자 추가(`NAS_STORAGE.md` §7) — 다섯 번째 `RemoteAccountKind`.
+- 남은 것: Dropbox/OneDrive(각각 개발자 앱 등록이 필요해 사용자 조치 선행).

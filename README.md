@@ -1,8 +1,8 @@
 # Easy Gallery
 
-핸드폰 갤러리(사진·영상)를 Google Drive·S3 호환 클라우드(Naver Cloud·KT Cloud·AWS·MinIO)·NAS(WebDAV·SMB)로 옮기고, 갤러리를 자유롭게 CRUD 하는 **Android 전용** 앱.
+핸드폰 갤러리(사진·영상)를 Google Drive·S3 호환 클라우드(Naver Cloud·KT Cloud·AWS·MinIO)·NAS(WebDAV·SMB·SFTP)로 옮기고, 갤러리를 자유롭게 CRUD 하는 **Android 전용** 앱.
 
-Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retrofit(Drive REST v3) · OkHttp(S3 SigV4·WebDAV 직접 구현) · smbj(SMB2/3)
+Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retrofit(Drive REST v3) · OkHttp(S3 SigV4·WebDAV 직접 구현) · smbj(SMB2/3) · sshj(SFTP)
 
 ## 주요 기능
 
@@ -10,7 +10,7 @@ Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retr
 - 카테고리: 항목에 여러 카테고리 지정(tri-state 피커), 카테고리 필터(OR·미분류), 썸네일 색 점, 관리 화면 — `docs/CATEGORIES.md`
 - 상세보기: 히어로 전환, 확대·스와이프 닫기, 영상 재생(비율 유지·재생바·배속·회전), EXIF 정보
 - 업로드: WorkManager 큐, Drive 재개 업로드, 영상 압축(Media3), 자동 백업, 업로드 배지
-- 저장소: Google Drive 파일 CRUD(이름 변경·이동·휴지통 실행 취소·검색), 다중 선택 일괄 이동·삭제, 기기에 저장(다운로드), 연결된 저장소 추가(S3 호환·WebDAV(Basic/Digest)·SMB(mDNS 검색)) 후 탐색·CRUD·업로드 대상 지정 — `docs/DRIVE_FILE_CRUD.md`, `docs/MULTI_CLOUD.md`, `docs/NAS_STORAGE.md`
+- 저장소: Google Drive 파일 CRUD(이름 변경·이동·휴지통 실행 취소·검색), 다중 선택 일괄 이동·삭제, 기기에 저장(다운로드), 연결된 저장소 추가(S3 호환·WebDAV(Basic/Digest)·SMB(mDNS 검색)·SFTP(호스트 키 고정)) 후 탐색·CRUD·업로드 대상 지정 — `docs/DRIVE_FILE_CRUD.md`, `docs/MULTI_CLOUD.md`, `docs/NAS_STORAGE.md`
 
 ## 문서
 

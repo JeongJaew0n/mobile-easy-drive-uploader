@@ -28,6 +28,10 @@
 | NAS-08 | SMB 탐색·새 폴더·이름 변경·폴더 이동·삭제 | 한글 폴더·파일 정상, 폴더 이름 변경/이동 즉시(복사 없음), 삭제 확인 후 즉시(휴지통 없음) | ⬜ | `rename` = SMB2 FileRenameInformation |
 | NAS-09 | SMB 폴더를 업로드 폴더로 지정 → 큰 영상 업로드 중 Wi-Fi 를 끄고 다시 켬 | 워커 재시도 시 원격 파일 크기부터 이어 올림(처음부터 아님), 완료 후 NAS 에서 재생 가능 | ⬜ | `queryStatus` → `Incomplete(size)` |
 | NAS-10 | 같은 이름 파일이 이미 있는 폴더로 업로드 | 덮어쓰지 않고 `이름 (1).jpg` 로 생성 | ⬜ | `RemoteNames.unique` |
+| NAS-14 | 저장소 추가 → SFTP, 주소·사용자·비밀번호 입력 → 연결 테스트 | 처음에는 "이 서버를 신뢰할까요?" 다이얼로그에 SHA-256 호스트 키 지문 → 신뢰 → 재테스트 성공. 서버에서 `ssh-keygen -lf /etc/ssh/ssh_host_*_key.pub` 로 지문 대조 | ⬜ | `PinnedHostKeyVerifier` |
+| NAS-15 | 루트 경로에 `/volume1/photo` 를 넣고 탐색 | 그 폴더가 루트로 보임. 새 폴더·이름 변경·이동·삭제(폴더는 하위까지) 동작, 한글 이름 정상 | ⬜ | `SftpPaths.absolute` |
+| NAS-16 | SFTP 폴더로 큰 영상 업로드 중 Wi-Fi 끊었다 다시 연결 | 원격 파일 크기부터 이어 올림. 완료 후 서버에서 크기·재생 확인 | ⬜ | 오프셋 쓰기 |
+| NAS-17 | 서버 호스트 키를 바꾼 뒤(또는 다른 서버로 주소 변경) 탐색 | 연결 거부 + "SFTP 오류…" — 자동으로 새 키를 신뢰하지 않음 | ⬜ | 중간자 방지 |
 | NAS-12 | Digest 인증만 켠 WebDAV 서버(Apache `AuthType Digest`, lighttpd) 연결 테스트·탐색·업로드 | 첫 요청 401 뒤 자동으로 Digest 로 전환해 성공, 업로드(PUT)도 401 없이 바로 성공 | ⬜ | `DigestAuth` 챌린지 캐시 |
 | NAS-13 | SMB 폼 → "네트워크에서 찾기" | 8초 안에 같은 Wi-Fi 의 NAS 가 "이름 · IP" 칩으로 나타남(NAS 가 mDNS 를 켠 경우), 칩 누르면 주소·표시 이름 채움. 없으면 안내 문구만 | ⬜ | `NsdManager _smb._tcp` |
 | NAS-11 | 모바일 데이터(Wi-Fi 끔)에서 SMB 연결 테스트 | 30초 안에 "SMB 오류: … timed out/unreachable" — 앱이 멈추지 않음 | ⬜ | 외부망 불가는 폼 힌트로 안내 |

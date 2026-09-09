@@ -6,6 +6,7 @@ enum class RemoteAccountKind {
     S3,
     WEBDAV,
     SMB,
+    SFTP,
 }
 
 /**
@@ -32,6 +33,7 @@ data class RemoteAccount(
     val location: String
         get() = when (kind) {
             RemoteAccountKind.SMB -> "smb://$endpoint/${bucketOrRoot.orEmpty()}"
+            RemoteAccountKind.SFTP -> "sftp://$endpoint${bucketOrRoot.orEmpty().ifEmpty { "/" }}"
             RemoteAccountKind.S3 -> listOfNotNull(endpoint, bucketOrRoot).joinToString(" · ")
             else -> endpoint
         }

@@ -20,5 +20,8 @@
 -dontwarn org.slf4j.**
 -dontwarn javax.naming.**
 # Kerberos(SPNEGO)·EL 은 smbj/mbassador 의 선택 경로 — NTLM 만 쓰므로 클래스가 없어도 된다
+# sshj(SFTP): smbj 와 같은 com.hierynomus 네임스페이스라 위 keep 이 함께 적용된다
+-dontwarn net.schmizz.sshj.**
+-dontwarn net.i2p.crypto.**
 -dontwarn org.ietf.jgss.**
 -dontwarn javax.el.**

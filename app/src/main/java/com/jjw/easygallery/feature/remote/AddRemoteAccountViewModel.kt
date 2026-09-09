@@ -10,6 +10,7 @@ import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.remote.fetchServerCertificateSha256
 import com.jjw.easygallery.core.data.remote.isTlsFailure
 import com.jjw.easygallery.core.data.remote.s3.PlainHttpClient
+import com.jjw.easygallery.core.data.remote.sftp.fetchSshHostKeySha256
 import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
 import com.jjw.easygallery.core.data.remote.smb.HostDiscovery
 import com.jjw.easygallery.core.data.remote.smb.NsdHostDiscovery
@@ -67,8 +68,11 @@ data class AddRemoteAccountUiState(
     val canSubmit: Boolean
         get() = displayName.isNotBlank() && endpoint.isNotBlank() && username.isNotBlank() &&
             (secret.isNotBlank() || isEditing) &&
-            (kind == RemoteAccountKind.WEBDAV || bucketOrRoot.isNotBlank())
+            (kind in KINDS_WITHOUT_CONTAINER || bucketOrRoot.isNotBlank())
 }
+
+/** 버킷/공유 이름이 필요 없는 종류(WebDAV 는 경로가 endpoint 에, SFTP 는 루트가 선택) */
+private val KINDS_WITHOUT_CONTAINER = setOf(RemoteAccountKind.WEBDAV, RemoteAccountKind.SFTP)
 
 sealed interface AddRemoteAccountEvent {
     data object Saved : AddRemoteAccountEvent
@@ -161,12 +165,10 @@ class AddRemoteAccountViewModel @Inject constructor(
                 Timber.w(e, "connection test failed")
                 Result.failure(e)
             }
-            // 자체 서명 인증서(WebDAV)면 지문을 읽어 와 사용자에게 신뢰 여부를 묻는다
+            // 자체 서명 인증서(WebDAV)·처음 보는 호스트 키(SFTP)면 지문을 읽어 와 신뢰 여부를 묻는다
             val failure = result.exceptionOrNull()
-            if (state.kind == RemoteAccountKind.WEBDAV && failure?.isTlsFailure() == true && state.certSha256 == null) {
-                val fingerprint = runCatching {
-                    withContext(ioDispatcher) { fetchServerCertificateSha256(httpClient, state.endpoint.trim()) }
-                }.getOrNull()
+            if (failure != null && state.certSha256 == null) {
+                val fingerprint = fetchFingerprintOrNull(state, failure)
                 if (fingerprint != null) {
                     _uiState.update { it.copy(isBusy = false, pendingCertSha256 = fingerprint) }
                     return@launch
@@ -175,6 +177,20 @@ class AddRemoteAccountViewModel @Inject constructor(
             _uiState.update { it.copy(isBusy = false, testResult = result) }
         }
     }
+
+    /** WebDAV 는 TLS 인증서, SFTP 는 SSH 호스트 키. 못 읽으면 null(일반 오류로 표시) */
+    private suspend fun fetchFingerprintOrNull(state: AddRemoteAccountUiState, failure: Throwable): String? =
+        when {
+            state.kind == RemoteAccountKind.WEBDAV && failure.isTlsFailure() -> runCatching {
+                withContext(ioDispatcher) { fetchServerCertificateSha256(httpClient, state.endpoint.trim()) }
+            }.getOrNull()
+
+            state.kind == RemoteAccountKind.SFTP -> runCatching {
+                withContext(ioDispatcher) { fetchSshHostKeySha256(state.endpoint.trim()) }
+            }.getOrNull()
+
+            else -> null
+        }
 
     /** 지문 다이얼로그에서 "신뢰" → 저장하고 바로 다시 테스트 */
     fun trustPendingCertificate() {
@@ -185,14 +201,19 @@ class AddRemoteAccountViewModel @Inject constructor(
 
     fun dismissPendingCertificate() = _uiState.update { it.copy(pendingCertSha256 = null) }
 
-    /** SMB 서버를 mDNS 로 [DISCOVERY_MILLIS] 동안 찾는다. 다시 누르면 처음부터 */
+    /** 같은 Wi-Fi 의 서버를 mDNS 로 [DISCOVERY_MILLIS] 동안 찾는다(SMB `_smb._tcp`, SFTP `_sftp-ssh._tcp`) */
     fun discoverSmbHosts() {
         discoveryJob?.cancel()
+        val serviceType = if (_uiState.value.kind == RemoteAccountKind.SFTP) {
+            NsdHostDiscovery.SFTP_SERVICE
+        } else {
+            NsdHostDiscovery.SMB_SERVICE
+        }
         discoveryJob = viewModelScope.launch {
             _uiState.update { it.copy(isDiscovering = true, discoveredHosts = emptyList()) }
             try {
                 withTimeoutOrNull(DISCOVERY_MILLIS) {
-                    hostDiscovery.discover(NsdHostDiscovery.SMB_SERVICE).collect { hosts ->
+                    hostDiscovery.discover(serviceType).collect { hosts ->
                         _uiState.update { it.copy(discoveredHosts = hosts) }
                     }
                 }
@@ -211,7 +232,7 @@ class AddRemoteAccountViewModel @Inject constructor(
         discoveryJob?.cancel()
         _uiState.update {
             it.copy(
-                endpoint = if (host.port == SMB_DEFAULT_PORT) host.host else "${host.host}:${host.port}",
+                endpoint = if (host.port in DEFAULT_PORTS) host.host else "${host.host}:${host.port}",
                 displayName = it.displayName.ifBlank { host.name },
                 isDiscovering = false,
                 testResult = null,
@@ -246,7 +267,7 @@ class AddRemoteAccountViewModel @Inject constructor(
 
     private companion object {
         const val DISCOVERY_MILLIS = 8_000L
-        const val SMB_DEFAULT_PORT = 445
+        val DEFAULT_PORTS = setOf(445, 22)
     }
 
     private fun AddRemoteAccountUiState.effectiveSecret(): String = secret.ifBlank { storedSecret.orEmpty() }

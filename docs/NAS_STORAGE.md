@@ -1,4 +1,4 @@
-# NAS 연동 — WebDAV(W1) + SMB(W2)
+# NAS 연동 — WebDAV(W1) + SMB(W2) + SFTP(W3)
 
 작성 2026-09-09. 집·사무실 NAS(Synology·QNAP·Nextcloud·일반 리눅스 서버)로 사진을 옮기고 탐색·CRUD 하려는 요구. `MULTI_CLOUD.md` 의 `RemoteStorage` 제공자로 구현한다.
 
@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **WebDAV(HTTPS)** | 표준 HTTP — 기존 OkHttp 로 끝, 외부망(DDNS·QuickConnect 역방향 프록시)에서도 동작, Synology·QNAP·Nextcloud 모두 기본 제공, TLS | 서버에서 WebDAV 서비스를 켜야 함, 재개 업로드 없음(전체 PUT) | **W1 로 먼저** |
 | SMB2/3 | NAS 기본, 로컬 네트워크 빠름, 별도 설정 없음, **오프셋 쓰기로 재개 업로드** | 외부망 불가(VPN 필요), 라이브러리 필요(`smbj`, Apache 2.0, ~1MB, BouncyCastle 의존), 배터리·절전 시 연결 유지 문제 | **W2 구현**(§5) |
-| SFTP | 어디나 있음 | 라이브러리(`sshj`) 무거움, 파일 목록 메타데이터 빈약 | 후보 |
+| SFTP | 리눅스 서버·NAS 어디나 있고 SSH 하나만 열면 됨, 오프셋 쓰기로 재개 가능 | 라이브러리(`sshj`) 필요(BouncyCastle 은 smbj 와 공유), 호스트 키 신뢰 절차 필요 | **W3 구현**(§7) |
 | FTP | 구식·평문 | 제외 | 제외 |
 
 ## 2. WebDAV 제공자 (`WebDavStorage`)
@@ -50,4 +50,16 @@
 - 2026-09-09 W2 SMB 구현: `SmbStorage`/`SmbModule`(`@RemoteKindKey(SMB)`), 계정 추가 폼에 SMB 종류(주소·공유 이름·도메인·사용자·비밀번호), 오프셋 재개 업로드, R8 규칙. `SmbPathsTest`.
 - 2026-09-09 WebDAV Digest 인증(`DigestAuth`/`DigestCalculator`, `DigestAuthTest` RFC 7616 벡터·MockWebServer 흐름).
 - 2026-09-09 SMB 서버 mDNS 검색(`HostDiscovery`/`NsdHostDiscovery`, 폼 `SmbDiscoveryRow`).
-- 남은 것: SFTP.
+- 2026-09-09 W3 SFTP 구현(§7): `SftpStorage`/`SftpPaths`/`PinnedHostKeyVerifier`, 호스트 키 지문 고정, 재개 업로드, mDNS `_sftp-ssh._tcp` 검색. 릴리스 APK 8.01MB → 8.32MB.
+- 남은 것: 키 파일(공개키) 인증, WebDAV 서버 쪽 휴지통.
+
+## 7. SFTP (W3) — `SftpStorage`
+
+- 라이브러리 `com.hierynomus:sshj` 0.40.0(Apache 2.0). 의존성 대부분(bcprov·asn-one·slf4j)을 smbj 와 공유하고, **bcpkix 는 제외**한다 — PEM 개인키를 읽을 때만 필요한데 우리는 비밀번호 인증만 쓰고, bcpkix 가 끌어오는 오래된 bcutil 이 최신 bcprov 와 클래스가 겹쳐 빌드가 깨진다(`app/build.gradle.kts` 의 `exclude`).
+- 계정: `endpoint = "host[:port]"`(기본 22), `bucketOrRoot` = 루트 경로(선택, 비우면 서버 기본 디렉터리), `username`/secret, `certSha256` = **SSH 호스트 키 SHA-256 지문**(WebDAV 인증서 지문과 같은 칸·같은 표시 형식을 재사용).
+- **호스트 키 신뢰**: `known_hosts` 를 쓰지 않는다. 계정에 붙은 지문과 정확히 같은 키만 통과(`PinnedHostKeyVerifier`). 지문이 없으면 연결 테스트가 실패하고, 그때 인증 없이 호스트 키만 읽어(`fetchSshHostKeySha256`) "이 서버를 신뢰할까요?" 다이얼로그를 띄운다. 수락하면 지문을 저장하고 다시 테스트 — WebDAV 자체 서명 인증서와 같은 흐름. 나중에 서버 키가 바뀌면 연결이 거부된다(중간자 경고).
+- `entryId` 는 다른 경로 기반 제공자와 같은 `/` 상대 경로(폴더는 `/` 끝). 서버에 보낼 때만 루트를 붙인다(`SftpPaths.absolute`). 공용 헬퍼는 `core/data/remote/RemotePaths`(SMB 도 같이 쓴다).
+- 목록 `SFTPClient.ls`, 폴더 생성 `mkdir`, 이름 변경·이동 `rename`(같은 서버 안), 삭제는 파일 `rm` / 폴더는 아래부터 훑어 지운다(SFTP 는 재귀 삭제가 없다). 휴지통 없음 → 능력 `DOWNLOAD·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD`.
+- **업로드(재개)**: `RemoteFile.write(offset, ...)` 로 임의 오프셋 쓰기가 되므로 `queryStatus` 가 `stat` 크기를 보고 `Incomplete(size)` 를 돌려주면 그 지점부터 이어 쓴다. 첫 시도만 `TRUNC`. 다운로드는 오프셋 읽기를 감싼 `InputStream` 이고, 닫을 때 SSH 세션까지 정리한다.
+- 연결은 SMB 와 같이 **작업마다 열고 닫는다**. 타임아웃 30초.
+- 검증: 단위 `SftpPathsTest`(루트 결합·기본 포트), `PinnedHostKeyVerifierTest`(지문 일치/불일치·대소문자). 실제 서버가 필요한 부분은 실기기 `NAS-14~17`.

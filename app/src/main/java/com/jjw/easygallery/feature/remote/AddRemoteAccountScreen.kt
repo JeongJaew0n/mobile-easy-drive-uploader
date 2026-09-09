@@ -106,15 +106,19 @@ fun AddRemoteAccountRoute(
     uiState.pendingCertSha256?.let { fingerprint ->
         AlertDialog(
             onDismissRequest = viewModel::dismissPendingCertificate,
-            title = { Text(stringResource(R.string.remote_cert_title)) },
+            title = {
+                val isSftp = uiState.kind == RemoteAccountKind.SFTP
+                Text(stringResource(if (isSftp) R.string.remote_hostkey_title else R.string.remote_cert_title))
+            },
             text = {
-                Text(
-                    stringResource(R.string.remote_cert_message, uiState.endpoint, fingerprint.toFingerprintDisplay()),
-                )
+                val isSftp = uiState.kind == RemoteAccountKind.SFTP
+                val message = if (isSftp) R.string.remote_hostkey_message else R.string.remote_cert_message
+                Text(stringResource(message, uiState.endpoint, fingerprint.toFingerprintDisplay()))
             },
             confirmButton = {
                 TextButton(onClick = viewModel::trustPendingCertificate) {
-                    Text(stringResource(R.string.remote_cert_trust))
+                    val isSftp = uiState.kind == RemoteAccountKind.SFTP
+                    Text(stringResource(if (isSftp) R.string.remote_hostkey_trust else R.string.remote_cert_trust))
                 }
             },
             dismissButton = {
@@ -176,7 +180,9 @@ internal fun AddRemoteAccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             EndpointField(uiState, onUpdate)
-            if (uiState.kind == RemoteAccountKind.SMB) SmbDiscoveryRow(uiState, onDiscover, onPickHost)
+            if (uiState.kind == RemoteAccountKind.SMB || uiState.kind == RemoteAccountKind.SFTP) {
+                SmbDiscoveryRow(uiState, onDiscover, onPickHost)
+            }
             KindSpecificFields(uiState, onUpdate)
             OutlinedTextField(
                 value = uiState.username,
@@ -270,8 +276,9 @@ private fun S3Preset.labelRes(): Int = when (this) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun KindChips(kind: RemoteAccountKind, onKindChange: (RemoteAccountKind) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(
             selected = kind == RemoteAccountKind.S3,
             onClick = { onKindChange(RemoteAccountKind.S3) },
@@ -287,6 +294,11 @@ private fun KindChips(kind: RemoteAccountKind, onKindChange: (RemoteAccountKind)
             onClick = { onKindChange(RemoteAccountKind.SMB) },
             label = { Text(stringResource(R.string.remote_kind_smb)) },
         )
+        FilterChip(
+            selected = kind == RemoteAccountKind.SFTP,
+            onClick = { onKindChange(RemoteAccountKind.SFTP) },
+            label = { Text(stringResource(R.string.remote_kind_sftp)) },
+        )
     }
 }
 
@@ -297,13 +309,17 @@ private fun EndpointField(
     onUpdate: (AddRemoteAccountUiState.() -> AddRemoteAccountUiState) -> Unit,
 ) {
     val isSmb = uiState.kind == RemoteAccountKind.SMB
+    val isSftp = uiState.kind == RemoteAccountKind.SFTP
     OutlinedTextField(
         value = uiState.endpoint,
         onValueChange = { v -> onUpdate { copy(endpoint = v) } },
-        label = { Text(stringResource(if (isSmb) R.string.remote_smb_host else R.string.remote_endpoint)) },
+        label = {
+            Text(stringResource(if (isSmb || isSftp) R.string.remote_smb_host else R.string.remote_endpoint))
+        },
         supportingText = {
             when {
                 isSmb -> Text(stringResource(R.string.remote_smb_hint))
+                isSftp -> Text(stringResource(R.string.remote_sftp_hint))
                 uiState.endpoint.isNotBlank() && !uiState.endpoint.startsWith("https://") ->
                     Text(stringResource(R.string.remote_https_warning), color = MaterialTheme.colorScheme.error)
                 uiState.kind == RemoteAccountKind.WEBDAV -> Text(stringResource(R.string.remote_webdav_hint))
@@ -324,6 +340,9 @@ private fun KindSpecificFields(
         RemoteAccountKind.SMB -> {
             SimpleField(uiState.bucketOrRoot, R.string.remote_smb_share) { v -> onUpdate { copy(bucketOrRoot = v) } }
             SimpleField(uiState.region, R.string.remote_smb_domain) { v -> onUpdate { copy(region = v) } }
+        }
+        RemoteAccountKind.SFTP -> {
+            SimpleField(uiState.bucketOrRoot, R.string.remote_sftp_root) { v -> onUpdate { copy(bucketOrRoot = v) } }
         }
         RemoteAccountKind.S3 -> {
             SimpleField(uiState.region, R.string.remote_region) { v -> onUpdate { copy(region = v) } }

@@ -132,7 +132,7 @@ internal fun RemoteAccountRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val icon = when (account.kind) {
-                RemoteAccountKind.WEBDAV, RemoteAccountKind.SMB -> R.drawable.ic_folder
+                RemoteAccountKind.WEBDAV, RemoteAccountKind.SMB, RemoteAccountKind.SFTP -> R.drawable.ic_folder
                 RemoteAccountKind.GOOGLE_DRIVE -> R.drawable.ic_insert_drive_file
                 else -> R.drawable.ic_cloud_upload
             }
