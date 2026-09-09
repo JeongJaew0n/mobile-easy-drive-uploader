@@ -48,7 +48,11 @@ abstract class DriveModule {
             .authenticator(tokenAuthenticator)
             .apply {
                 if (BuildConfig.DEBUG) {
-                    addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.HEADERS))
+                    // 헤더를 찍되 액세스 토큰은 가린다 — logcat 에 그대로 남으면 그 자체가 자격 증명이다
+                    val logging = HttpLoggingInterceptor()
+                        .setLevel(HttpLoggingInterceptor.Level.HEADERS)
+                        .apply { redactHeader("Authorization") }
+                    addInterceptor(logging)
                 }
             }
             .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
