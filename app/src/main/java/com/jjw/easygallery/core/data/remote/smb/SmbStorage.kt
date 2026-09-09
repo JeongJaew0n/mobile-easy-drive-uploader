@@ -2,11 +2,13 @@ package com.jjw.easygallery.core.data.remote.smb
 
 import android.content.Context
 import com.hierynomus.msdtyp.AccessMask
+import com.hierynomus.mserref.NtStatus
 import com.hierynomus.msfscc.FileAttributes
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation
 import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2CreateOptions
 import com.hierynomus.mssmb2.SMB2ShareAccess
+import com.hierynomus.mssmb2.SMBApiException
 import com.hierynomus.protocol.commons.EnumWithValue.EnumUtils
 import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
@@ -134,7 +136,7 @@ class SmbStorage(
             }
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             runCatching { connection.close() }
-            throw RemoteStorageException("SMB 오류: ${e.message ?: e.javaClass.simpleName}", cause = e)
+            throw e.toStorageException()
         }
     }
 
@@ -178,8 +180,35 @@ class SmbStorage(
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             // smbj 는 SMBApiException(상태 코드)·SocketException 등 다양한 예외를 던진다 → 하나로 감싼다
-            throw RemoteStorageException("SMB 오류: ${e.message ?: e.javaClass.simpleName}", cause = e)
+            throw e.toStorageException()
         }
+    }
+
+    /**
+     * 다시 해도 결과가 같은 오류(자격 증명·공유 이름·권한)는 4xx 로 표시해 업로드 워커가 **즉시** 포기하게 한다.
+     * 나머지(연결 끊김·타임아웃)는 코드 없이 감싸 재시도 대상으로 남긴다.
+     */
+    private fun Exception.toStorageException(): RemoteStorageException {
+        val message = "SMB 오류: ${message ?: javaClass.simpleName}"
+        val httpCode = (this as? SMBApiException)?.status?.let { status ->
+            when (status) {
+                NtStatus.STATUS_LOGON_FAILURE,
+                NtStatus.STATUS_ACCOUNT_DISABLED,
+                NtStatus.STATUS_LOGON_TYPE_NOT_GRANTED,
+                NtStatus.STATUS_PASSWORD_EXPIRED,
+                NtStatus.STATUS_ACCESS_DENIED,
+                -> HTTP_UNAUTHORIZED
+
+                NtStatus.STATUS_BAD_NETWORK_NAME,
+                NtStatus.STATUS_BAD_NETWORK_PATH,
+                NtStatus.STATUS_OBJECT_NAME_NOT_FOUND,
+                NtStatus.STATUS_OBJECT_PATH_NOT_FOUND,
+                -> HTTP_NOT_FOUND
+
+                else -> null
+            }
+        }
+        return RemoteStorageException(message, httpCode = httpCode, cause = this)
     }
 
     private fun FileIdBothDirectoryInformation.isDirectory(): Boolean =
@@ -292,6 +321,8 @@ class SmbStorage(
 
     private companion object {
         const val TIMEOUT_SECONDS = 30L
+        const val HTTP_UNAUTHORIZED = 401
+        const val HTTP_NOT_FOUND = 404
         val SHARE_ALL: EnumSet<SMB2ShareAccess> =
             EnumSet.of(SMB2ShareAccess.FILE_SHARE_READ, SMB2ShareAccess.FILE_SHARE_WRITE)
         val RENAME_ACCESS: EnumSet<AccessMask> = EnumSet.of(AccessMask.DELETE, AccessMask.GENERIC_READ)

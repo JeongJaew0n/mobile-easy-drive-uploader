@@ -62,4 +62,5 @@
 - 목록 `SFTPClient.ls`, 폴더 생성 `mkdir`, 이름 변경·이동 `rename`(같은 서버 안), 삭제는 파일 `rm` / 폴더는 아래부터 훑어 지운다(SFTP 는 재귀 삭제가 없다). 휴지통 없음 → 능력 `DOWNLOAD·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD`.
 - **업로드(재개)**: `RemoteFile.write(offset, ...)` 로 임의 오프셋 쓰기가 되므로 `queryStatus` 가 `stat` 크기를 보고 `Incomplete(size)` 를 돌려주면 그 지점부터 이어 쓴다. 첫 시도만 `TRUNC`. 다운로드는 오프셋 읽기를 감싼 `InputStream` 이고, 닫을 때 SSH 세션까지 정리한다.
 - 연결은 SMB 와 같이 **작업마다 열고 닫는다**. 타임아웃 30초.
+- **오류 분류**: 인증 실패(`UserAuthException`)·전송 계층 오류(호스트 키 불일치 등 `TransportException`)는 4xx 로 표시해 업로드 워커가 즉시 포기한다. 연결 끊김·타임아웃만 재시도(최대 5회). SMB 도 같은 방식으로 `NtStatus`(LOGON_FAILURE·ACCESS_DENIED → 401, BAD_NETWORK_NAME·경로 없음 → 404)를 매핑한다.
 - 검증: 단위 `SftpPathsTest`(루트 결합·기본 포트), `PinnedHostKeyVerifierTest`(지문 일치/불일치·대소문자). 실제 서버가 필요한 부분은 실기기 `NAS-14~17`.

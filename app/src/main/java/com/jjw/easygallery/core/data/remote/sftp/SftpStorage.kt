@@ -25,6 +25,8 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.SFTPClient
+import net.schmizz.sshj.transport.TransportException
+import net.schmizz.sshj.userauth.UserAuthException
 import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -157,8 +159,18 @@ class SftpStorage(
         return ssh
     }
 
-    private fun asStorageException(e: Exception): RemoteStorageException =
-        RemoteStorageException("SFTP 오류: ${e.message ?: e.javaClass.simpleName}", cause = e)
+    /**
+     * 인증 실패·권한 오류는 다시 해도 같으므로 4xx 로 표시해 업로드 워커가 즉시 포기하게 한다.
+     * 호스트 키 불일치도 여기 포함된다(사용자가 다시 신뢰해야 한다).
+     */
+    private fun asStorageException(e: Exception): RemoteStorageException {
+        val permanent = e is UserAuthException || e is TransportException
+        return RemoteStorageException(
+            "SFTP 오류: ${e.message ?: e.javaClass.simpleName}",
+            httpCode = if (permanent) HTTP_UNAUTHORIZED else null,
+            cause = e,
+        )
+    }
 
     private fun RemoteResourceInfo.toEntry(parentId: String): RemoteEntry {
         val folder = isDirectory
@@ -262,6 +274,7 @@ class SftpStorage(
     private companion object {
         const val DEFAULT_PORT = 22
         const val TIMEOUT_MILLIS = 30_000
+        const val HTTP_UNAUTHORIZED = 401
         const val MILLIS_PER_SECOND = 1_000L
         const val CHUNK_BYTES = 64 * 1024
 
