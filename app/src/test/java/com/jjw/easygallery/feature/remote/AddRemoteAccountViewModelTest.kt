@@ -138,6 +138,11 @@ class AddRemoteAccountViewModelTest {
         assertFalse(vm.uiState.value.canSubmit) // SMB 는 공유 이름 필수
         vm.update { copy(bucketOrRoot = "photo") }
         assertTrue(vm.uiState.value.canSubmit)
+
+        vm.setKind(RemoteAccountKind.SFTP)
+        assertEquals("", vm.uiState.value.bucketOrRoot) // 종류를 바꾸면 컨테이너 칸을 비운다
+        vm.update { copy(endpoint = "nas.local:2222") }
+        assertTrue(vm.uiState.value.canSubmit) // SFTP 루트 경로는 선택
     }
 
     @Test
