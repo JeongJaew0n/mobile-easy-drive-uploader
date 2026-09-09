@@ -249,6 +249,7 @@ class SftpStorage(
                     }
                 }
                 Timber.d("uploaded %s -> sftp://%s/%s", source.displayName, account.endpoint, sessionUri)
+                send(UploadEvent.Progress(length, length)) // trySend 는 버퍼가 차면 버려진다 — 마지막은 확실히
                 send(UploadEvent.Completed(sessionUri))
             }.flowOn(ioDispatcher)
 

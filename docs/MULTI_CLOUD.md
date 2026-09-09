@@ -130,4 +130,5 @@ data class RemoteAccountEntity(
 - 2026-09-09 갤러리 선택 상단바 ⋮ "다른 저장소로 업로드"(저장소가 둘 이상일 때) — 이번 배치만 고른 계정으로(`EnqueueUploadsUseCase.toAccount`; 기본 대상과 같으면 설정 폴더, 아니면 루트), 설정의 기본 대상은 바뀌지 않는다. 기본 대상에 ✓ 표시.
 - 2026-09-09 계정 **수정**: 설정 행 ⋮ "수정" → 같은 폼(`AddRemoteAccountKey(accountId)`)이 저장된 값으로 채워진다(종류는 잠금, 비밀은 비움 — 비워 두면 유지). 저장 시 `RemoteAccountRepository.update` + `StorageRegistry.evict` 로 바뀐 자격 증명이 즉시 반영된다.
 - 2026-09-09 SFTP 제공자 추가(`NAS_STORAGE.md` §7) — 다섯 번째 `RemoteAccountKind`.
+- 2026-09-09 2차 감사 반영: `StorageRegistry` 캐시를 `ConcurrentHashMap` + `Mutex` 로(메인·워커 스레드가 함께 만져 인스턴스가 중복 생성될 수 있었다), S3 목록 페이지 200 → 1000 이고 같은 continuation token 이 반복되면 중단(무한 루프 방지), 경로 규칙은 이름의 공백을 다듬지 않는다(서버가 허용하는 `" a.jpg"` 가 "없는 파일" 이 되던 문제), 주소 파싱이 IPv6 리터럴(`[fe80::1]:445`)을 인식한다.
 - 남은 것: Dropbox/OneDrive(각각 개발자 앱 등록이 필요해 사용자 조치 선행).

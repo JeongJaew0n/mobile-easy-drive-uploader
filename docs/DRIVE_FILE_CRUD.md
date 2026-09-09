@@ -86,8 +86,9 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 
 - `Capability.DOWNLOAD` + `RemoteStorage.openDownload(entryId): InputStream` — Drive `GET files/{id}?alt=media`(`@Streaming`), S3 `GET` 오브젝트(SigV4), WebDAV `GET`, SMB 는 연결을 잡은 채 `File.inputStream` 을 돌려주고 스트림을 닫을 때 파일·공유·세션·연결을 함께 닫는다. 네 제공자 모두 지원.
 - 행 ⋮ "기기에 저장"(파일만), 다중 선택 상단바 ⬇(폴더는 건너뜀). 파일마다 `DownloadWorker`(WorkManager, 유니크 `download-<entryId>` KEEP, 네트워크 필요, 지수 백오프 15s, 3회) — 큐(Room)는 두지 않았다: 업로드처럼 수천 장을 한 번에 내리는 흐름이 아니고 WorkManager 가 재시도·순서를 맡는다.
+- 파일 이름의 `/`·제어 문자는 `_` 로 바꾸고(비면 대체 이름), 제공자가 `application/octet-stream` 을 주면 확장자로 다시 찾는다 — 그러지 않으면 HEIC·DNG 가 Download 폴더로 들어가 갤러리에 보이지 않는다.
 - 저장은 `MediaStoreSaver`: `IS_PENDING=1` 로 삽입 → 스트림 복사 → `IS_PENDING=0`. 이미지 `Pictures/Easy Gallery`, 영상 `Movies/Easy Gallery`, 그 외 `Download/Easy Gallery`. 실패하면 만든 항목을 지운다. 갤러리(MediaStore 관찰)에 자동으로 나타난다.
 - 알림은 업로드 채널을 공유(포그라운드 ID 1004, 결과 1005). 진행률은 워커가 `StateFlow` 로 받아 별도 코루틴에서 `setForeground` — 저장기 콜백은 블로킹 I/O 스레드라 suspend 를 못 부른다.
-- 재시도 판단: `RemoteStorageException` 은 5xx/코드 없음이면 재시도, 4xx 는 즉시 실패. `IOException` 은 재시도.
+- 재시도 판단: `RemoteStorageException` 은 5xx/코드 없음이면 재시도, 4xx 는 즉시 실패. `IOException` 은 재시도. 미지원 저장소(`UnsupportedOperationException`)는 재시도하지 않는다. Drive 는 Retrofit 이 비2xx 를 `HttpException` 으로 던지므로 저장소에서 상태 코드를 살려 감싼다(그러지 않으면 5xx·429 가 재시도 없이 영구 실패했다).
 - **버그 수정(2026-09-09)**: 워커가 신속 작업(`setExpedited`)인데 `getForegroundInfo` 를 구현하지 않아, API 30 이하(minSdk 29)에서 WorkManager 가 시작 직전에 워커를 실패시켰다 — 구현을 추가했다. 알림 ID 도 파일 키로 흩었다(고정 ID 를 쓰면 동시에 여러 개를 받을 때 한 워커가 끝나며 다른 워커의 진행 알림까지 지운다).
 - 테스트: `DriveRestRepositoryTest` `alt=media`, `DriveBrowserViewModelTest` 선택 다운로드(폴더 제외·선택 해제·이벤트). MediaStore 저장은 실기기 DRV-23.

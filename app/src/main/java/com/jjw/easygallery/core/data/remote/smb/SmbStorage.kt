@@ -236,7 +236,9 @@ class SmbStorage(
         override suspend fun startSession(source: UploadSource, folderId: String, length: Long): String =
             withShare { share ->
                 val name = RemoteNames.uniqueBlocking(source.displayName) { candidate ->
-                    share.fileExists(SmbPaths.toSmb(SmbPaths.child(folderId, candidate, isFolder = false)))
+                    val path = SmbPaths.toSmb(SmbPaths.child(folderId, candidate, isFolder = false))
+                    // 같은 이름의 폴더가 있으면 그 경로로는 파일을 못 만든다 — 둘 다 검사한다
+                    share.fileExists(path) || share.folderExists(path)
                 }
                 SmbPaths.child(folderId, name, isFolder = false)
             }
@@ -290,6 +292,7 @@ class SmbStorage(
                     }
                 }
                 Timber.d("uploaded %s -> smb://%s/%s/%s", source.displayName, account.endpoint, shareName, sessionUri)
+                send(UploadEvent.Progress(length, length)) // trySend 는 버퍼가 차면 버려진다 — 마지막은 확실히
                 send(UploadEvent.Completed(sessionUri))
             }.flowOn(ioDispatcher)
     }

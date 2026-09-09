@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.io.InputStream
@@ -21,10 +22,12 @@ class MediaStoreSaver @Inject constructor(@param:ApplicationContext private val 
     /** [onProgress] 는 복사한 바이트 수. 실패하면 만들어 둔 항목을 지우고 다시 던진다 */
     fun save(displayName: String, mimeType: String, input: InputStream, onProgress: (Long) -> Unit = {}): Uri {
         val resolver = context.contentResolver
-        val (collection, relativePath) = target(mimeType)
+        val safeName = sanitize(displayName)
+        val resolved = resolveMimeType(mimeType, safeName)
+        val (collection, relativePath) = target(resolved)
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
+            put(MediaStore.MediaColumns.MIME_TYPE, resolved)
             put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
@@ -51,6 +54,23 @@ class MediaStoreSaver @Inject constructor(@param:ApplicationContext private val 
         }
     }
 
+    /** 원격 이름에는 `/` 나 제어 문자가 들어올 수 있다. 비면 insert 자체가 실패하므로 대체 이름을 준다 */
+    private fun sanitize(displayName: String): String =
+        displayName.map { if (it == '/' || it == '\\' || it.isISOControl()) '_' else it }
+            .joinToString("")
+            .trim()
+            .ifBlank { FALLBACK_NAME }
+
+    /**
+     * 제공자가 확장자를 모르면 `application/octet-stream` 을 준다. 그대로 두면 HEIC·DNG 사진이
+     * Download 폴더로 들어가 갤러리에 뜨지 않으므로 확장자로 한 번 더 찾아본다.
+     */
+    private fun resolveMimeType(mimeType: String, name: String): String {
+        if (mimeType != OCTET_STREAM) return mimeType
+        val extension = name.substringAfterLast('.', "").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
+    }
+
     private fun target(mimeType: String): Pair<Uri, String> = when {
         mimeType.startsWith("image/") ->
             MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "Pictures/$FOLDER"
@@ -61,6 +81,8 @@ class MediaStoreSaver @Inject constructor(@param:ApplicationContext private val 
 
     private companion object {
         const val FOLDER = "Easy Gallery"
+        const val FALLBACK_NAME = "download"
+        const val OCTET_STREAM = "application/octet-stream"
         const val BUFFER_SIZE = 256 * 1024
     }
 }

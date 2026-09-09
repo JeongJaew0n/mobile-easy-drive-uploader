@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.StorageRegistry
+import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.upload.work.UploadNotifications
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -78,6 +79,9 @@ class DownloadWorker @AssistedInject constructor(
             Result.success()
         } catch (e: CancellationException) {
             throw e
+        } catch (e: UnsupportedOperationException) {
+            // 이 저장소가 다운로드를 지원하지 않음 — 다시 해도 같다
+            fail(entryId, name, e, retry = false)
         } catch (e: RemoteStorageException) {
             fail(entryId, name, e, retry = e.httpCode == null || e.httpCode >= HTTP_SERVER_ERROR)
         } catch (e: IOException) {

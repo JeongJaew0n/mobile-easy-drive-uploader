@@ -1,9 +1,11 @@
 package com.jjw.easygallery.core.data.drive
 
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
+import retrofit2.HttpException
 import java.io.InputStream
 import java.time.Instant
 import java.time.format.DateTimeParseException
@@ -34,7 +36,15 @@ class DriveRestRepository @Inject constructor(
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
 
-    override suspend fun download(fileId: String): InputStream = api.download(fileId).byteStream()
+    /**
+     * Retrofit 은 비2xx 를 [HttpException](RuntimeException)으로 던진다. 그대로 두면 워커의
+     * `IOException` 분기를 비켜가 5xx·429 가 재시도 없이 영구 실패한다 → 상태 코드를 살려 감싼다.
+     */
+    override suspend fun download(fileId: String): InputStream = try {
+        api.download(fileId).byteStream()
+    } catch (e: HttpException) {
+        throw RemoteStorageException("다운로드 실패 (${e.code()})", httpCode = e.code(), cause = e)
+    }
 
     override suspend fun search(query: String, pageToken: String?): DrivePage {
         val page = api.listFiles(

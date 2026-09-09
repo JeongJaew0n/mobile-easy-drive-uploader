@@ -188,7 +188,10 @@ class S3Storage(
                 .build()
             val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
             result.objects.filter { it.key != prefix }.forEach { keys += it.key }
-            token = result.nextContinuationToken
+            val next = result.nextContinuationToken
+            // 같은 토큰을 계속 돌려주는 서버를 만나면 리스트가 무한히 자란다
+            if (next != null && next == token) break
+            token = next
         } while (token != null)
         return keys
     }
@@ -402,7 +405,7 @@ class S3Storage(
 
     private companion object {
         const val DEFAULT_REGION = "us-east-1"
-        const val PAGE_SIZE = 200
+        const val PAGE_SIZE = 1000
         const val DEFAULT_PART_SIZE = 8L * 1024 * 1024
         const val MPU_PREFIX = "mpu|"
         const val HTTP_NOT_FOUND = 404
