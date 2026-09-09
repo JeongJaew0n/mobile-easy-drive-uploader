@@ -13,7 +13,6 @@ import com.hierynomus.protocol.commons.EnumWithValue.EnumUtils
 import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
-import com.hierynomus.smbj.io.ByteChunkProvider
 import com.hierynomus.smbj.share.DiskShare
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
@@ -280,43 +279,6 @@ class SmbStorage(
                 Timber.d("uploaded %s -> smb://%s/%s/%s", source.displayName, account.endpoint, shareName, sessionUri)
                 send(UploadEvent.Completed(sessionUri))
             }.flowOn(ioDispatcher)
-    }
-
-    /** content:// 스트림을 [startOffset] 부터 [total] 까지 SMB 쓰기 청크로 넘긴다 */
-    private class ContentChunkProvider(
-        private val input: InputStream,
-        startOffset: Long,
-        private val total: Long,
-        private val onProgress: (Long) -> Unit,
-    ) : ByteChunkProvider() {
-        init {
-            offset = startOffset
-            var skipped = 0L
-            while (skipped < startOffset) {
-                val n = input.skip(startOffset - skipped)
-                if (n <= 0) break
-                skipped += n
-            }
-        }
-
-        override fun prepareWrite(maxBytesToPrepare: Int) = Unit
-
-        override fun isAvailable(): Boolean = offset < total
-
-        override fun bytesLeft(): Int = (total - offset).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-
-        override fun getChunk(chunk: ByteArray): Int {
-            val want = minOf(chunk.size.toLong(), total - offset).toInt()
-            if (want <= 0) return -1
-            var read = 0
-            while (read < want) {
-                val n = input.read(chunk, read, want - read)
-                if (n < 0) break
-                read += n
-            }
-            onProgress(offset + read)
-            return if (read == 0) -1 else read
-        }
     }
 
     private companion object {

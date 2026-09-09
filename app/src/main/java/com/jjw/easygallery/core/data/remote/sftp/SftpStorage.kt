@@ -10,6 +10,7 @@ import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
+import com.jjw.easygallery.core.data.remote.smb.skipExactly
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
@@ -224,7 +225,9 @@ class SftpStorage(
                             val buffer = ByteArray(CHUNK_BYTES)
                             var position = offset
                             while (position < length) {
-                                val read = stream.read(buffer)
+                                // 선언된 길이를 넘겨 쓰지 않는다 — 넘치면 재개 판정(stat 크기)이 어긋난다
+                                val want = minOf(buffer.size.toLong(), length - position).toInt()
+                                val read = stream.read(buffer, 0, want)
                                 if (read <= 0) break
                                 file.write(position, buffer, 0, read)
                                 position += read
@@ -280,15 +283,5 @@ class SftpStorage(
 
         fun guessMimeType(name: String): String =
             URLConnection.guessContentTypeFromName(name) ?: "application/octet-stream"
-    }
-}
-
-/** [offset] 바이트를 확실히 건너뛴다(스트림이 부분 skip 을 돌려줄 수 있다) */
-private fun InputStream.skipExactly(offset: Long) {
-    var skipped = 0L
-    while (skipped < offset) {
-        val n = skip(offset - skipped)
-        if (n <= 0) break
-        skipped += n
     }
 }
