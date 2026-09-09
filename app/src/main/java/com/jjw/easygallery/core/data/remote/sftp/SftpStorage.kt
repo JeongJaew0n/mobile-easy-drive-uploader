@@ -14,6 +14,7 @@ import com.jjw.easygallery.core.data.remote.smb.skipExactly
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
+import com.jjw.easygallery.core.data.upload.openOriginalStream
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
@@ -151,6 +152,7 @@ class SftpStorage(
 
     /** 연결 + 호스트 키 확인 + 비밀번호 인증 */
     private fun connect(): SSHClient {
+        SshSecurity.ensureFullBouncyCastle()
         val (host, port) = RemotePaths.hostPort(account.endpoint, DEFAULT_PORT)
         val ssh = SSHClient()
         ssh.connectTimeout = TIMEOUT_MILLIS
@@ -233,7 +235,7 @@ class SftpStorage(
                     val modes = EnumSet.of(OpenMode.WRITE)
                     if (offset == 0L) modes.addAll(listOf(OpenMode.CREAT, OpenMode.TRUNC))
                     val written = sftp.open(absolute(sessionUri), modes).use { file ->
-                        val input = context.contentResolver.openInputStream(source.uri)
+                        val input = context.openOriginalStream(source.uri)
                             ?: throw FileNotFoundException(source.uri.toString())
                         input.use { stream ->
                             stream.skipExactly(offset)

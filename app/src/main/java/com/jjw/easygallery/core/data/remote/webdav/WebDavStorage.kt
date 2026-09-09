@@ -211,7 +211,7 @@ class WebDavStorage(
             channelFlow {
                 send(UploadEvent.Progress(0, length))
                 val body = ContentUriRequestBody(
-                    resolver = context.contentResolver,
+                    context = context,
                     uri = source.uri,
                     mediaType = source.mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
                     offset = 0,

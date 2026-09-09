@@ -39,6 +39,7 @@ coil = "3.6.2"
 kizitonwoseCalendar = "2.10.1"
 smbj = "0.15.0"
 sshj = "0.40.0"
+bouncycastle = "1.85.2"
 retrofit = "3.0.0"
 okhttp = "5.5.0"
 timber = "5.0.1"
@@ -114,6 +115,7 @@ coil-video = { module = "io.coil-kt.coil3:coil-video", version.ref = "coil" }
 kizitonwose-calendar-compose = { module = "com.kizitonwose.calendar:compose", version.ref = "kizitonwoseCalendar" }
 smbj = { module = "com.hierynomus:smbj", version.ref = "smbj" }
 sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 
 # Auth (Credential Manager + Google Identity + OAuth AuthorizationClient)
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidxCredentials" }

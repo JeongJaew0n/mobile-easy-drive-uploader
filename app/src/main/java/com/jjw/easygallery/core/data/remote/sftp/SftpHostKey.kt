@@ -39,6 +39,7 @@ class PinnedHostKeyVerifier(private val expectedSha256: String?) : HostKeyVerifi
  * 계정 추가 화면이 "이 서버를 신뢰할까요?" 를 묻는 데 쓴다.
  */
 fun fetchSshHostKeySha256(endpoint: String): String {
+    SshSecurity.ensureFullBouncyCastle()
     val (host, port) = RemotePaths.hostPort(endpoint, SSH_DEFAULT_PORT)
     val verifier = PinnedHostKeyVerifier(expectedSha256 = null)
     SSHClient().use { ssh ->

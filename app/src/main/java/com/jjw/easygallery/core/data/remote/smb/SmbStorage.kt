@@ -25,6 +25,7 @@ import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
+import com.jjw.easygallery.core.data.upload.openOriginalStream
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
@@ -282,7 +283,7 @@ class SmbStorage(
                         EnumSet.noneOf(SMB2CreateOptions::class.java),
                     )
                     file.use { remote ->
-                        val input = context.contentResolver.openInputStream(source.uri)
+                        val input = context.openOriginalStream(source.uri)
                             ?: throw FileNotFoundException(source.uri.toString())
                         input.use { stream ->
                             val provider = ContentChunkProvider(stream, offset) { sent ->

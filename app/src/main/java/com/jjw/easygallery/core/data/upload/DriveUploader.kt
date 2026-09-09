@@ -131,7 +131,7 @@ class DriveUploader @Inject constructor(
             val mimeType = source.mimeType.ifBlank { DEFAULT_MIME_TYPE }
             send(UploadEvent.Progress(offset, length))
             val body = ContentUriRequestBody(
-                resolver = context.contentResolver,
+                context = context,
                 uri = source.uri,
                 mediaType = mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
                 offset = offset,

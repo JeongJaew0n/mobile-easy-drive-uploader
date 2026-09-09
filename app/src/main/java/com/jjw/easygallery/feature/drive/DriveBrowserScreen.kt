@@ -7,10 +7,15 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -74,7 +79,10 @@ fun DriveBrowserRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     val context = LocalContext.current
-    val rootName = stringResource(R.string.drive_root_name)
+    // Drive 는 "내 드라이브", 다른 저장소는 최상위 폴더라는 뜻의 중립적인 이름
+    val driveRootName = stringResource(R.string.drive_root_name)
+    val storageRootName = stringResource(R.string.storage_root_name)
+    val rootName = if (key.accountId == null) driveRootName else storageRootName
 
     LaunchedEffect(key) { viewModel.load(key.accountId, key.folderId, key.folderName, rootName) }
     LaunchedEffect(Unit) {
@@ -331,6 +339,8 @@ private fun UploadFolderButton(uiState: DriveBrowserUiState, onClick: () -> Unit
         onClick = onClick,
         enabled = uiState.current != null && !uiState.isLoading,
         modifier = Modifier
+            // 인셋이 없으면 버튼 아래 절반이 시스템 내비게이션 바에 가려 눌리지 않는다(실기기 확인)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .fillMaxWidth()
             .padding(16.dp),
     ) {

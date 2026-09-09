@@ -1,6 +1,6 @@
 package com.jjw.easygallery.core.data.upload
 
-import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
 import okhttp3.MediaType
 import okhttp3.RequestBody
@@ -14,7 +14,7 @@ import java.io.FileNotFoundException
  * 재전송 불가(isOneShot) — 실패 시 상위에서 세션 상태를 조회해 다시 이어 올린다.
  */
 class ContentUriRequestBody(
-    private val resolver: ContentResolver,
+    private val context: Context,
     private val uri: Uri,
     private val mediaType: MediaType,
     private val offset: Long,
@@ -29,7 +29,7 @@ class ContentUriRequestBody(
     override fun isOneShot(): Boolean = true
 
     override fun writeTo(sink: BufferedSink) {
-        val input = resolver.openInputStream(uri) ?: throw FileNotFoundException(uri.toString())
+        val input = context.openOriginalStream(uri) ?: throw FileNotFoundException(uri.toString())
         input.source().buffer().use { source ->
             if (offset > 0) source.skip(offset)
             var sent = offset

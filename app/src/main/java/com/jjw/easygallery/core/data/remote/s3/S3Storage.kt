@@ -377,7 +377,7 @@ class S3Storage(
             total: Long,
             emit: (UploadEvent) -> Unit,
         ) = ContentUriRequestBody(
-            resolver = context.contentResolver,
+            context = context,
             uri = source.uri,
             mediaType = source.mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
             offset = start,

@@ -5,7 +5,7 @@
     <string name="gallery_title">갤러리</string>
     <string name="gallery_title_favorites">즐겨찾기</string>
     <string name="gallery_title_not_backed_up">백업 안 됨</string>
-    <string name="gallery_media_count_with_backup">%1$d개 · Drive 백업 %2$d개</string>
+    <string name="gallery_media_count_with_backup">%1$d개 · 백업 %2$d개</string>
     <string name="gallery_uploaded_badge">Drive에 백업됨</string>
     <string name="gallery_not_backed_up_empty">모든 항목이 Drive에 백업되어 있습니다</string>
     <string name="gallery_menu_not_backed_up_only">백업 안 된 항목만 보기</string>
@@ -190,6 +190,7 @@
     <!-- Google Drive 탐색 -->
     <string name="drive_title">Google Drive</string>
     <string name="drive_root_name">내 드라이브</string>
+    <string name="storage_root_name">최상위 폴더</string>
     <string name="drive_folder_empty">비어 있는 폴더입니다. 오른쪽 위에서 새 폴더를 만들 수 있습니다.</string>
     <string name="drive_use_as_upload_folder">이 폴더를 업로드 폴더로 지정</string>
     <string name="drive_folder_created">%1$s 폴더를 만들었습니다</string>
@@ -201,7 +202,7 @@
 
     <!-- 원격 저장소(다중 클라우드·NAS) -->
     <string name="remote_section">연결된 저장소</string>
-    <string name="remote_section_description">Google Drive 외에 S3 호환 클라우드(Naver Cloud·KT Cloud·AWS·MinIO)와 NAS(WebDAV)를 연결할 수 있습니다.</string>
+    <string name="remote_section_description">Google Drive 외에 S3 호환 클라우드(Naver Cloud·KT Cloud·AWS·MinIO)와 NAS(WebDAV·SMB·SFTP)를 연결할 수 있습니다.</string>
     <string name="remote_add">저장소 추가</string>
     <string name="remote_kind_google">Google Drive</string>
     <string name="remote_kind_s3">S3 호환 (Naver Cloud · KT Cloud · AWS · MinIO)</string>
@@ -215,7 +216,7 @@
     <string name="remote_smb_share">공유 폴더 이름</string>
     <string name="remote_smb_domain">도메인/작업 그룹 (선택)</string>
     <string name="remote_smb_discover">네트워크에서 찾기</string>
-    <string name="remote_smb_discovering">같은 Wi-Fi의 SMB 서버를 찾는 중… (최대 8초)</string>
+    <string name="remote_smb_discovering">같은 Wi-Fi의 서버를 찾는 중… (최대 8초)</string>
     <string name="remote_preset">서비스</string>
     <string name="remote_preset_naver">Naver Cloud Object Storage</string>
     <string name="remote_preset_kt">KT Cloud Object Storage</string>

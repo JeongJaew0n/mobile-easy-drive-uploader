@@ -153,6 +153,8 @@ dependencies {
     implementation(libs.sshj) {
         exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
     }
+    // smbj·sshj 가 런타임으로 끌어오지만, 안드로이드의 축소판 "BC" 를 교체하려면 컴파일 시점에도 필요하다
+    implementation(libs.bouncycastle.prov)
 
     // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)
