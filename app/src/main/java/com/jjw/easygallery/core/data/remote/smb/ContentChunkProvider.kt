@@ -1,59 +1,36 @@
 package com.jjw.easygallery.core.data.remote.smb
 
-import com.hierynomus.smbj.io.ByteChunkProvider
+import com.hierynomus.smbj.io.InputStreamByteChunkProvider
 import java.io.InputStream
 
 /**
- * content:// 스트림을 SMB 쓰기 청크로 넘긴다. [startOffset] 부터 [total] 까지만 보낸다(재개 업로드).
+ * content:// 스트림을 SMB 쓰기 청크로 넘긴다. 재개 업로드를 위해 [startOffset] 부터 보낸다.
  *
- * smbj 의 `ByteChunkProvider.writeChunk` 는 [getChunk] 가 돌려준 수를 그대로 `offset` 에 더한다.
- * **음수를 돌려주면 offset 이 뒤로 가 무한 루프가 된다** — 원본이 예상보다 짧아도 0 을 돌려주고
- * [isAvailable] 로 끝났음을 알린다.
+ * smbj 의 [InputStreamByteChunkProvider] 를 그대로 쓴다 — `SMB2WriteRequest` 는 `bytesLeft()` 로
+ * **패킷 Length 를 먼저 써 넣은 뒤** 본문을 채우므로, 직접 구현하면 EOF 에서 선언 길이와 본문이
+ * 어긋난 WRITE 가 나간다. 상위 클래스가 `prepareWrite` 로 미리 읽어 두어 그 둘을 일치시킨다.
  */
 internal class ContentChunkProvider(
-    private val input: InputStream,
+    input: InputStream,
     startOffset: Long,
-    private val total: Long,
     private val onProgress: (Long) -> Unit = {},
-) : ByteChunkProvider() {
-
-    /** 원본이 total 보다 짧아 더 읽을 게 없을 때 */
-    private var exhausted = false
+) : InputStreamByteChunkProvider(input.also { it.skipExactly(startOffset) }) {
 
     init {
         offset = startOffset
-        input.skipExactly(startOffset)
     }
 
-    override fun prepareWrite(maxBytesToPrepare: Int) = Unit
+    override fun getChunk(chunk: ByteArray): Int {
+        val size = super.getChunk(chunk)
+        onProgress(offset + size)
+        return size
+    }
 
-    override fun isAvailable(): Boolean = !exhausted && offset < total
-
-    override fun bytesLeft(): Int =
-        if (exhausted) 0 else (total - offset).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-
-    /** smbj 의 `writeChunk` 가 하는 일(청크를 받아 offset 전진)을 테스트에서 재현하기 위한 창구 */
+    /** smbj 가 하는 일(청크를 받아 offset 전진)을 테스트에서 재현하기 위한 창구 */
     fun writeInto(chunk: ByteArray): Int {
         val size = getChunk(chunk)
         offset += size
         return size
-    }
-
-    override fun getChunk(chunk: ByteArray): Int {
-        val want = minOf(chunk.size.toLong(), total - offset).toInt()
-        if (want <= 0) {
-            exhausted = true
-            return 0
-        }
-        var read = 0
-        while (read < want) {
-            val n = input.read(chunk, read, want - read)
-            if (n < 0) break
-            read += n
-        }
-        if (read == 0) exhausted = true
-        onProgress(offset + read)
-        return read
     }
 }
 

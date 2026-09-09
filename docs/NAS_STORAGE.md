@@ -62,6 +62,7 @@
 - 목록 `SFTPClient.ls`, 폴더 생성 `mkdir`, 이름 변경·이동 `rename`(같은 서버 안), 삭제는 파일 `rm` / 폴더는 아래부터 훑어 지운다(SFTP 는 재귀 삭제가 없다). 휴지통 없음 → 능력 `DOWNLOAD·RENAME·MOVE·FOLDER_MUTATION·RESUMABLE_UPLOAD`.
 - **업로드(재개)**: `RemoteFile.write(offset, ...)` 로 임의 오프셋 쓰기가 되므로 `queryStatus` 가 `stat` 크기를 보고 `Incomplete(size)` 를 돌려주면 그 지점부터 이어 쓴다. 첫 시도만 `TRUNC`. 다운로드는 오프셋 읽기를 감싼 `InputStream` 이고, 닫을 때 SSH 세션까지 정리한다.
 - 연결은 SMB 와 같이 **작업마다 열고 닫는다**. 타임아웃 30초.
+- **버그 수정(2026-09-09, 2차 감사)**: SMB 청크 제공자를 직접 구현하지 않고 smbj 의 `InputStreamByteChunkProvider` 를 상속하도록 바꿨다 — `SMB2WriteRequest` 가 `bytesLeft()` 로 **패킷 Length 를 먼저 써 넣은 뒤** 본문을 채우므로, 직접 구현하면 EOF 에서 선언 길이와 본문이 어긋난 WRITE 가 나간다(상위 클래스가 `prepareWrite` 로 미리 읽어 둘을 맞춘다). 두 제공자 모두 업로드 후 **크기를 검증**해 원본이 잘렸을 때 완료로 기록하지 않는다(SFTP 는 조용히 잘린 파일을 성공으로 남기고 자동 백업이 다시 올리지 않던 데이터 손실 경로였다). `abort` 도 구현해 영구 실패 시 반쯤 올라간 파일을 지운다.
 - **버그 수정(2026-09-09)**: SMB 청크 제공자가 원본 스트림이 예상 길이보다 짧을 때 `getChunk` 에서 -1 을 돌려줬는데, smbj 는 그 값을 그대로 `offset` 에 더해 **오프셋이 뒤로 가며 무한 루프**가 된다. 0 을 돌려주고 `isAvailable` 로 끝을 알리도록 고치고(`ContentChunkProvider`), 그 계약을 흉내 낸 회귀 테스트(`ContentChunkProviderTest`)를 붙였다. SFTP 쪽은 선언된 길이를 넘겨 쓰지 않도록 청크를 잘랐다(넘치면 `stat` 기반 재개 판정이 어긋난다).
 - **오류 분류**: 인증 실패(`UserAuthException`)·전송 계층 오류(호스트 키 불일치 등 `TransportException`)는 4xx 로 표시해 업로드 워커가 즉시 포기한다. 연결 끊김·타임아웃만 재시도(최대 5회). SMB 도 같은 방식으로 `NtStatus`(LOGON_FAILURE·ACCESS_DENIED → 401, BAD_NETWORK_NAME·경로 없음 → 404)를 매핑한다.
 - 검증: 단위 `SftpPathsTest`(루트 결합·기본 포트), `PinnedHostKeyVerifierTest`(지문 일치/불일치·대소문자). 실제 서버가 필요한 부분은 실기기 `NAS-14~17`.

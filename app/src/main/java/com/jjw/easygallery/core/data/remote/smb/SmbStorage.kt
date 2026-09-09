@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.FilterInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.EnumSet
@@ -251,29 +252,41 @@ class SmbStorage(
             }
         }
 
+        /** 영구 실패로 버릴 때 반쯤 올라간 파일을 지운다 — 남겨 두면 다시 올릴 때 " (1)" 사본이 생긴다 */
+        override suspend fun abort(sessionUri: String) {
+            runCatching { withShare { share -> share.rm(SmbPaths.toSmb(sessionUri)) } }
+                .onFailure { Timber.i(it, "abort 실패(무시): %s", sessionUri) }
+        }
+
         override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
             channelFlow {
                 send(UploadEvent.Progress(offset, length))
                 withShare { share ->
                     val disposition =
                         if (offset > 0) SMB2CreateDisposition.FILE_OPEN_IF else SMB2CreateDisposition.FILE_OVERWRITE_IF
+                    val path = SmbPaths.toSmb(sessionUri)
                     val file = share.openFile(
-                        SmbPaths.toSmb(sessionUri),
+                        path,
                         EnumSet.of(AccessMask.GENERIC_WRITE),
                         EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
                         SHARE_ALL,
                         disposition,
                         EnumSet.noneOf(SMB2CreateOptions::class.java),
                     )
-                    file.use {
+                    file.use { remote ->
                         val input = context.contentResolver.openInputStream(source.uri)
                             ?: throw FileNotFoundException(source.uri.toString())
                         input.use { stream ->
-                            val provider = ContentChunkProvider(stream, offset, length) { sent ->
+                            val provider = ContentChunkProvider(stream, offset) { sent ->
                                 trySend(UploadEvent.Progress(sent, length))
                             }
-                            it.write(provider)
+                            remote.write(provider)
                         }
+                    }
+                    // 원본이 예상 길이와 다르면(잘림·바뀜) 완료로 기록하지 않는다
+                    val written = share.getFileInformation(path).standardInformation.endOfFile
+                    if (written != length) {
+                        throw IOException("업로드한 크기가 다릅니다: $written / $length")
                     }
                 }
                 Timber.d("uploaded %s -> smb://%s/%s/%s", source.displayName, account.endpoint, shareName, sessionUri)

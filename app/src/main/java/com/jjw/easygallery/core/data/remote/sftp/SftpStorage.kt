@@ -30,6 +30,7 @@ import net.schmizz.sshj.transport.TransportException
 import net.schmizz.sshj.userauth.UserAuthException
 import timber.log.Timber
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.EnumSet
@@ -211,13 +212,19 @@ class SftpStorage(
             }
         }
 
+        /** 영구 실패로 버릴 때 반쯤 올라간 파일을 지운다 — 남겨 두면 다시 올릴 때 " (1)" 사본이 생긴다 */
+        override suspend fun abort(sessionUri: String) {
+            runCatching { withSftp { sftp -> sftp.rm(absolute(sessionUri)) } }
+                .onFailure { Timber.i(it, "abort 실패(무시): %s", sessionUri) }
+        }
+
         override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
             channelFlow {
                 send(UploadEvent.Progress(offset, length))
                 withSftp { sftp ->
                     val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT)
                     if (offset == 0L) modes.add(OpenMode.TRUNC)
-                    sftp.open(absolute(sessionUri), modes).use { file ->
+                    val written = sftp.open(absolute(sessionUri), modes).use { file ->
                         val input = context.contentResolver.openInputStream(source.uri)
                             ?: throw FileNotFoundException(source.uri.toString())
                         input.use { stream ->
@@ -233,7 +240,12 @@ class SftpStorage(
                                 position += read
                                 trySend(UploadEvent.Progress(position, length))
                             }
+                            position
                         }
+                    }
+                    // 원본이 예상보다 짧으면 잘린 파일이 "완료" 로 기록된다 — 그 전에 막는다
+                    if (written != length) {
+                        throw IOException("업로드한 크기가 다릅니다: $written / $length")
                     }
                 }
                 Timber.d("uploaded %s -> sftp://%s/%s", source.displayName, account.endpoint, sessionUri)
