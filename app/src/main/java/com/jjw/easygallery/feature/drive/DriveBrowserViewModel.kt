@@ -50,6 +50,13 @@ class DriveBrowserViewModel @Inject constructor(
     private var searchJob: Job? = null
     private var unfilteredEntries: List<DriveEntry>? = null
 
+    /** 검색 중에 목록을 바꾸는 작업이 있었는지 — 있으면 검색을 나갈 때 다시 읽는다 */
+    private var mutatedDuringSearch = false
+
+    /** 일괄 작업이 도는 동안 제공자 진행 보고를 무시하기 위한 플래그 */
+    @Volatile
+    private var batchInProgress = false
+
     /**
      * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
      * [folderId] null 이면 그 저장소의 루트, [rootName] 은 루트 표시 이름.
@@ -96,12 +103,17 @@ class DriveBrowserViewModel @Inject constructor(
     private fun observeMutationProgress() {
         val reporter = drive as? ReportsMutationProgress ?: return
         viewModelScope.launch {
-            reporter.mutationProgress.collect { progress -> _uiState.update { it.copy(mutationProgress = progress) } }
+            reporter.mutationProgress.collect { progress ->
+                // 일괄 작업 중에는 "항목 n / 전체" 를 쓰고 있으므로 제공자의 오브젝트 단위 진행은 무시한다
+                if (!batchInProgress) _uiState.update { it.copy(mutationProgress = progress) }
+            }
         }
     }
 
     /** 목록이 있으면 당겨서 새로고침 표시([DriveBrowserUiState.isRefreshing]), 비어 있으면 전체 로딩 */
     fun refresh() {
+        // 변경 중에 목록을 통째로 갈면 낙관적 제거·실패 복구와 어긋나 같은 항목이 두 번 들어간다
+        if (_uiState.value.isMutating) return
         _uiState.update {
             it.copy(isRefreshing = it.entries.isNotEmpty(), isLoading = it.entries.isEmpty(), error = null)
         }
@@ -115,6 +127,7 @@ class DriveBrowserViewModel @Inject constructor(
     /** 검색 모드. SEARCH 능력이 없는 저장소는 현재 폴더 목록을 로컬에서 거른다(`unfilteredEntries` 보관) */
     fun startSearch() {
         if (!remoteSearch) unfilteredEntries = _uiState.value.entries
+        mutatedDuringSearch = false
         _uiState.update { it.copy(searchQuery = "", selectedIds = emptySet()) }
     }
 
@@ -143,8 +156,10 @@ class DriveBrowserViewModel @Inject constructor(
     /** 검색 종료 → 원래 폴더 목록으로(로컬 필터였으면 보관한 목록 그대로, 원격이면 다시 읽음) */
     fun exitSearch() {
         searchJob?.cancel()
-        val kept = unfilteredEntries
+        // 검색 중 지우거나 옮긴 게 있으면 보관본이 낡았다 — 그대로 되돌리면 지운 항목이 되살아난다
+        val kept = unfilteredEntries?.takeUnless { mutatedDuringSearch }
         unfilteredEntries = null
+        mutatedDuringSearch = false
         if (kept != null) {
             _uiState.update { it.copy(searchQuery = null, entries = kept) }
             return
@@ -164,7 +179,7 @@ class DriveBrowserViewModel @Inject constructor(
     fun createFolder(name: String) {
         val current = _uiState.value.current ?: return
         val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() || _uiState.value.isMutating) return
         viewModelScope.launch {
             _uiState.update { it.copy(isMutating = true) }
             try {
@@ -287,7 +302,7 @@ class DriveBrowserViewModel @Inject constructor(
         val current = _uiState.value.current ?: return
         val targets = selectedEntries()
         if (targets.isEmpty() || target.id == current.id) return
-        if (targets.any { it.isFolder && it.id == target.id }) {
+        if (targets.any { it.isFolder && target.id.isUnder(it.id) }) {
             viewModelScope.launch { events.send(DriveBrowserEvent.Error(MOVE_INTO_SELF_MESSAGE)) }
             return
         }
@@ -302,7 +317,8 @@ class DriveBrowserViewModel @Inject constructor(
     fun restoreAll(entries: List<DriveEntry>) {
         if (entries.isEmpty()) return
         if (_uiState.value.isMutating) return
-        _uiState.update { it.copy(entries = (it.entries + entries).sortedForDrive(), isMutating = true) }
+        batchInProgress = true
+        _uiState.update { it.copy(entries = it.entries.plusMissing(entries), isMutating = true) }
         viewModelScope.launch {
             val failed = ArrayList<DriveEntry>()
             entries.forEachIndexed { index, entry ->
@@ -313,6 +329,7 @@ class DriveBrowserViewModel @Inject constructor(
                     failed += entry
                 }
             }
+            batchInProgress = false
             _uiState.update { state ->
                 state.copy(
                     entries = state.entries.filterNot { e -> failed.any { f -> f.id == e.id } },
@@ -341,6 +358,8 @@ class DriveBrowserViewModel @Inject constructor(
         onSuccess: (done: List<DriveEntry>) -> DriveBrowserEvent,
     ) {
         if (_uiState.value.isMutating) return
+        if (_uiState.value.isSearching) mutatedDuringSearch = true
+        batchInProgress = true
         val ids = targets.map { it.id }.toSet()
         _uiState.update {
             it.copy(entries = it.entries.filterNot { e -> e.id in ids }, selectedIds = emptySet(), isMutating = true)
@@ -358,9 +377,10 @@ class DriveBrowserViewModel @Inject constructor(
                         failed += entry
                     }
             }
+            batchInProgress = false
             _uiState.update { state ->
                 state.copy(
-                    entries = (state.entries + failed).sortedForDrive(),
+                    entries = state.entries.plusMissing(failed),
                     isMutating = false,
                     mutationProgress = null,
                 )
@@ -377,6 +397,7 @@ class DriveBrowserViewModel @Inject constructor(
         onSuccess: () -> DriveBrowserEvent,
     ) {
         if (_uiState.value.isMutating) return
+        if (_uiState.value.isSearching) mutatedDuringSearch = true
         val before = _uiState.value.entries
         _uiState.update { it.copy(entries = optimistic(it.entries), isMutating = true) }
         viewModelScope.launch {
@@ -410,8 +431,11 @@ class DriveBrowserViewModel @Inject constructor(
                 val query = _uiState.value.searchQuery
                 val page = if (query != null) drive.search(query, token) else drive.listChildren(current.id, token)
                 _uiState.update { state ->
+                    val entries = if (reset) page.entries else state.entries.plusMissing(page.entries)
                     state.copy(
-                        entries = if (reset) page.entries else state.entries + page.entries,
+                        entries = entries,
+                        // 사라진 항목이 선택으로 남으면 "5개 선택" 을 띄우고 셋만 지운다
+                        selectedIds = state.selectedIds.intersect(entries.map { it.id }.toSet()),
                         nextPageToken = page.nextPageToken,
                         isLoading = false,
                         isRefreshing = false,
@@ -469,6 +493,17 @@ data class DriveBrowserUiState(
     /** 원격 검색 결과(부모 미상)에서만 이동을 막는다. 로컬 필터는 같은 폴더라 이동 가능 */
     val isRemoteSearchResult: Boolean get() = isSearching && Capability.SEARCH in capabilities
 }
+
+/** 이미 있는 id 는 건너뛰고 붙인다 — 같은 키가 두 번 들어가면 LazyColumn 이 예외를 던진다 */
+internal fun List<DriveEntry>.plusMissing(more: List<DriveEntry>): List<DriveEntry> {
+    if (more.isEmpty()) return this
+    val present = map { it.id }.toSet()
+    return (this + more.filterNot { it.id in present }).sortedForDrive()
+}
+
+/** 경로 기반 제공자(S3·WebDAV·SMB·SFTP)에서 [this] 가 [folderId] 안(또는 자신)인지. Drive 의 불투명 id 는 해당 없음 */
+internal fun String.isUnder(folderId: String): Boolean =
+    this == folderId || (folderId.endsWith("/") && startsWith(folderId))
 
 /** 폴더 먼저, 이름순(대소문자 무시) — Drive 목록 정렬(`folder,name_natural`)과 맞춘다 */
 internal fun List<DriveEntry>.sortedForDrive(): List<DriveEntry> =

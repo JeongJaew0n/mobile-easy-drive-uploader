@@ -183,6 +183,55 @@ class DriveBrowserViewModelTest {
     }
 
     @Test
+    fun `a refresh during a batch is ignored so failed items are not duplicated`() = runTest(testDispatcher) {
+        coEvery { drive.delete("f1") } returns Unit
+        coEvery { drive.delete("f2") } throws IOException("offline")
+        val viewModel = loadedViewModel()
+        viewModel.toggleSelection(fileA)
+        viewModel.toggleSelection(fileB)
+
+        viewModel.trashSelected()
+        viewModel.refresh() // 배치가 도는 동안 당겨서 새로고침
+        advanceUntilIdle()
+
+        val names = viewModel.uiState.value.entries.map { it.name }
+        assertEquals(listOf("Album", "b.jpg"), names) // 실패한 것만 되살아나고 중복 없음
+        assertEquals(names.distinct(), names)
+    }
+
+    @Test
+    fun `moving a folder into its own subtree is rejected for path based storages`() = runTest(testDispatcher) {
+        val folder = entry("photos/", "photos", DriveEntry.FOLDER_MIME_TYPE)
+        coEvery { drive.listChildren("root", null, false) } returns DrivePage(listOf(folder), null)
+        val viewModel = loadedViewModel()
+        viewModel.toggleSelection(folder)
+
+        viewModel.moveSelected(DriveFolder("photos/2026/", "2026"))
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.entries.size)
+        coVerify(exactly = 0) { drive.move(any(), any(), any()) }
+        viewModel.eventFlow.test { assertTrue(awaitItem() is DriveBrowserEvent.Error) }
+    }
+
+    @Test
+    fun `deleting while the local filter is on refetches on exit instead of resurrecting`() = runTest(testDispatcher) {
+        every { drive.capabilities } returns setOf(Capability.RENAME, Capability.MOVE)
+        coEvery { drive.delete("f1") } returns Unit
+        val viewModel = loadedViewModel()
+
+        viewModel.startSearch()
+        viewModel.search("a.jpg")
+        viewModel.trash(fileA)
+        advanceUntilIdle()
+        viewModel.exitSearch()
+        advanceUntilIdle()
+
+        // 보관본을 그대로 되돌리지 않고 서버에서 다시 읽는다
+        coVerify(exactly = 2) { drive.listChildren("root", null, false) }
+    }
+
+    @Test
     fun `download selected enqueues files only and clears the selection`() = runTest(testDispatcher) {
         val viewModel = loadedViewModel()
         viewModel.selectAll()

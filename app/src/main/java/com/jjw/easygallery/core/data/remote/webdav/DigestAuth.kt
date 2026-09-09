@@ -33,15 +33,24 @@ class DigestAuth(private val username: String, private val password: String) {
         chain.proceed(request.newBuilder().header("Authorization", header).build())
     }
 
-    /** 401 Digest 챌린지 → 응답 계산 후 재시도. 반복 실패면 null(포기) */
+    /**
+     * 401 Digest 챌린지 → 응답 계산 후 재시도.
+     *
+     * 포기 조건은 "이미 Digest 로 보냈는데 **같은 nonce** 로 또 거절당함" 이다. nonce 가 바뀌었다면
+     * `stale` 표시가 없어도 만료로 보고 한 번 더 시도한다 — 그러지 않으면 캐시된 죽은 nonce 로
+     * 이후 모든 요청이 실패해 계정이 사실상 잠긴다.
+     */
     val authenticator = Authenticator { _: Route?, response: Response ->
         val parsed = response.headers("WWW-Authenticate").firstNotNullOfOrNull { Challenge.parse(it) }
             ?: return@Authenticator null
         val previous = response.request.header("Authorization")
         val alreadyDigest = previous?.startsWith("Digest ", ignoreCase = true) == true
-        if (alreadyDigest && !parsed.stale) return@Authenticator null
-        challenge = parsed
-        nonceCount.set(0)
+        val sameNonce = previous != null && previous.contains("nonce=\"" + parsed.nonce + "\"")
+        if (alreadyDigest && !parsed.stale && sameNonce) return@Authenticator null
+        synchronized(this) {
+            challenge = parsed
+            nonceCount.set(0)
+        }
         response.request.newBuilder().header("Authorization", authorization(response.request, parsed)).build()
     }
 
@@ -72,9 +81,10 @@ class DigestAuth(private val username: String, private val password: String) {
     ) {
         companion object {
             fun parse(header: String): Challenge? {
-                if (!header.startsWith("Digest ", ignoreCase = true)) return null
+                // 한 줄에 `Basic …, Digest …` 를 합쳐 보내는 서버가 있어 Digest 구간부터 읽는다
+                val start = SCHEME.find(header)?.range?.last?.plus(1) ?: return null
                 val params = HashMap<String, String>()
-                PARAM.findAll(header.substring("Digest ".length)).forEach { m ->
+                PARAM.findAll(header.substring(start)).forEach { m ->
                     params[m.groupValues[1].lowercase()] = m.groupValues[QUOTED].ifEmpty { m.groupValues[BARE] }
                 }
                 val nonce = params["nonce"] ?: return null
@@ -91,6 +101,7 @@ class DigestAuth(private val username: String, private val password: String) {
 
             private const val QUOTED = 2
             private const val BARE = 3
+            private val SCHEME = Regex("""(?:^|,)\s*Digest\s+""", RegexOption.IGNORE_CASE)
             private val PARAM = Regex("""(\w+)=(?:"((?:[^"\\]|\\.)*)"|([^,\s]*))""")
         }
     }
@@ -154,7 +165,12 @@ object DigestCalculator {
     }
 
     private fun hasher(algorithm: String): (String) -> String {
-        val name = when (algorithm.removeSuffix("-sess").uppercase()) {
+        val base = if (algorithm.endsWith("-sess", ignoreCase = true)) {
+            algorithm.dropLast(SESS_SUFFIX_LENGTH)
+        } else {
+            algorithm
+        }
+        val name = when (base.uppercase()) {
             "SHA-256" -> "SHA-256"
             "SHA-512-256" -> "SHA-512/256"
             else -> "MD5"
@@ -164,6 +180,7 @@ object DigestCalculator {
 
     private fun quote(value: String) = value.replace("\\", "\\\\").replace("\"", "\\\"")
 
+    private const val SESS_SUFFIX_LENGTH = 5
     private const val HEX_RADIX = 16
     private const val NC_DIGITS = 8
 }

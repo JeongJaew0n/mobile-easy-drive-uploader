@@ -123,6 +123,47 @@ class DigestAuthTest {
     }
 
     @Test
+    fun `a new nonce without stale is retried instead of locking the account out`() {
+        val auth = DigestAuth("user", "pw")
+        val client = OkHttpClient.Builder().addInterceptor(auth.interceptor).authenticator(auth.authenticator).build()
+        // 1) Basic → 401(n1)  2) Digest(n1) → nonce 만료, stale 표시 없이 새 nonce  3) Digest(n2) → 성공
+        server.enqueue(challenge("n1"))
+        server.enqueue(challenge("n2"))
+        server.enqueue(MockResponse(code = 207))
+
+        client.newCall(Request.Builder().url(server.url("/dav/")).build())
+            .execute().use { assertEquals(207, it.code) }
+
+        assertEquals(3, server.requestCount)
+        server.takeRequest()
+        assertTrue(server.takeRequest().headers["Authorization"]!!.contains("nonce=\"n1\""))
+        assertTrue(server.takeRequest().headers["Authorization"]!!.contains("nonce=\"n2\""))
+    }
+
+    @Test
+    fun `a combined Basic and Digest header is still parsed`() {
+        val challenge = DigestAuth.Challenge.parse("""Basic realm="x", Digest realm="nas", nonce="n1", qop="auth"""")
+        assertNotNull(challenge)
+        assertEquals("nas", challenge!!.realm)
+        assertEquals("n1", challenge.nonce)
+    }
+
+    @Test
+    fun `an uppercase -sess algorithm still uses the right hash`() {
+        val sess = rfcChallenge.copy(algorithm = "SHA-256-SESS")
+        val lower = rfcChallenge.copy(algorithm = "sha-256-sess")
+        assertEquals(
+            DigestCalculator.response("u", "p", "GET", "/x", lower, nc = 1, cnonce = "c"),
+            DigestCalculator.response("u", "p", "GET", "/x", sess, nc = 1, cnonce = "c"),
+        )
+    }
+
+    private fun challenge(nonce: String) = MockResponse.Builder()
+        .code(401)
+        .addHeader("WWW-Authenticate", """Digest realm="nas", nonce="$nonce", qop="auth", algorithm=MD5""")
+        .build()
+
+    @Test
     fun `a second 401 with the same nonce gives up instead of looping`() {
         val auth = DigestAuth("user", "wrong")
         val client = OkHttpClient.Builder().addInterceptor(auth.interceptor).authenticator(auth.authenticator).build()

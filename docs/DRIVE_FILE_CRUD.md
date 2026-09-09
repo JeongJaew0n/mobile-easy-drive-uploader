@@ -69,14 +69,15 @@ suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnl
 - **일괄 처리는 순차** — Drive REST 에 batch 엔드포인트가 있지만(multipart/mixed) 다른 제공자(S3·WebDAV·SMB)에는 없어 `RemoteStorage` 표면을 그대로 쓴다. `mutateBatch`: 선택 항목을 낙관적으로 빼고 하나씩 호출, 진행은 `mutationProgress`(n / total) 로, **실패한 항목만 목록에 되살리고** `BatchFailed(count)` 를 덧붙인다(전부 되돌리지 않는다 — 이미 옮겨진 것을 되돌릴 방법이 없다).
 - 휴지통 있는 저장소: 확인 없이 휴지통 → 스낵바 "n개를 휴지통으로 옮겼습니다 · 실행 취소"(`restoreAll` 순차 복원). 없는 저장소: "n개 항목 삭제" 확인 다이얼로그 후 영구 삭제.
 - 이동 대상이 선택된 폴더 자신이면 거부(하위 폴더로의 이동은 서버가 거부하고 그 항목만 실패로 남는다).
-- 테스트: `DriveBrowserViewModelTest` 일괄 휴지통(성공 1·실패 1), 자기 자신으로 이동 거부·전체 선택.
+- **버그 수정(2026-09-09, 2차 감사)**: (1) 배치가 도는 동안 당겨서 새로고침하면 목록이 서버본으로 갈린 뒤 실패 항목이 덧붙어 **같은 키가 두 번 들어가 목록이 크래시**했다 → 변경 중 새로고침을 막고, 재삽입은 중복을 걸러 넣는다(`plusMissing`). (2) 목록을 다시 읽으면 `selectedIds` 를 현재 항목으로 좁힌다(전에는 "5개 선택" 을 띄우고 셋만 지웠다). (3) 폴더를 **자기 하위로** 옮기는 것을 막는다(경로 기반 제공자, `isUnder`). (4) `createFolder` 도 다른 변경과 같은 잠금을 쓴다. (5) 일괄 작업 중에는 제공자의 오브젝트 단위 진행을 무시해 진행바가 두 척도를 오가지 않는다.
+- 테스트: `DriveBrowserViewModelTest` 일괄 휴지통(성공 1·실패 1), 자기 자신으로 이동 거부·전체 선택, 배치 중 새로고침 중복 방지, 하위 폴더 이동 거부, 로컬 필터 중 삭제 후 재조회.
 
 ## 8. 검색 (2026-09-09 추가)
 
 - `Capability.SEARCH`(Drive 만) → 상단바 검색 아이콘 → `DriveSearchTopBar`(텍스트 필드가 제목 자리, 자동 포커스). 입력마다 `search(query)`, ViewModel 이 350ms 디바운스 후 `RemoteStorage.search` — Drive 는 `q = name contains '<이스케이프>' and trashed = false`, 정렬 `folder,name_natural`, 페이징은 폴더 목록과 같은 `fetchPage`. 빈 문자열은 안내 문구, 결과 없음은 "일치하는 파일이 없습니다".
 - 검색은 **Drive 전체**(현재 폴더 한정 아님) — Drive 의 `contains` 는 접두어 토큰 매칭이라 "IMG_2026" 같은 앞부분 검색에 강하고 중간 문자열은 놓칠 수 있다(Drive 제약).
 - 검색 결과에는 부모 폴더 정보가 없어(`fields` 에 parents 를 넣어도 다중 부모·공유 항목이 있어 `removeParents` 가 애매) **이동은 숨긴다**(행 ⋮·다중 선택 상단바 모두). 이름 변경·휴지통·열기는 그대로. 하단 "업로드 폴더로 지정"도 숨김.
-- 뒤로 가기는 검색만 종료하고 원래 폴더를 다시 읽는다. S3·WebDAV·SMB 는 아이콘이 나오지 않는다(접두어 목록만 있음 — 폴더 내 필터는 후보).
+- 뒤로 가기는 검색만 종료한다. 로컬 필터 중에 지우거나 옮긴 게 있으면 보관본이 낡았으므로 그대로 되돌리지 않고 다시 읽는다(전에는 지운 항목이 되살아났다). S3·WebDAV·SMB 는 아이콘이 나오지 않는다(접두어 목록만 있음 — 폴더 내 필터는 후보).
 - **SEARCH 가 없는 저장소(S3·WebDAV·SMB)** 도 같은 아이콘이 보이고, 현재 폴더 목록을 **로컬에서 이름으로 거른다**(대소문자 무시, 즉시). 원격 호출 없음, 힌트 "이 폴더에서 이름으로 찾기". 같은 폴더라 이동도 그대로 가능(`isRemoteSearchResult` 로 구분). 종료하면 보관한 목록으로 복귀(다시 읽지 않음).
 - 행 세부에 **"이 기기에서 올림"** — 업로드 원장(`uploaded_media.driveFileId`, 계정별)에 있는 원격 ID 면 표시. 기기에서 지웠는지는 모르니 "기기에 있음"이라 하지 않았다.
 - 테스트: `DriveRestRepositoryTest` 검색 쿼리(공백 trim·따옴표 이스케이프), `DriveBrowserViewModelTest` 디바운스·결과·종료 복귀, 로컬 필터·원장 표시.
