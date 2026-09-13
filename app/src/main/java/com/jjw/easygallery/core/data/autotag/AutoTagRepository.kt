@@ -28,7 +28,14 @@ class AutoTagRepository @Inject constructor(
     // 훑을 때만 만들고 끝나면 닫는다 — 라벨러는 자원을 붙잡고 있다
     private val labelerProvider: Provider<ImageLabeler>,
 ) {
-    data class ScanResult(val scanned: Int, val tagged: Int, val failed: Int, val modelUnavailable: Boolean = false)
+    data class ScanResult(
+        val scanned: Int,
+        val tagged: Int,
+        val failed: Int,
+        /** 계속 실패해 더 시도하지 않기로 한 사진 수 */
+        val givenUp: Int = 0,
+        val modelUnavailable: Boolean = false,
+    )
 
     fun observeLabelCounts(): Flow<List<AutoTagCount>> = dao.observeCounts()
 
@@ -49,13 +56,14 @@ class AutoTagRepository @Inject constructor(
         val cached = dao.allScans().associateBy { it.mediaId }
         prune(cached.keys, items)
 
-        val targets = items.filter { item ->
+        val targets = items.filter { shouldAnalyze(it, cached[it.id]) }
+        val givenUp = items.count { item ->
             val seen = cached[item.id]
-            seen == null || seen.sizeBytes != item.sizeBytes || seen.dateModifiedSeconds != item.dateModifiedSeconds
+            seen != null && seen.matches(item) && seen.failureCount >= AutoTagScanEntity.MAX_FAILURES
         }
         if (targets.isEmpty()) {
             onProgress(0, 0)
-            return ScanResult(scanned = 0, tagged = 0, failed = 0)
+            return ScanResult(scanned = 0, tagged = 0, failed = 0, givenUp = givenUp)
         }
 
         var tagged = 0
@@ -63,9 +71,9 @@ class AutoTagRepository @Inject constructor(
         val labeler = labelerProvider.get()
         try {
             targets.forEachIndexed { index, item ->
-                when (val outcome = labelOne(labeler, item)) {
+                when (val outcome = labelOne(labeler, item, cached[item.id])) {
                     Outcome.ModelUnavailable ->
-                        return ScanResult(index, tagged, failed, modelUnavailable = true)
+                        return ScanResult(index, tagged, failed, givenUp, modelUnavailable = true)
                     Outcome.Failed -> failed++
                     is Outcome.Done -> if (outcome.hasLabels) tagged++
                 }
@@ -74,10 +82,10 @@ class AutoTagRepository @Inject constructor(
         } finally {
             runCatching { labeler.close() }
         }
-        return ScanResult(scanned = targets.size, tagged = tagged, failed = failed)
+        return ScanResult(scanned = targets.size, tagged = tagged, failed = failed, givenUp = givenUp)
     }
 
-    private suspend fun labelOne(labeler: ImageLabeler, item: MediaItem): Outcome = try {
+    private suspend fun labelOne(labeler: ImageLabeler, item: MediaItem, seen: AutoTagScanEntity?): Outcome = try {
         val labels = labeler.label(item.uri)
             .filter { it.confidence >= MIN_CONFIDENCE }
             .take(MAX_LABELS_PER_ITEM)
@@ -85,7 +93,7 @@ class AutoTagRepository @Inject constructor(
         dao.replaceFor(
             mediaId = item.id,
             tags = labels.map { AutoTagEntity(item.id, it.label, it.confidence, now) },
-            scan = AutoTagScanEntity(item.id, item.sizeBytes, item.dateModifiedSeconds, now),
+            scan = AutoTagScanEntity(item.id, item.sizeBytes, item.dateModifiedSeconds, now, failureCount = 0),
         )
         Outcome.Done(labels.isNotEmpty())
     } catch (e: CancellationException) {
@@ -94,15 +102,28 @@ class AutoTagRepository @Inject constructor(
         Timber.i(e, "이미지 인식 모델 준비 중 — 훑기 중단")
         Outcome.ModelUnavailable
     } catch (e: IOException) {
-        Timber.w(e, "라벨링 실패(읽기): %s", item.displayName)
+        recordFailure(item, seen, e, "읽기")
         Outcome.Failed
     } catch (e: SecurityException) {
-        Timber.w(e, "라벨링 실패(권한): %s", item.displayName)
+        recordFailure(item, seen, e, "권한")
         Outcome.Failed
     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
         // 디코딩 실패·모델 오류 등은 그 사진만 건너뛴다
-        Timber.w(e, "라벨링 실패: %s", item.displayName)
+        recordFailure(item, seen, e, "기타")
         Outcome.Failed
+    }
+
+    /** 실패 횟수를 올려 둔다. [AutoTagScanEntity.MAX_FAILURES] 에 닿으면 다음부터 건너뛴다 */
+    private suspend fun recordFailure(item: MediaItem, seen: AutoTagScanEntity?, e: Exception, kind: String) {
+        val count = if (seen != null && seen.matches(item)) seen.failureCount + 1 else 1
+        dao.insertScan(
+            AutoTagScanEntity(item.id, item.sizeBytes, item.dateModifiedSeconds, System.currentTimeMillis(), count),
+        )
+        if (count >= AutoTagScanEntity.MAX_FAILURES) {
+            Timber.w(e, "라벨링 %d회 실패 — 더 시도하지 않는다: %s", count, item.displayName)
+        } else {
+            Timber.w(e, "라벨링 실패(%s, %d회): %s", kind, count, item.displayName)
+        }
     }
 
     /** 갤러리에서 사라진 사진의 태그·기록을 지운다 */
@@ -122,5 +143,20 @@ class AutoTagRepository @Inject constructor(
         /** 이보다 낮은 라벨은 버린다(`docs/AUTO_TAGGING.md` §5.2) */
         const val MIN_CONFIDENCE = 0.6f
         const val MAX_LABELS_PER_ITEM = 5
+
+        /** 캐시가 이 사진의 현재 파일과 같은 것을 가리키는지 */
+        fun AutoTagScanEntity.matches(item: MediaItem): Boolean =
+            sizeBytes == item.sizeBytes && dateModifiedSeconds == item.dateModifiedSeconds
+
+        /**
+         * 이 사진을 (다시) 분석해야 하는지. 순수 함수라 테스트로 굳힌다.
+         * - 기록이 없거나 파일이 바뀌었으면 분석한다(실패 횟수도 다시 센다).
+         * - 성공 기록(`failureCount == 0`)이면 건너뛴다.
+         * - 실패가 [AutoTagScanEntity.MAX_FAILURES] 미만이면 다시 시도하고, 이상이면 포기한다.
+         */
+        fun shouldAnalyze(item: MediaItem, seen: AutoTagScanEntity?): Boolean {
+            if (seen == null || !seen.matches(item)) return true
+            return seen.failureCount in 1 until AutoTagScanEntity.MAX_FAILURES
+        }
     }
 }

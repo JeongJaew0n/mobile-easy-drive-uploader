@@ -38,10 +38,11 @@ class AutoTagWorker @AssistedInject constructor(
                 }
             }
             Timber.i(
-                "자동 태그: 분석 %d, 라벨 붙음 %d, 실패 %d, 모델대기 %s",
+                "자동 태그: 분석 %d, 라벨 붙음 %d, 실패 %d, 포기 %d, 모델대기 %s",
                 result.scanned,
                 result.tagged,
                 result.failed,
+                result.givenUp,
                 result.modelUnavailable,
             )
             prefs.setAutoTagLastRun(System.currentTimeMillis())
