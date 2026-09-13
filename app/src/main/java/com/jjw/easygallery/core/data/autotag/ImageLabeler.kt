@@ -49,14 +49,25 @@ class MlKitImageLabeler @Inject constructor(
         }
     }
 
+    /**
+     * ML Kit 네이티브 분류기는 **ARGB_8888 만** 받는다. 다른 포맷을 넘기면 자바 예외가 아니라
+     * `JNI DETECTED ERROR ... Bitmap must have RGBA_8888 format` 으로 **프로세스가 죽는다**
+     * (실기기에서 1250장쯤에서 발생). 그래서 디코딩 뒤 포맷을 반드시 확인하고, 아니면 변환한다.
+     */
     private fun decodeScaled(uri: Uri): Bitmap {
         val source = ImageDecoder.createSource(context.contentResolver, uri)
-        return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        val decoded = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
             val longest = maxOf(info.size.width, info.size.height)
             if (longest > MAX_EDGE_PX) decoder.setTargetSampleSize(sampleSizeFor(longest))
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE // ML Kit 은 하드웨어 비트맵을 읽지 못한다
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE // 하드웨어 비트맵은 읽지 못한다
+            // 저메모리 정책이면 RGB_565 가 나온다 — 기본 정책을 명시해 8888 을 유도한다
+            decoder.memorySizePolicy = ImageDecoder.MEMORY_POLICY_DEFAULT
             decoder.isMutableRequired = false
         }
+        if (decoded.config == Bitmap.Config.ARGB_8888) return decoded
+        val converted = decoded.copy(Bitmap.Config.ARGB_8888, false)
+        decoded.recycle()
+        return requireNotNull(converted) { "비트맵을 ARGB_8888 로 바꾸지 못했습니다" }
     }
 
     private suspend fun runLabeler(image: InputImage): List<AutoLabel> =

@@ -79,6 +79,9 @@ class ImageLabeler @Inject constructor(private val context: Context) {
 - **원본이 아니라 축소 이미지로 돌린다.** 모델 입력이 224px 안팎이라 원본(수천 픽셀)을 디코딩할 이유가 없다. `ImageDecoder` 로 512px 정도로 줄여 `InputImage.fromBitmap` 에 넘긴다. 메모리·속도 모두 이득이고 6119장을 훑어도 OOM 이 나지 않는다.
 - `ACCESS_MEDIA_LOCATION` 은 쓰지 않는다. 위치 정보는 분류에 필요 없다.
 - 라벨러 인스턴스는 **한 번 만들어 재사용**하고 훑기가 끝나면 `close()`. 사진마다 만들면 초기화 비용이 지배적이 된다.
+- **비트맵은 반드시 `ARGB_8888`**. ML Kit 네이티브 분류기는 다른 포맷을 받으면 자바 예외가 아니라
+  `JNI DETECTED ERROR ... Bitmap must have RGBA_8888 format` 으로 **프로세스를 죽인다**(실기기에서 1250장쯤 발생).
+  `try/catch` 로 건너뛸 수 없으므로 디코딩 뒤 포맷을 확인하고 아니면 변환해서 넘긴다.
 
 ### 5.2 훑기
 
