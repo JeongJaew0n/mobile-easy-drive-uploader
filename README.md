@@ -19,6 +19,7 @@ Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retr
 - [애니메이션 개선 분석](docs/ANIMATION_IMPROVEMENT.md)
 - [상세보기 안정화](docs/VIEWER_STABILITY.md) · [기간 선택 UI](docs/DATE_RANGE_PICKER.md) · [카테고리](docs/CATEGORIES.md)
 - [Drive 파일 CRUD](docs/DRIVE_FILE_CRUD.md) · [다중 클라우드](docs/MULTI_CLOUD.md) · [NAS](docs/NAS_STORAGE.md)
+- [자동 태그(ML Kit)](docs/AUTO_TAGGING.md)
 - [Google 로그인 문제 해결](docs/GOOGLE_SIGN_IN_TROUBLESHOOTING.md)
 - [수동 테스트 대기 목록](docs/manual-tests/README.md)
 - [릴리스 빌드·서명](docs/RELEASE.md)
