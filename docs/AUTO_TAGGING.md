@@ -151,3 +151,7 @@ ML Kit 은 영어 라벨을 준다(`Food`, `Beach`, `Dog`…). 한국어로 보�
 ## 10. 진행 기록
 
 - 2026-09-13 설계 작성.
+- 2026-09-13 구현: Room v8(`auto_tag`·`auto_tag_scan`), `ImageLabeler`(ML Kit, 512px 축소 + 소프트웨어 비트맵),
+  `AutoTagRepository.scan`(캐시 판정·정리·모델 미준비 시 중단), `AutoTagWorker`/`AutoTagScheduler`(즉시 실행 + 매일 지정 시각 자기 재예약),
+  설정 진입점과 전용 화면(스위치·시각 선택·진행률·라벨 목록·카테고리로 만들기·숨기기·전부 지우기), 라벨 한국어 대응표 40개.
+  단위 테스트는 `AutoTagSchedulerTest`(시각 계산 경계). 실기기 항목은 `manual-tests/12-auto-tagging.md`.

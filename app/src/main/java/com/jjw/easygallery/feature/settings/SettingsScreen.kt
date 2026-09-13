@@ -62,6 +62,7 @@ fun SettingsRoute(
     onDriveClick: () -> Unit,
     onAutoBackupClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
+    onAutoTagClick: () -> Unit,
     onCategoriesClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
@@ -112,6 +113,7 @@ fun SettingsRoute(
         onDriveClick = onDriveClick,
         onAutoBackupClick = onAutoBackupClick,
         onDuplicatesClick = onDuplicatesClick,
+        onAutoTagClick = onAutoTagClick,
         onCategoriesClick = onCategoriesClick,
         onAddRemoteAccountClick = onAddRemoteAccountClick,
         onOpenRemoteAccount = onOpenRemoteAccount,
@@ -148,6 +150,7 @@ internal fun SettingsScreen(
     onDriveClick: () -> Unit = {},
     onAutoBackupClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
+    onAutoTagClick: () -> Unit = {},
     onCategoriesClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
@@ -258,6 +261,11 @@ internal fun SettingsScreen(
                 icon = painterResource(R.drawable.ic_label),
                 title = stringResource(R.string.settings_categories),
                 onClick = onCategoriesClick,
+            )
+            NavigationRow(
+                icon = painterResource(R.drawable.ic_auto_tag),
+                title = stringResource(R.string.auto_tag_settings_entry),
+                onClick = onAutoTagClick,
             )
             SwitchRow(
                 title = stringResource(R.string.settings_category_badges),

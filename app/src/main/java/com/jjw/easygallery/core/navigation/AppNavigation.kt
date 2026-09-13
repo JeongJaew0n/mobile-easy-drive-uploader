@@ -18,6 +18,7 @@ import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.motion.MotionSpecs
 import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
+import com.jjw.easygallery.feature.autotag.AutoTagRoute
 import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
@@ -94,6 +95,7 @@ fun AppNavigation() {
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
+                    onAutoTagClick = { backStack.add(AutoTagKey) },
                     onCategoriesClick = { backStack.add(CategoriesKey) },
                     onAddRemoteAccountClick = { backStack.add(AddRemoteAccountKey()) },
                     onEditRemoteAccount = { accountId -> backStack.add(AddRemoteAccountKey(accountId)) },
@@ -105,6 +107,9 @@ fun AppNavigation() {
             }
             entry<DuplicatesKey> {
                 DuplicatesRoute(onBackClick = { backStack.removeLastOrNull() })
+            }
+            entry<AutoTagKey> {
+                AutoTagRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<AutoBackupKey> {
                 AutoBackupRoute(onBackClick = { backStack.removeLastOrNull() })

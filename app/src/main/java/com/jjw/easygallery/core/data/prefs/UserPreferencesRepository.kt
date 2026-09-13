@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -18,6 +19,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.userPreferencesStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
+
+/** 자동 태그 기본 시각: 새벽 4시 */
+const val DEFAULT_AUTO_TAG_MINUTE = 4 * 60
+private const val MINUTES_PER_DAY = 24 * 60
 
 data class UserPreferences(
     val accountEmail: String? = null,
@@ -40,6 +45,11 @@ data class UserPreferences(
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     /** 썸네일 오른쪽 위 카테고리 색 점. 배지가 많으면 시끄러울 수 있어 끌 수 있다 */
     val showCategoryBadges: Boolean = true,
+    /** 새 사진을 매일 한 번 자동으로 분석한다(`docs/AUTO_TAGGING.md` §5.4) */
+    val autoTagEnabled: Boolean = false,
+    /** 자동 분석 시각(하루 중 분, 0~1439). 기본 04:00 */
+    val autoTagMinuteOfDay: Int = DEFAULT_AUTO_TAG_MINUTE,
+    val autoTagLastRunMillis: Long = 0,
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 
@@ -63,6 +73,9 @@ class UserPreferencesRepository @Inject constructor(
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
             autoBackupEnabled = prefs[KEY_AUTO_BACKUP_ENABLED] ?: false,
+            autoTagEnabled = prefs[KEY_AUTO_TAG_ENABLED] ?: false,
+            autoTagMinuteOfDay = prefs[KEY_AUTO_TAG_MINUTE] ?: DEFAULT_AUTO_TAG_MINUTE,
+            autoTagLastRunMillis = prefs[KEY_AUTO_TAG_LAST_RUN] ?: 0L,
             autoBackupPaths = prefs[KEY_AUTO_BACKUP_PATHS] ?: emptySet(),
             autoBackupIncludeVideos = prefs[KEY_AUTO_BACKUP_VIDEOS] ?: true,
             autoBackupSinceSeconds = prefs[KEY_AUTO_BACKUP_SINCE] ?: 0L,
@@ -128,6 +141,20 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun setAutoTagEnabled(enabled: Boolean) {
+        store.edit { it[KEY_AUTO_TAG_ENABLED] = enabled }
+    }
+
+    /** [minuteOfDay] 는 0~1439. 범위를 벗어나면 무시한다 */
+    suspend fun setAutoTagMinuteOfDay(minuteOfDay: Int) {
+        if (minuteOfDay !in 0 until MINUTES_PER_DAY) return
+        store.edit { it[KEY_AUTO_TAG_MINUTE] = minuteOfDay }
+    }
+
+    suspend fun setAutoTagLastRun(millis: Long) {
+        store.edit { it[KEY_AUTO_TAG_LAST_RUN] = millis }
+    }
+
     suspend fun setAutoBackupPaths(paths: Set<String>) {
         store.edit { it[KEY_AUTO_BACKUP_PATHS] = paths }
     }
@@ -161,6 +188,9 @@ class UserPreferencesRepository @Inject constructor(
 
     private companion object {
         val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
+        val KEY_AUTO_TAG_ENABLED = booleanPreferencesKey("auto_tag_enabled")
+        val KEY_AUTO_TAG_MINUTE = intPreferencesKey("auto_tag_minute_of_day")
+        val KEY_AUTO_TAG_LAST_RUN = longPreferencesKey("auto_tag_last_run")
         val KEY_AUTO_BACKUP_PATHS = stringSetPreferencesKey("auto_backup_paths")
         val KEY_AUTO_BACKUP_VIDEOS = booleanPreferencesKey("auto_backup_videos")
         val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")

@@ -29,6 +29,7 @@ androidxCredentials = "1.6.0"
 hilt = "2.60.1"
 googleid = "1.2.0"
 playServicesAuth = "22.0.0"
+mlkitImageLabeling = "16.0.8"
 
 # Kotlin libs
 coroutines = "1.11.0"
@@ -122,6 +123,7 @@ androidx-credentials = { module = "androidx.credentials:credentials", version.re
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidxCredentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
+play-services-mlkit-image-labeling = { module = "com.google.android.gms:play-services-mlkit-image-labeling", version.ref = "mlkitImageLabeling" }
 
 # Network
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }

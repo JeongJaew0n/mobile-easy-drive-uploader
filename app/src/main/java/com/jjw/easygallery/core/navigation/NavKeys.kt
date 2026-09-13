@@ -29,6 +29,10 @@ data object DuplicatesKey : AppNavKey
 @Serializable
 data object CategoriesKey : AppNavKey
 
+/** 자동 태그(ML Kit 이미지 라벨링). `docs/AUTO_TAGGING.md` */
+@Serializable
+data object AutoTagKey : AppNavKey
+
 /**
  * 탭한 썸네일의 화면(윈도우) 좌표와 원본 정보. 상세보기가 이 사각형에서 확대되는 히어로 연출을 그린다.
  * 회전·복원 시 좌표가 어긋날 수 있어 상세보기는 첫 진입 1회만 사용하고 이후 무시한다.

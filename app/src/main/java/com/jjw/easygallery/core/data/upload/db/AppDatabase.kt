@@ -12,8 +12,10 @@ import androidx.room.RoomDatabase
         CategoryEntity::class,
         MediaCategoryEntity::class,
         RemoteAccountEntity::class,
+        AutoTagEntity::class,
+        AutoTagScanEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -22,6 +24,7 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 4, to = 5),
         AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7),
+        AutoMigration(from = 7, to = 8),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaHashDao(): MediaHashDao
     abstract fun categoryDao(): CategoryDao
     abstract fun remoteAccountDao(): RemoteAccountDao
+    abstract fun autoTagDao(): AutoTagDao
 
     companion object {
         const val NAME = "easy_gallery.db"

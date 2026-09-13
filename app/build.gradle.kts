@@ -158,6 +158,8 @@ dependencies {
 
     // Auth (Play Services AuthorizationClient)
     implementation(libs.play.services.auth)
+    // 온디바이스 이미지 라벨링. 모델은 Play 서비스가 관리한다 (docs/AUTO_TAGGING.md §3)
+    implementation(libs.play.services.mlkit.image.labeling)
     implementation(libs.kotlinx.coroutines.play.services)
 
     // Network
