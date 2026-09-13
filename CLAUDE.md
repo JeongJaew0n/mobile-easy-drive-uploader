@@ -46,3 +46,20 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - 벡터 아이콘은 `res/drawable/ic_*.xml` 에 직접 추가 (`material-icons-extended` 미사용, `?attr/colorControlNormal` 같은 AppCompat 속성 금지).
 - 줄 길이 120, 트레일링 콤마 사용 (detekt formatting 이 검사).
 - 애니메이션은 `LocalMotion.current`(`core/ui/motion/MotionSpecs`) 의 스펙·프리셋만 사용. `tween(숫자)` 리터럴, `size/padding` 애니메이션, 무한·매 프레임 애니메이션 금지. 새 `if` 로 컴포저블을 넣고 빼는 자리는 `AnimatedVisibility`/`AnimatedContent` 를 기본으로 한다.
+
+## 프로젝트 규칙 (my-app-init, 2026-09-13 확정)
+
+### git
+- author: `JeongJaew0n <45487307+JeongJaew0n@users.noreply.github.com>` — `git config --local` 로 설정돼 있다. 커밋 전 `git config user.email` 로 확인한다.
+- 커밋·푸시: **전자동**. 작업 단위가 끝나고 검증(detekt·testDebugUnitTest)이 통과하면 커밋하고 `origin/main` 에 푸시한다. 사용자가 2026-09-13 에 준 지속적 승인이며, 근거 없이 자동 푸시하는 것과 구분된다.
+- 브랜치: **main 고정**. 브랜치를 만들지 않고 main 에 바로 쌓는다.
+- **예외 — 리뷰는 자동 커밋·푸시하지 않는다.** 코드리뷰·리뷰 문서, 그리고 리뷰에서 나온 수정은 위 정책이 '전자동'이어도 사람이 읽고 판단한 뒤에 커밋한다. 리뷰는 사실이 아니라 의견이고, 틀린 의견이 먼저 기록에 박히면 되돌리기 어렵다.
+
+### docs
+- 여러 단계짜리 작업은 코드를 건드리기 전에 `docs/plans/<slug>/` 에 계획을 먼저 쓴다. 기능 단위 설계 문서(`docs/<FEATURE>.md`)는 지금처럼 계속 쓴다 — plans 는 "이번 작업을 어떻게 진행할지", 설계 문서는 "이 기능이 어떻게 동작하는지"다.
+- 원인 찾는 데 시간이 걸린 오류는 `docs/troubleshootings/` 에 남긴다. 원인이 라이브러리·런타임·OS 에 있으면 `reusable/`, 이 프로젝트의 코드·설정에 있으면 `project-specific/`.
+- 도메인 용어를 새로 만들거나 이름을 바꾸면 `docs/glossary/README.md` 를 먼저 고치고 코드를 그 이름에 맞춘다. 코드만 바꾸면 용어집이 거짓말이 된다.
+- 기기·계정·네트워크가 필요해 확인하지 못한 동작은 `docs/manual-tests/` 에 남긴다(위 "수동 테스트 대기 목록" 규칙).
+
+### 설계
+- 기능 묶음 단위는 **feature** 다. 새 기능은 기존 feature 에 넣을지 새 feature 를 만들지 먼저 정하고 시작한다. 코드 디렉터리(`feature/<name>`)와 문서 이름도 이 말을 쓴다. 여러 feature 가 함께 쓰는 것은 `core/*` 로 내린다.

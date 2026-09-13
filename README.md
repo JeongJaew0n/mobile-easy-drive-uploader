@@ -23,6 +23,9 @@ Kotlin · Jetpack Compose · Hilt · Navigation 3 · Room · WorkManager · Retr
 - [Google 로그인 문제 해결](docs/GOOGLE_SIGN_IN_TROUBLESHOOTING.md)
 - [수동 테스트 대기 목록](docs/manual-tests/README.md)
 - [릴리스 빌드·서명](docs/RELEASE.md)
+- `docs/plans/` — 여러 단계짜리 작업의 진행 계획
+- `docs/glossary/` — 이 프로젝트에서만 통하는 용어
+- `docs/troubleshootings/` — 원인 찾는 데 시간이 걸린 오류 기록
 
 ## 시작하기
 
