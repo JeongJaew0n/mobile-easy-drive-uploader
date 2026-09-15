@@ -54,3 +54,7 @@ Compose 달력 라이브러리 중 가장 널리 쓰이고 활발히 유지된�
 
 - 로컬: detekt · 단위 테스트 · assembleDebug · lint. R8 는 리플렉션 없는 라이브러리라 규칙 추가 없음(`assembleRelease` 로 `missing_rules.txt` 부재 확인).
 - 기기(사용자 지시가 있을 때만): `manual-tests/01-gallery-basics.md` GAL-12/13 을 새 UI 기준으로 고치고 GAL-22(사진 없는 날 비활성·개수 점), GAL-23(과거 달로 스크롤 → 가장 오래된 달에서 멈춤) 추가.
+
+## 연·월 빠른 이동 (2026-09-16)
+
+달력 위 고정 헤더에 지금 보이는 달을 띄우고, 누르면 연·월 점프 패널이 열린다. 사진이 있는 연도·달만 고를 수 있고(`DateJump`, `dayCounts` 기준), 고르면 `animateScrollToMonth` 로 이동한다. 6년치 사진에서 예전 달을 찾을 때 세로 스크롤을 대신한다. 날짜(일) 선택·범위 로직은 그대로. 계획은 `docs/plans/date-quick-jump/`.

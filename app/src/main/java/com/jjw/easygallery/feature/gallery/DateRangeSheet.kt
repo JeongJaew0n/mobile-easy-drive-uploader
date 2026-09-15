@@ -18,10 +18,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -110,6 +114,25 @@ internal fun DateRangeSheet(
                     }
                 },
             )
+            var jumpOpen by remember { mutableStateOf(false) }
+            val visibleMonth = calendarState.firstVisibleMonth.yearMonth
+            MonthJumpHeader(
+                month = visibleMonth,
+                expanded = jumpOpen,
+                onToggle = { jumpOpen = !jumpOpen },
+            )
+            if (jumpOpen) {
+                MonthJumpPanel(
+                    dayCounts = dayCounts,
+                    visibleMonth = visibleMonth,
+                    startMonth = startMonth,
+                    endMonth = thisMonth,
+                    onPick = { target ->
+                        jumpOpen = false
+                        scope.launch { calendarState.animateScrollToMonth(target) }
+                    },
+                )
+            }
             WeekdayHeader(firstDayOfWeek)
             HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
             RangeCalendar(
@@ -352,3 +375,87 @@ private const val ENDPOINT_SIZE_DP = 40
 private const val DOT_SIZE_DP = 4
 private const val HALF_PERCENT = 50
 private const val DISABLED_ALPHA = 0.38f
+
+/** 달력 위 고정 헤더 — 지금 보이는 달을 보여주고, 누르면 연·월 점프 패널을 연다 */
+@Composable
+private fun MonthJumpHeader(month: YearMonth, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp + 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.gallery_date_month_label, month.year, month.monthValue),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = stringResource(
+                if (expanded) R.string.gallery_date_jump_collapse else R.string.gallery_date_jump_expand,
+            ),
+        )
+    }
+}
+
+/** 연도 행 + 월 그리드. 사진이 있는 연도·달만 고를 수 있다 */
+@Composable
+private fun MonthJumpPanel(
+    dayCounts: Map<LocalDate, Int>,
+    visibleMonth: YearMonth,
+    startMonth: YearMonth,
+    endMonth: YearMonth,
+    onPick: (YearMonth) -> Unit,
+) {
+    val years = remember(dayCounts) { DateJump.yearsWithPhotos(dayCounts) }
+    var selectedYear by remember(visibleMonth) { mutableStateOf(visibleMonth.year) }
+    val activeMonths = remember(dayCounts, selectedYear) { DateJump.monthsWithPhotos(dayCounts, selectedYear) }
+
+    Column(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp, vertical = 4.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            years.forEach { year ->
+                FilterChip(
+                    selected = year == selectedYear,
+                    onClick = { selectedYear = year },
+                    label = { Text(stringResource(R.string.gallery_date_year_label, year)) },
+                )
+            }
+        }
+        Column(Modifier.padding(top = 8.dp)) {
+            for (row in 0 until MONTH_GRID_ROWS) {
+                Row(Modifier.fillMaxWidth()) {
+                    for (col in 0 until MONTH_GRID_COLS) {
+                        val month = row * MONTH_GRID_COLS + col + 1
+                        MonthCell(
+                            month = month,
+                            enabled = month in activeMonths,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onPick(DateJump.target(selectedYear, month, startMonth, endMonth)) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+    HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
+}
+
+@Composable
+private fun MonthCell(month: Int, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+        Text(
+            text = stringResource(R.string.gallery_date_month_only_label, month),
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private const val MONTH_GRID_COLS = 4
+private const val MONTH_GRID_ROWS = 3
