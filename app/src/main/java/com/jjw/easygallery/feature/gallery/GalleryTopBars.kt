@@ -13,6 +13,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -28,11 +30,8 @@ import com.jjw.easygallery.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GalleryTopBar(
-    itemCount: Int?,
-    uploadedCount: Int,
-    favoritesOnly: Boolean,
-    notBackedUpOnly: Boolean,
-    supportsTrashAndFavorites: Boolean,
+    /** 아직 목록이 없으면(로딩·권한 요청) null */
+    content: GalleryUiState.Content?,
     onSettingsClick: () -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
@@ -41,8 +40,13 @@ internal fun GalleryTopBar(
     onDuplicatesClick: () -> Unit,
     onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit = {},
-    categoryTitle: String? = null,
 ) {
+    val itemCount = content?.itemCount
+    val uploadedCount = content?.uploadedCount ?: 0
+    val favoritesOnly = content?.favoritesOnly == true
+    val notBackedUpOnly = content?.notBackedUpOnly == true
+    val supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true
+    val categoryTitle = content?.let { categoryTitle(it.categoryFilter, it.categories) }
     TopAppBar(
         title = {
             Column {
@@ -136,4 +140,31 @@ internal fun SelectionTopBar(
             }
         },
     )
+}
+
+/**
+ * 출처 탭(`docs/plans/gallery-source-tabs`). 카메라 사진 사이에 카카오톡 이미지가 섞여 들어오는 것을 가른다.
+ *
+ * 항목이 없는 탭도 계속 보여준다 — 데이터에 따라 탭이 생겼다 사라지면 위치가 흔들린다.
+ * 개수는 라벨에 넣지 않는다. 세려면 전체 목록을 네 번 훑어야 하고, 지금 탭의 개수는 상단바에 이미 있다.
+ */
+@Composable
+internal fun GallerySourceTabs(tab: GalleryTab?, onSelect: (GalleryTab) -> Unit) {
+    val selected = tab ?: GalleryTab.ALL
+    PrimaryTabRow(selectedTabIndex = selected.ordinal) {
+        GalleryTab.entries.forEach { entry ->
+            Tab(
+                selected = entry == selected,
+                onClick = { onSelect(entry) },
+                text = { Text(stringResource(entry.labelRes())) },
+            )
+        }
+    }
+}
+
+private fun GalleryTab.labelRes(): Int = when (this) {
+    GalleryTab.ALL -> R.string.gallery_tab_all
+    GalleryTab.CAMERA -> R.string.gallery_tab_camera
+    GalleryTab.SCREENSHOT -> R.string.gallery_tab_screenshot
+    GalleryTab.OTHER -> R.string.gallery_tab_other
 }

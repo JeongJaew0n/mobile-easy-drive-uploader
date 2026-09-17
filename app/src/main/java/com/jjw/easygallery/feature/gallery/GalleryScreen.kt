@@ -57,6 +57,7 @@ internal fun GalleryScreen(
     onUploadQueueClick: () -> Unit,
     modifier: Modifier = Modifier,
     onSelectionChange: (Set<Long>) -> Unit = {},
+    onTabChange: (GalleryTab) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
@@ -104,22 +105,22 @@ internal fun GalleryScreen(
                         onUploadTo = onUploadSelectedTo,
                     )
                 } else {
-                    GalleryTopBar(
-                        itemCount = content?.itemCount,
-                        uploadedCount = content?.uploadedCount ?: 0,
-                        favoritesOnly = content?.favoritesOnly == true,
-                        notBackedUpOnly = content?.notBackedUpOnly == true,
-                        supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true,
-                        onSettingsClick = onSettingsClick,
-                        onFavoritesOnlyChange = onFavoritesOnlyChange,
-                        onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
-                        onTrashClick = onTrashClick,
-                        onDriveClick = onDriveClick,
-                        onDuplicatesClick = onDuplicatesClick,
-                        onPickDateRange = { showDateRange = true },
-                        onPickCategory = { showCategoryFilter = true },
-                        categoryTitle = content?.let { categoryTitle(it.categoryFilter, it.categories) },
-                    )
+                    // 탭은 상단바와 한 덩어리다 — 선택 모드로 바뀌면 함께 사라진다.
+                    // 탭을 누르면 선택이 풀리므로 선택 상단바 옆에 두면 실수로 누르기 쉽다.
+                    Column {
+                        GalleryTopBar(
+                            content = content,
+                            onSettingsClick = onSettingsClick,
+                            onFavoritesOnlyChange = onFavoritesOnlyChange,
+                            onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
+                            onTrashClick = onTrashClick,
+                            onDriveClick = onDriveClick,
+                            onDuplicatesClick = onDuplicatesClick,
+                            onPickDateRange = { showDateRange = true },
+                            onPickCategory = { showCategoryFilter = true },
+                        )
+                        GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
+                    }
                 }
             }
         },

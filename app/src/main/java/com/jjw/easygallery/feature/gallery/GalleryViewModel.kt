@@ -91,6 +91,7 @@ class GalleryViewModel @Inject constructor(
     private val dateRange = MutableStateFlow<DateRange?>(null)
     private val notBackedUpOnly = MutableStateFlow(false)
     private val categoryFilter = MutableStateFlow<CategoryFilter?>(null)
+    private val tab = MutableStateFlow(GalleryTab.ALL)
 
     // 배지·"백업 안 됨" 필터는 현재 업로드 대상 계정 기준(다른 계정에 올린 건 그 계정을 골랐을 때 보인다)
     private val uploadedIds: Flow<Set<Long>> = prefs.preferences
@@ -156,6 +157,22 @@ class GalleryViewModel @Inject constructor(
         clearSelection()
         filterVersion++
         categoryFilter.value = filter
+    }
+
+    /**
+     * 상단 탭(출처) 전환. **다른 필터를 모두 푼다**(2026-09-17 사용자 결정) —
+     * 탭은 "지금 무엇을 보고 있는가" 의 최상위 기준이라, 이전 탭에서 걸어둔 조건이 따라오면
+     * 결과가 비어 보이는 이유를 알기 어렵다.
+     */
+    fun setTab(next: GalleryTab) {
+        if (tab.value == next) return
+        clearSelection()
+        filterVersion++
+        tab.value = next
+        filter.value = MediaFilter.All
+        dateRange.value = null
+        notBackedUpOnly.value = false
+        categoryFilter.value = null
     }
 
     // ---------- 카테고리 ----------
@@ -285,6 +302,7 @@ class GalleryViewModel @Inject constructor(
         val categories: List<Category>,
         val assignments: CategoryAssignments,
         val categoryFilter: CategoryFilter?,
+        val tab: GalleryTab,
         val version: Int,
     )
 
@@ -293,13 +311,14 @@ class GalleryViewModel @Inject constructor(
         val range: DateRange?,
         val notBackedUpOnly: Boolean,
         val category: CategoryFilter?,
+        val tab: GalleryTab,
     )
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
         // 원장(uploadedIds)은 업로드가 끝날 때만 바뀌므로 여기서 결합해도 선택 토글과 무관하다.
-        val filters = combine(dateRange, notBackedUpOnly, categoryFilter) { range, pending, category ->
-            MemoryFilters(range, pending, category)
+        val filters = combine(dateRange, notBackedUpOnly, categoryFilter, tab) { range, pending, category, t ->
+            MemoryFilters(range, pending, category, t)
         }
         val catalog = combine(
             mediaRepository.observeMedia(filter),
@@ -308,15 +327,19 @@ class GalleryViewModel @Inject constructor(
             categoryRepository.observeCategories(),
             categoryRepository.observeAssignments(),
         ) { all, f, uploaded, categories, assignments ->
-            // 순서: 백업 → 카테고리 → 기간. 기간 달력(dayCounts)은 기간 직전 목록으로 센다
-            val pending = if (f.notBackedUpOnly) all.filter { it.id !in uploaded } else all
+            // 순서: 탭(출처) → 백업 → 카테고리 → 기간. 기간 달력(dayCounts)은 기간 직전 목록으로 센다.
+            // 탭이 가장 바깥 범위라 제일 먼저 거른다 — 그래야 달력도 그 탭의 날짜만 보여준다.
+            val inTab = if (f.tab == GalleryTab.ALL) all else all.filter { f.tab.matches(it) }
+            val pending = if (f.notBackedUpOnly) inTab.filter { it.id !in uploaded } else inTab
             val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
             val items = categorized.filterByDate(f.range)
             latestItems = items
             Catalog(
                 items = items,
                 sections = groupByDate(items),
-                albums = albumsFrom(items),
+                // 탭 적용 전 목록에서 뽑는다. 이동 대상 폴더까지 탭으로 걸리면
+                // 카메라 탭에서 다른 폴더로 옮길 수 없다
+                albums = albumsFrom(all),
                 byId = items.associateBy { it.id },
                 range = f.range,
                 uploadedIds = uploaded,
@@ -326,6 +349,7 @@ class GalleryViewModel @Inject constructor(
                 categories = categories,
                 assignments = assignments,
                 categoryFilter = f.category,
+                tab = f.tab,
                 version = filterVersion,
             )
         }
@@ -350,6 +374,7 @@ class GalleryViewModel @Inject constructor(
                 categories = c.categories,
                 assignments = c.assignments,
                 categoryFilter = c.categoryFilter,
+                tab = c.tab,
                 showCategoryBadges = badges,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
@@ -397,6 +422,8 @@ sealed interface GalleryUiState {
         /** mediaId → 카테고리 ID. 썸네일 배지·피커 초기 상태 */
         val assignments: CategoryAssignments = emptyMap(),
         val categoryFilter: CategoryFilter? = null,
+        /** 지금 보고 있는 출처 탭 */
+        val tab: GalleryTab = GalleryTab.ALL,
         val showCategoryBadges: Boolean = true,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,

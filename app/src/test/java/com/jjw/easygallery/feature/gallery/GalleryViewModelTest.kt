@@ -271,7 +271,7 @@ class GalleryViewModelTest {
         }
     }
 
-    private fun sampleItem(id: Long): MediaItem = MediaItem(
+    private fun sampleItem(id: Long, relativePath: String = "DCIM/Camera/"): MediaItem = MediaItem(
         id = id,
         uri = mockk<Uri>(relaxed = true),
         displayName = "IMG_$id.jpg",
@@ -281,7 +281,84 @@ class GalleryViewModelTest {
         dateTakenMillis = 1_757_000_000_000,
         bucketId = 1,
         bucketName = "Camera",
+        relativePath = relativePath,
     )
+
+    // ---------- 출처 탭 (docs/plans/gallery-source-tabs) ----------
+
+    @Test
+    fun `탭은 출처로 목록을 가른다`() = runTest(testDispatcher) {
+        val camera = sampleItem(1, "DCIM/Camera/")
+        val shot = sampleItem(2, "DCIM/Screenshots/")
+        val kakao = sampleItem(3, "Pictures/KakaoTalk/")
+        every { repository.observeMedia(any()) } returns flowOf(listOf(camera, shot, kakao))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+
+            viewModel.setTab(GalleryTab.CAMERA)
+            (awaitItem() as GalleryUiState.Content).let {
+                assertEquals(listOf(camera), it.sections.single().items)
+                assertEquals(GalleryTab.CAMERA, it.tab)
+            }
+
+            viewModel.setTab(GalleryTab.SCREENSHOT)
+            assertEquals(listOf(shot), (awaitItem() as GalleryUiState.Content).sections.single().items)
+
+            viewModel.setTab(GalleryTab.OTHER)
+            assertEquals(listOf(kakao), (awaitItem() as GalleryUiState.Content).sections.single().items)
+        }
+    }
+
+    /** 탭을 바꾸면 이전 탭에서 걸어둔 조건이 따라오지 않는다(2026-09-17 결정) */
+    @Test
+    fun `탭을 바꾸면 기간·백업·카테고리 필터가 풀린다`() = runTest(testDispatcher) {
+        val camera = sampleItem(1, "DCIM/Camera/")
+        val kakao = sampleItem(2, "Pictures/KakaoTalk/")
+        every { repository.observeMedia(any()) } returns flowOf(listOf(camera, kakao))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+
+            viewModel.setNotBackedUpOnly(true)
+            assertTrue((awaitItem() as GalleryUiState.Content).notBackedUpOnly)
+            viewModel.setCategoryFilter(CategoryFilter.Uncategorized)
+            assertEquals(CategoryFilter.Uncategorized, (awaitItem() as GalleryUiState.Content).categoryFilter)
+
+            viewModel.setTab(GalleryTab.OTHER)
+            (awaitItem() as GalleryUiState.Content).let {
+                assertEquals(GalleryTab.OTHER, it.tab)
+                assertEquals(false, it.notBackedUpOnly)
+                assertEquals(null, it.categoryFilter)
+                assertEquals(null, it.dateRange)
+                assertEquals(false, it.favoritesOnly)
+            }
+        }
+    }
+
+    @Test
+    fun `같은 탭을 다시 눌러도 아무 일도 없다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1)))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+            viewModel.setNotBackedUpOnly(true)
+            awaitItem()
+
+            // ALL 이 이미 선택돼 있다 — 필터가 풀리면 안 된다
+            viewModel.setTab(GalleryTab.ALL)
+            expectNoEvents()
+        }
+    }
 
     @Test
     fun `category filter keeps only matching items and uncategorized shows the rest`() = runTest(testDispatcher) {

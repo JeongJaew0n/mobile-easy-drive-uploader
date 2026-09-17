@@ -127,6 +127,7 @@ fun GalleryRoute(
         onUploadSelectedTo = { startUploadTo(it) },
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
+        onTabChange = viewModel::setTab,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,

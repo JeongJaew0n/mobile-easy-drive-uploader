@@ -32,6 +32,8 @@
 | 능력 (Capability) | 저장소가 지원하는 동작의 집합(TRASH·RENAME·MOVE·SEARCH·DOWNLOAD 등). 화면 메뉴가 이 값에 따라 달라진다 | 저장소마다 다르다 — Drive 만 SEARCH 가 있다 |
 | 원장 (UploadLedger) | 업로드 완료 기록(`uploaded_media`). "이미 백업됨" 판단의 근거 | 큐(`upload_tasks`)와 다름 — 큐는 새 배치마다 비운다 |
 | 업로드 대상 | 지금 기본으로 올릴 저장소 계정과 폴더. 갤러리에서 ⋮ 로 이번 배치만 다른 곳에 올릴 수도 있다 | `UserPreferences.uploadAccountId` (null = Google Drive) |
+| 출처 (MediaSource) | 사진이 **어디서 온 것인지**. `relativePath` 로만 판정한다 — `DCIM/` 아래는 카메라, 경로에 `Screenshots` 가 있으면 스크린샷, 나머지는 다른 앱 | 갤러리 상단 탭의 기준. 앨범(폴더)보다 거친 단위다 |
+| 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것 |
 
 ## 규칙
 

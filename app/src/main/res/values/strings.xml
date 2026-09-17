@@ -66,6 +66,10 @@
     <string name="gallery_date_preset_7days">최근 7일</string>
     <string name="gallery_date_preset_30days">최근 30일</string>
     <string name="gallery_date_preset_year">올해</string>
+    <string name="gallery_tab_all">전체</string>
+    <string name="gallery_tab_camera">카메라</string>
+    <string name="gallery_tab_screenshot">스크린샷</string>
+    <string name="gallery_tab_other">다른 앱</string>
     <string name="gallery_date_sheet_title">기간 선택</string>
     <string name="gallery_date_sheet_hint">사진이 있는 날만 선택할 수 있습니다</string>
     <string name="gallery_date_month_label">%1$d년 %2$d월</string>
