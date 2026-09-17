@@ -308,6 +308,8 @@
     <string name="notification_upload_done_with_failures">%1$d개 성공, %2$d개 실패</string>
     <string name="notification_scan_title">중복 사진 검사 중</string>
     <string name="notification_scan_text">파일 내용 비교 %1$d/%2$d</string>
+    <string name="notification_tag_scan_title">사진 자동 태그 분석 중</string>
+    <string name="notification_tag_scan_text">사진 분석 %1$d/%2$d</string>
     <string name="notification_sign_in_required_title">업로드가 중단되었습니다</string>
     <string name="notification_sign_in_required_text">Google 계정을 다시 연결해야 업로드를 계속할 수 있습니다</string>
 
@@ -385,6 +387,7 @@
     <string name="auto_tag_time_description">이 시각쯤 자동으로 분석합니다. 기기 상태에 따라 늦어질 수 있습니다.</string>
     <string name="auto_tag_scan_now">지금 전체 분석</string>
     <string name="auto_tag_scan_stop">분석 중지</string>
+    <string name="auto_tag_scan_waiting">시작을 기다리는 중입니다 (배터리가 넉넉해지면 시작합니다)</string>
     <string name="auto_tag_scanning">분석 중… %1$d / %2$d</string>
     <string name="auto_tag_scanned_count">분석한 사진 %1$d장</string>
     <string name="auto_tag_last_run">마지막 분석: %1$s</string>
@@ -394,6 +397,7 @@
     <string name="auto_tag_to_category">카테고리로 만들기</string>
     <string name="auto_tag_to_category_done">%1$s 카테고리에 %2$d장을 넣었습니다</string>
     <string name="auto_tag_hide_label">이 라벨 숨기기</string>
+    <string name="auto_tag_unhide_label">숨기기 해제</string>
     <string name="auto_tag_hidden_notice">숨긴 라벨 %1$d개</string>
     <string name="auto_tag_show_hidden">숨긴 라벨 보기</string>
     <string name="auto_tag_clear">자동 태그 전부 지우기</string>

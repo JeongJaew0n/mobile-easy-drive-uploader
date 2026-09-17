@@ -82,6 +82,7 @@ fun AutoTagRoute(
         onScanNow = viewModel::scanNow,
         onStopScan = viewModel::stopScan,
         onHideLabel = viewModel::hideLabel,
+        onUnhideLabel = viewModel::unhideLabel,
         onToggleShowHidden = viewModel::toggleShowHidden,
         onCopyToCategory = viewModel::copyToCategory,
         onClearAll = viewModel::clearAll,
@@ -99,6 +100,7 @@ internal fun AutoTagScreen(
     onScanNow: () -> Unit,
     onStopScan: () -> Unit,
     onHideLabel: (String) -> Unit,
+    onUnhideLabel: (String) -> Unit,
     onToggleShowHidden: () -> Unit,
     onCopyToCategory: (String, String) -> Unit,
     onClearAll: () -> Unit,
@@ -164,7 +166,7 @@ internal fun AutoTagScreen(
             items(uiState.labels, key = { it.label }) { row ->
                 AutoTagLabelRowItem(
                     row = row,
-                    onHide = { onHideLabel(row.label) },
+                    onToggleHidden = { if (row.hidden) onUnhideLabel(row.label) else onHideLabel(row.label) },
                     onCopy = { display -> onCopyToCategory(row.label, display) },
                 )
             }
@@ -287,6 +289,9 @@ private fun AutoTagStatusRow(
             text = when {
                 progress.running && progress.total > 0 ->
                     stringResource(R.string.auto_tag_scanning, progress.done, progress.total)
+                // 배터리 제약이나 모델 대기로 큐에만 들어가 있는 동안. 안 그러면
+                // 진행 바도 문구도 없이 "분석 중지" 버튼만 뜬 멈춘 화면이 된다
+                progress.running -> stringResource(R.string.auto_tag_scan_waiting)
                 uiState.lastRunMillis > 0 -> stringResource(
                     R.string.auto_tag_last_run,
                     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -325,7 +330,7 @@ private fun AutoTagStatusRow(
 }
 
 @Composable
-private fun AutoTagLabelRowItem(row: AutoTagLabelRow, onHide: () -> Unit, onCopy: (String) -> Unit) {
+private fun AutoTagLabelRowItem(row: AutoTagLabelRow, onToggleHidden: () -> Unit, onCopy: (String) -> Unit) {
     var menuExpanded by remember { mutableStateOf(false) }
     val displayName = AutoTagLabels.displayNameRes(row.label)?.let { stringResource(it) } ?: row.label
     Row(
@@ -355,10 +360,17 @@ private fun AutoTagLabelRowItem(row: AutoTagLabelRow, onHide: () -> Unit, onCopy
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.auto_tag_hide_label)) },
+                    // 숨김이 저장되므로 되돌릴 자리가 필요하다 — "숨긴 라벨 보기" 상태에서 이 항목으로 푼다
+                    text = {
+                        Text(
+                            stringResource(
+                                if (row.hidden) R.string.auto_tag_unhide_label else R.string.auto_tag_hide_label,
+                            ),
+                        )
+                    },
                     onClick = {
                         menuExpanded = false
-                        onHide()
+                        onToggleHidden()
                     },
                 )
             }

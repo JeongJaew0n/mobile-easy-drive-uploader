@@ -10,6 +10,8 @@ import com.jjw.easygallery.core.data.upload.work.UploadNotifications
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.IOException
 
@@ -34,7 +36,7 @@ class AutoTagWorker @AssistedInject constructor(
             val result = repository.scan { done, total ->
                 setProgress(workDataOf(KEY_DONE to done, KEY_TOTAL to total))
                 if (total >= FOREGROUND_THRESHOLD) {
-                    runCatching { setForeground(notifications.scanForegroundInfo(done, total)) }
+                    runCatching { setForeground(notifications.tagScanForegroundInfo(done, total)) }
                 }
             }
             Timber.i(
@@ -54,8 +56,10 @@ class AutoTagWorker @AssistedInject constructor(
             Timber.e(e, "자동 태그 훑기 실패")
             Result.retry()
         } finally {
-            // 매일 실행분이면 다음 날 것을 다시 잡는다(WorkManager 는 "매일 몇 시"를 직접 못 준다)
-            if (daily) runCatching { scheduler.rescheduleDaily() }
+            // 매일 실행분이면 다음 날 것을 다시 잡는다(WorkManager 는 "매일 몇 시"를 직접 못 준다).
+            // NonCancellable 이 없으면 작업이 취소·중단될 때 여기 suspend 호출이 즉시 튕겨,
+            // 다시 잡지 못한 채 매일 실행이 영영 멈춘다.
+            if (daily) withContext(NonCancellable) { runCatching { scheduler.rescheduleDaily(afterRun = true) } }
         }
     }
 

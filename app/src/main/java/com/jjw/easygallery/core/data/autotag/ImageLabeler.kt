@@ -11,7 +11,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.Closeable
 import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -31,8 +30,11 @@ interface ImageLabeler : Closeable {
 /**
  * ML Kit 온디바이스 이미지 라벨링(`docs/AUTO_TAGGING.md` §5.1).
  * 원본이 아니라 [MAX_EDGE_PX] 로 줄인 비트맵을 넣는다 — 모델 입력이 224px 안팎이라 원본을 디코딩할 이유가 없다.
+ *
+ * **스코프를 붙이지 않는다.** [close] 가 네이티브 분류기를 영구히 닫아 버리므로,
+ * 싱글턴으로 두면 첫 훑기가 끝난 뒤 두 번째 훑기부터 사진마다
+ * `This detector is already closed!` 로 전부 실패한다. 훑기마다 새로 만든다.
  */
-@Singleton
 class MlKitImageLabeler @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : ImageLabeler {

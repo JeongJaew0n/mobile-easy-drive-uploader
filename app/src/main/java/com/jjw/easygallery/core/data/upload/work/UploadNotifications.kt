@@ -75,6 +75,27 @@ class UploadNotifications @Inject constructor(
     }
 
     /**
+     * 자동 태그 진행 — 중복 검사와 **다른 ID**. 새벽 자동 태그와 중복 검사가 겹칠 수 있는데,
+     * ID 가 같으면 먼저 끝난 쪽이 아직 도는 쪽의 알림까지 지운다.
+     */
+    fun tagScanForegroundInfo(done: Int, total: Int): ForegroundInfo {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle(context.getString(R.string.notification_tag_scan_title))
+            .setContentText(context.getString(R.string.notification_tag_scan_text, done, total))
+            .setProgress(total.coerceAtLeast(1), done, false)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openAppIntent())
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(TAG_SCAN_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(TAG_SCAN_ID, notification)
+        }
+    }
+
+    /**
      * 다운로드 진행 — 업로드와 같은 채널. 여러 파일이 동시에 내려올 수 있어 [key] 로 알림을 구분한다
      * (같은 ID 를 쓰면 한 워커가 끝날 때 다른 워커의 알림까지 사라진다).
      */
@@ -151,6 +172,7 @@ class UploadNotifications @Inject constructor(
         const val PROGRESS_ID = 1001
         const val SUMMARY_ID = 1002
         const val SCAN_ID = 1003
+        const val TAG_SCAN_ID = 1004
         const val DOWNLOAD_ID_BASE = 2000
         const val DOWNLOAD_RESULT_ID_BASE = 3000
         private const val DOWNLOAD_ID_SLOTS = 500

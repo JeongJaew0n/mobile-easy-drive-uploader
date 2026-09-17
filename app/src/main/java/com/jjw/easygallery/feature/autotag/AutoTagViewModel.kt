@@ -23,7 +23,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /** 화면에 보여줄 라벨 한 줄 */
-data class AutoTagLabelRow(val label: String, val count: Int)
+data class AutoTagLabelRow(val label: String, val count: Int, val hidden: Boolean = false)
 
 data class AutoTagUiState(
     val enabled: Boolean = false,
@@ -52,7 +52,6 @@ class AutoTagViewModel @Inject constructor(
     private val assignCategories: AssignCategoriesUseCase,
 ) : ViewModel() {
 
-    private val hidden = MutableStateFlow<Set<String>>(emptySet())
     private val showHidden = MutableStateFlow(false)
     private val isBusy = MutableStateFlow(false)
 
@@ -64,11 +63,12 @@ class AutoTagViewModel @Inject constructor(
         repository.observeLabelCounts(),
         repository.observeScannedCount(),
         scheduler.observeProgress(),
-        combine(hidden, showHidden, isBusy) { h, s, b -> Triple(h, s, b) },
-    ) { p, counts, scanned, progress, (hiddenLabels, show, busy) ->
+        combine(showHidden, isBusy) { s, b -> s to b },
+    ) { p, counts, scanned, progress, (show, busy) ->
+        val hiddenLabels = p.autoTagHiddenLabels
         val rows = counts
             .filter { show || it.label !in hiddenLabels }
-            .map { AutoTagLabelRow(it.label, it.count) }
+            .map { AutoTagLabelRow(it.label, it.count, it.label in hiddenLabels) }
         AutoTagUiState(
             enabled = p.autoTagEnabled,
             minuteOfDay = p.autoTagMinuteOfDay,
@@ -94,10 +94,14 @@ class AutoTagViewModel @Inject constructor(
 
     fun scanNow() = scheduler.scanNow()
 
-    fun stopScan() = scheduler.cancelScan()
+    fun stopScan() = viewModelScope.launch { scheduler.cancelScan() }
 
-    fun hideLabel(label: String) {
-        hidden.value = hidden.value + label
+    fun hideLabel(label: String) = viewModelScope.launch {
+        prefs.setAutoTagHiddenLabels(prefs.current().autoTagHiddenLabels + label)
+    }
+
+    fun unhideLabel(label: String) = viewModelScope.launch {
+        prefs.setAutoTagHiddenLabels(prefs.current().autoTagHiddenLabels - label)
     }
 
     fun toggleShowHidden() {

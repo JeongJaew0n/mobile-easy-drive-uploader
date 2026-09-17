@@ -11,6 +11,8 @@ import com.jjw.easygallery.core.domain.model.MediaType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
@@ -25,9 +27,13 @@ import javax.inject.Singleton
 class AutoTagRepository @Inject constructor(
     private val media: MediaRepository,
     private val dao: AutoTagDao,
-    // 훑을 때만 만들고 끝나면 닫는다 — 라벨러는 자원을 붙잡고 있다
+    // 훑을 때마다 새로 만들고 끝나면 닫는다 — 스코프가 없어야 한다(ImageLabeler 주석 참고)
     private val labelerProvider: Provider<ImageLabeler>,
 ) {
+    // 즉시 훑기와 매일 훑기는 WorkManager 고유 작업 이름이 달라 겹칠 수 있다.
+    // 겹치면 같은 사진을 두 번 디코딩하며 메모리·CPU 만 두 배로 쓴다.
+    private val scanLock = Mutex()
+
     data class ScanResult(
         val scanned: Int,
         val tagged: Int,
@@ -51,7 +57,10 @@ class AutoTagRepository @Inject constructor(
      * 아직 분석하지 않았거나 파일이 바뀐 **사진**만 훑는다. [onProgress] 는 (완료, 전체).
      * 모델이 아직 없으면 즉시 멈춘다 — 계속 돌아도 전부 실패한다.
      */
-    suspend fun scan(onProgress: suspend (done: Int, total: Int) -> Unit = { _, _ -> }): ScanResult {
+    suspend fun scan(onProgress: suspend (done: Int, total: Int) -> Unit = { _, _ -> }): ScanResult =
+        scanLock.withLock { scanLocked(onProgress) }
+
+    private suspend fun scanLocked(onProgress: suspend (done: Int, total: Int) -> Unit): ScanResult {
         val items = media.observeMedia(MediaFilter.All).first().filter { it.type == MediaType.IMAGE }
         val cached = dao.allScans().associateBy { it.mediaId }
         prune(cached.keys, items)
@@ -116,6 +125,9 @@ class AutoTagRepository @Inject constructor(
     /** 실패 횟수를 올려 둔다. [AutoTagScanEntity.MAX_FAILURES] 에 닿으면 다음부터 건너뛴다 */
     private suspend fun recordFailure(item: MediaItem, seen: AutoTagScanEntity?, e: Exception, kind: String) {
         val count = if (seen != null && seen.matches(item)) seen.failureCount + 1 else 1
+        // 파일이 바뀌어 다시 분석하다 실패한 경우, 예전 내용 기준 라벨을 남겨 두면 안 된다.
+        // 그 라벨로 카테고리를 만들면 엉뚱한 사진이 딸려 들어간다. 라벨이 없는 편이 틀린 라벨보다 낫다.
+        dao.deleteTagsOf(item.id)
         dao.insertScan(
             AutoTagScanEntity(item.id, item.sizeBytes, item.dateModifiedSeconds, System.currentTimeMillis(), count),
         )

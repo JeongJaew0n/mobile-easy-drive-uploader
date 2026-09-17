@@ -114,7 +114,13 @@ class ImageLabeler @Inject constructor(private val context: Context) {
 - 유니크 워크 `auto-tag-scan`, `ExistingWorkPolicy.KEEP`.
 - 제약: `setRequiresBatteryNotLow(true)`, `setRequiresCharging` 은 **걸지 않는다**(사용자가 직접 누르는 동작이라 즉시 돌아야 한다). 대신 전체 훑기는 충전 중을 권장한다고 화면에 적는다.
 - 20장 이상이면 포그라운드 알림(중복 검사의 `FOREGROUND_THRESHOLD` 와 같은 값, 같은 채널).
-- 진행률은 `setProgress` → 화면이 `getWorkInfosForUniqueWorkFlow` 로 본다.
+- 진행률은 `setProgress` → 화면이 `getWorkInfosForUniqueWorkFlow` 로 본다. **즉시 훑기와 매일 훑기 두 이름을 함께 본다** —
+  매일분만 돌고 있을 때 화면이 "쉬는 중"으로 보이면 사용자가 겹치는 훑기를 또 시작하게 된다.
+  단, 매일분이 다음 시각을 기다리며 `ENQUEUED` 로 앉아 있는 것은 "도는 중"이 아니다.
+- 고유 작업 이름이 둘이라 겹칠 수 있어, 마지막 방어선으로 `AutoTagRepository.scan` 을 `Mutex` 로 직렬화한다.
+- 라벨러는 **스코프 없이** 주입받아 훑기마다 새로 만들고 `finally` 에서 닫는다.
+  `close()` 는 네이티브 분류기를 영구히 닫으므로 싱글턴으로 두면 두 번째 훑기가 전부 실패한다
+  (`docs/troubleshootings/reusable/mlkit-detector-already-closed-on-second-run.md`).
 
 ### 5.4 새 사진 — 매일 정해진 시각
 
@@ -126,6 +132,10 @@ class ImageLabeler @Inject constructor(private val context: Context) {
   - 정확한 알람(`AlarmManager.setExactAndAllowWhileIdle`)을 쓰지 않는 이유: `SCHEDULE_EXACT_ALARM` 권한이 필요하고 Doze 를 깨워 배터리를 먹는다. 사진 태깅은 몇 분 늦어도 상관없다.
   - 대신 **정확한 시각은 보장되지 않는다**. Doze·기기 꺼짐으로 밀리면 WorkManager 가 조건이 맞을 때 실행한다. 화면에 "대략 그 시각"이라고 적는다.
 - 시각을 바꾸거나 스위치를 켜면 다시 예약하고, 끄면 `cancelUniqueWork` 한다.
+- 자기 재예약은 `withContext(NonCancellable)` 안에서 한다. 작업이 취소·중단되면 `finally` 의 suspend 호출이
+  즉시 튕겨, 다음 날 것을 못 잡은 채 **매일 실행이 영영 멈춘다**.
+- "분석 중지" 는 매일분이 **실제로 돌고 있을 때만** 그것도 취소한다. 다음 시각을 기다리는 예약까지 지우면
+  매일 실행이 통째로 사라진다.
 - 마지막 훑기 이후 추가·수정된 사진만 대상이라(§5.2 의 캐시 판정) 대개 몇 장이다.
 
 ## 6. 라벨 표시 이름
@@ -177,3 +187,23 @@ ML Kit 은 영어 라벨을 준다(`Food`, `Beach`, `Dog`…). 한국어로 보�
   `AutoTagRepository.scan`(캐시 판정·정리·모델 미준비 시 중단), `AutoTagWorker`/`AutoTagScheduler`(즉시 실행 + 매일 지정 시각 자기 재예약),
   설정 진입점과 전용 화면(스위치·시각 선택·진행률·라벨 목록·카테고리로 만들기·숨기기·전부 지우기), 라벨 한국어 대응표 40개.
   단위 테스트는 `AutoTagSchedulerTest`(시각 계산 경계). 실기기 항목은 `manual-tests/12-auto-tagging.md`.
+- 2026-09-16 코드 리뷰 후 결함 3건 수정(기기 재검증 전). 모두 **한 번만 돌려 보는 검증으로는 안 잡히는** 것들이다.
+  1. `MlKitImageLabeler` 가 `@Singleton` 인데 호출부가 `close()` 를 불러, 프로세스가 살아 있는 동안 두 번째 훑기부터 전부 실패했다.
+     세 번 반복하면 모든 사진이 `MAX_FAILURES` 에 닿아 영구히 포기된다. 스코프를 뺐고 `ImageLabelerScopeTest` 로 굳혔다.
+  2. 즉시 훑기와 매일 훑기가 직렬화되지 않았고, 화면은 즉시 훑기만 보고 있었다. 진행 상태를 양쪽으로 넓히고 `Mutex` 를 넣었다.
+  3. 워커의 자기 재예약이 취소에 튕겨 매일 실행이 멈출 수 있었다. `NonCancellable` 로 감쌌다.
+  기기 확인 항목 TAG-17~19 추가.
+- 2026-09-16 리뷰 2차. 알림 관련 2건 수정: 자동 태그 진행 알림이 "중복 사진 검사 중" 문구를 그대로 쓰고 있었고,
+  중복 검사와 알림 ID(`SCAN_ID`)까지 같아 새벽 04:00 에 둘이 겹치면 먼저 끝난 쪽이 나머지 알림을 지웠다.
+  전용 문구와 `TAG_SCAN_ID` 로 분리. 큐에서 대기 중(배터리 부족·모델 대기)일 때 진행 바도 문구도 없이
+  "분석 중지" 버튼만 뜨던 것도 대기 문구를 넣어 고쳤다.
+- 2026-09-16 리뷰 3차(LOW 3건). (1) 예약을 분 단위로 잘라 04:00 을 59초 앞두고 뜬 훑기가 끝나며 다시 예약하면
+  또 0분으로 잘려 헛도는 재실행이 반복됐다 → 초 단위로 건다(`Duration.toSeconds()` 는 API 31 이라 `seconds` 를 쓴다).
+  (2) 파일이 바뀐 사진의 재분석이 실패하면 예전 내용 기준 라벨이 남아, 그 라벨로 카테고리를 만들면 엉뚱한 사진이
+  딸려 들어갔다 → 실패 시 라벨을 지운다. (3) 숨긴 라벨이 화면을 벗어나면 되살아났다(메모리 상태) →
+  `auto_tag_hidden_labels` 로 저장하고 ⋮ 메뉴에 "숨기기 해제" 를 넣었다.
+- 2026-09-16 실기기 검증(Galaxy S23+). 리뷰 수정본을 A/B 로 확인했다 — `@Singleton` 을 되돌린 대조군은
+  같은 프로세스 2차 훑기에서 `MlKitException: This detector is already closed!` 로 실패했고,
+  수정본은 같은 시나리오를 4회 연속 통과했다. **여기서만 드러난 결함 1건**: 초 단위 예약으로 바꿨어도
+  JobScheduler 가 목표보다 1초쯤 일찍 깨워(21:49:59) 재예약이 오늘 것을 또 잡아 두 번 돌았다
+  → `delayUntil(skipWithin=)` 과 `rescheduleDaily(afterRun = true)` 로 막고 21:55 재시험에서 1회만 확인.

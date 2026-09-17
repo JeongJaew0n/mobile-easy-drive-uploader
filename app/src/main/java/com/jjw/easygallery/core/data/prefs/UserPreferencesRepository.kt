@@ -50,6 +50,8 @@ data class UserPreferences(
     /** 자동 분석 시각(하루 중 분, 0~1439). 기본 04:00 */
     val autoTagMinuteOfDay: Int = DEFAULT_AUTO_TAG_MINUTE,
     val autoTagLastRunMillis: Long = 0,
+    /** 자동 태그 목록에서 감춘 라벨(ML Kit 영어 원문) */
+    val autoTagHiddenLabels: Set<String> = emptySet(),
 ) {
     val isSignedIn: Boolean get() = accountEmail != null
 
@@ -76,6 +78,7 @@ class UserPreferencesRepository @Inject constructor(
             autoTagEnabled = prefs[KEY_AUTO_TAG_ENABLED] ?: false,
             autoTagMinuteOfDay = prefs[KEY_AUTO_TAG_MINUTE] ?: DEFAULT_AUTO_TAG_MINUTE,
             autoTagLastRunMillis = prefs[KEY_AUTO_TAG_LAST_RUN] ?: 0L,
+            autoTagHiddenLabels = prefs[KEY_AUTO_TAG_HIDDEN] ?: emptySet(),
             autoBackupPaths = prefs[KEY_AUTO_BACKUP_PATHS] ?: emptySet(),
             autoBackupIncludeVideos = prefs[KEY_AUTO_BACKUP_VIDEOS] ?: true,
             autoBackupSinceSeconds = prefs[KEY_AUTO_BACKUP_SINCE] ?: 0L,
@@ -155,6 +158,11 @@ class UserPreferencesRepository @Inject constructor(
         store.edit { it[KEY_AUTO_TAG_LAST_RUN] = millis }
     }
 
+    /** 화면에 "숨긴 N개" 토글이 있어 사용자는 유지되는 설정으로 읽는다 — 메모리에만 두면 안 된다 */
+    suspend fun setAutoTagHiddenLabels(labels: Set<String>) {
+        store.edit { it[KEY_AUTO_TAG_HIDDEN] = labels }
+    }
+
     suspend fun setAutoBackupPaths(paths: Set<String>) {
         store.edit { it[KEY_AUTO_BACKUP_PATHS] = paths }
     }
@@ -191,6 +199,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_AUTO_TAG_ENABLED = booleanPreferencesKey("auto_tag_enabled")
         val KEY_AUTO_TAG_MINUTE = intPreferencesKey("auto_tag_minute_of_day")
         val KEY_AUTO_TAG_LAST_RUN = longPreferencesKey("auto_tag_last_run")
+        val KEY_AUTO_TAG_HIDDEN = stringSetPreferencesKey("auto_tag_hidden_labels")
         val KEY_AUTO_BACKUP_PATHS = stringSetPreferencesKey("auto_backup_paths")
         val KEY_AUTO_BACKUP_VIDEOS = booleanPreferencesKey("auto_backup_videos")
         val KEY_AUTO_BACKUP_SINCE = longPreferencesKey("auto_backup_since_seconds")
