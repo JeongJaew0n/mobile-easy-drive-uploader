@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -32,10 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,33 +122,46 @@ internal fun DateRangeSheet(
                 },
             )
             var jumpOpen by remember { mutableStateOf(false) }
-            val visibleMonth = calendarState.firstVisibleMonth.yearMonth
+            // `firstVisibleMonth` 는 헤더 **안에서만** 읽는다. 여기서 읽으면 달력을 넘길 때마다
+            // 시트 전체가 다시 그려진다(dayCounts 가 불안정 타입이라 달력도 건너뛰지 못한다).
             MonthJumpHeader(
-                month = visibleMonth,
+                state = calendarState,
                 expanded = jumpOpen,
                 onToggle = { jumpOpen = !jumpOpen },
             )
+            HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
+            // 패널은 달력 "자리를 대신" 쓴다. 위에 쌓으면 달력 높이(400dp 고정) 때문에
+            // 적용 버튼이 화면 밖으로 밀린다.
             if (jumpOpen) {
                 MonthJumpPanel(
                     dayCounts = dayCounts,
-                    visibleMonth = visibleMonth,
+                    // 패널이 열려 있는 동안엔 달력이 없어 이 값이 변하지 않는다
+                    initialYear = calendarState.firstVisibleMonth.yearMonth.year,
                     startMonth = startMonth,
                     endMonth = thisMonth,
                     onPick = { target ->
                         jumpOpen = false
                         scope.launch { calendarState.animateScrollToMonth(target) }
                     },
+                    // 달력과 같은 이유로 남는 높이만 쓴다. 고정 높이로 두면 가로 화면에서
+                    // 월 그리드 마지막 줄과 적용 버튼이 잘린다(실기기 확인).
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            } else {
+                WeekdayHeader(firstDayOfWeek)
+                RangeCalendar(
+                    state = calendarState,
+                    dayCounts = dayCounts,
+                    today = today,
+                    selection = selection,
+                    onDayClick = { selection = selection.select(it) },
+                    // 세로에서는 400dp, 가로처럼 낮은 화면에서는 남는 만큼만 쓴다.
+                    // 고정 높이로 두면 적용·취소 행이 화면 밖으로 밀린다.
+                    modifier = Modifier
+                        .heightIn(max = CALENDAR_HEIGHT_DP.dp)
+                        .weight(1f, fill = false),
                 )
             }
-            WeekdayHeader(firstDayOfWeek)
-            HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
-            RangeCalendar(
-                state = calendarState,
-                dayCounts = dayCounts,
-                today = today,
-                selection = selection,
-                onDayClick = { selection = selection.select(it) },
-            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,12 +243,12 @@ private fun RangeCalendar(
     today: LocalDate,
     selection: DateRangeSelection,
     onDayClick: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     VerticalCalendar(
         state = state,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(CALENDAR_HEIGHT_DP.dp)
             .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp),
         monthHeader = { month -> MonthHeader(month) },
         dayContent = { day ->
@@ -378,7 +398,8 @@ private const val DISABLED_ALPHA = 0.38f
 
 /** 달력 위 고정 헤더 — 지금 보이는 달을 보여주고, 누르면 연·월 점프 패널을 연다 */
 @Composable
-private fun MonthJumpHeader(month: YearMonth, expanded: Boolean, onToggle: () -> Unit) {
+private fun MonthJumpHeader(state: CalendarState, expanded: Boolean, onToggle: () -> Unit) {
+    val month = state.firstVisibleMonth.yearMonth
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,23 +425,43 @@ private fun MonthJumpHeader(month: YearMonth, expanded: Boolean, onToggle: () ->
 @Composable
 private fun MonthJumpPanel(
     dayCounts: Map<LocalDate, Int>,
-    visibleMonth: YearMonth,
+    initialYear: Int,
     startMonth: YearMonth,
     endMonth: YearMonth,
     onPick: (YearMonth) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val years = remember(dayCounts) { DateJump.yearsWithPhotos(dayCounts) }
-    var selectedYear by remember(visibleMonth) { mutableStateOf(visibleMonth.year) }
-    val activeMonths = remember(dayCounts, selectedYear) { DateJump.monthsWithPhotos(dayCounts, selectedYear) }
+    val years = remember(dayCounts, startMonth, endMonth) {
+        DateJump.yearsWithPhotos(dayCounts, startMonth, endMonth)
+    }
+    // 패널이 열려 있는 동안만 유지한다. 열 때의 연도로 시작하고, 이후 사용자가 고른 값을 지킨다
+    // 달력 범위는 연속이지만 사진이 있는 연도는 띄엄띄엄일 수 있다. 사진 없는 해에서 패널을 열면
+    // 고른 연도 칩이 하나도 없고 열두 달이 전부 비활성이라 화면이 죽은 것처럼 보인다 → 가장 가까운 해로 당긴다.
+    var selectedYear by rememberSaveable(years) {
+        mutableStateOf(DateJump.nearestYear(years, initialYear) ?: initialYear)
+    }
+    val activeMonths = remember(dayCounts, selectedYear, startMonth, endMonth) {
+        DateJump.monthsWithPhotos(dayCounts, selectedYear, startMonth, endMonth)
+    }
 
-    Column(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp, vertical = 4.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp, vertical = 4.dp),
+    ) {
+        // 오래된 해를 보다가 패널을 열면 선택된 칩이 오른쪽 화면 밖에 있다.
+        // 그대로 두면 "아무것도 안 골라진" 것처럼 보이므로 열 때 그 칩까지 스크롤해 둔다.
+        val yearListState = rememberLazyListState()
+        LaunchedEffect(Unit) {
+            val index = years.indexOf(selectedYear)
+            if (index > 0) yearListState.scrollToItem(index)
+        }
+        LazyRow(
+            state = yearListState,
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            years.forEach { year ->
+            items(years, key = { it }) { year ->
                 FilterChip(
                     selected = year == selectedYear,
                     onClick = { selectedYear = year },
@@ -444,7 +485,6 @@ private fun MonthJumpPanel(
             }
         }
     }
-    HorizontalDivider(Modifier.padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp))
 }
 
 @Composable
@@ -452,7 +492,11 @@ private fun MonthCell(month: Int, enabled: Boolean, modifier: Modifier, onClick:
     TextButton(onClick = onClick, enabled = enabled, modifier = modifier) {
         Text(
             text = stringResource(R.string.gallery_date_month_only_label, month),
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            // onSurfaceVariant 로는 어두운 테마에서 활성과 구별되지 않는다(실기기 확인).
+            // 날짜 셀의 비활성 표현과 같은 투명도를 쓴다.
+            color = MaterialTheme.colorScheme.onSurface.let {
+                if (enabled) it else it.copy(alpha = DISABLED_ALPHA)
+            },
         )
     }
 }
