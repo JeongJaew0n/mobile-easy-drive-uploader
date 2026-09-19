@@ -109,19 +109,65 @@ class MediaViewerViewModelTest {
     }
 
     @Test
-    fun `deleting the current item keeps the same slot`() = runTest(testDispatcher) {
+    fun `현재 항목을 지우면 바로 이전 사진으로 간다`() = runTest(testDispatcher) {
         val viewModel = createViewModel()
         collectState(viewModel)
         viewModel.load(mediaId = 2, favoritesOnly = false)
         advanceUntilIdle()
 
-        // 2번이 사라지면 같은 자리에 있던 3번이 보여야 한다
         items.value = listOf(item(1), item(3))
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.currentIndex)
-        assertEquals(3L, state.items[state.currentIndex].id)
+        assertEquals(0, state.currentIndex)
+        assertEquals(1L, state.current?.id)
+    }
+
+    /** current 가 null 이면 화면이 통째로 비어 검은 화면이 된다 — 그 상태로 남지 않아야 한다 */
+    @Test
+    fun `지운 뒤에도 현재 항목이 비지 않는다`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        viewModel.load(mediaId = 3, favoritesOnly = false)
+        advanceUntilIdle()
+
+        items.value = listOf(item(1), item(2))
+        advanceUntilIdle()
+
+        assertEquals(2L, viewModel.uiState.value.current?.id)
+    }
+
+    @Test
+    fun `첫 사진을 지우면 이전이 없어 그 자리에 머문다`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        viewModel.load(mediaId = 1, favoritesOnly = false)
+        advanceUntilIdle()
+
+        items.value = listOf(item(2), item(3))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(0, state.currentIndex)
+        assertEquals(2L, state.current?.id)
+    }
+
+    /** 옮겨간 사진이 곧바로 편집 대상이 된다 — 페이저가 알려주기를 기다리지 않는다 */
+    @Test
+    fun `지운 뒤 연달아 지우면 옮겨간 사진이 지워진다`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        viewModel.load(mediaId = 3, favoritesOnly = false)
+        advanceUntilIdle()
+
+        items.value = listOf(item(1), item(2))
+        advanceUntilIdle()
+        items.value = listOf(item(1))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(0, state.currentIndex)
+        assertEquals(1L, state.current?.id)
     }
 
     @Test

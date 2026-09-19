@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -69,6 +70,9 @@ class MediaViewerViewModel @Inject constructor(
     val actionEvents = actionController.events
 
     private var items: List<MediaItem> = emptyList()
+
+    /** 보고 있던 자리. 삭제로 항목이 사라졌을 때 "바로 이전" 을 찾는 기준이 된다 */
+    private var lastIndex = 0
 
     val uiState: StateFlow<MediaViewerUiState> = filter
         .flatMapLatest { f -> if (f == null) flowOf(MediaViewerUiState()) else contentFlow(f) }
@@ -154,14 +158,17 @@ class MediaViewerViewModel @Inject constructor(
         actionController.isMutating,
     ) { list, id, detailMap, extras, mutating ->
         items = list
-        val index = list.indexOfFirst { it.id == id }.takeIf { it >= 0 }
-        val current = index?.let(list::get)
+        val found = list.indexOfFirst { it.id == id }
+        // 지워졌으면 바로 이전 사진으로 간다. 예전에는 current 가 null 이 되어
+        // 화면이 통째로 비었고(검은 화면), 인덱스를 맞추는 쪽에도 닿지 못해 복구되지 않았다.
+        val index = if (found >= 0) found else previousIndexAfterRemoval(lastIndex, list.size)
+        lastIndex = index
+        val current = list.getOrNull(index)
         if (current != null) loadDetailsIfNeeded(current)
         val assigned = current?.let { extras.assignments[it.id] }.orEmpty()
         MediaViewerUiState(
             items = list,
-            // 현재 항목이 삭제되면 같은 자리(다음 항목)를 보여준다
-            currentIndex = index ?: currentIndex(list),
+            currentIndex = index,
             current = current,
             details = current?.let { detailMap[it.id] },
             albums = albumsFrom(list),
@@ -174,14 +181,14 @@ class MediaViewerViewModel @Inject constructor(
             isMutating = mutating,
             isLoading = false,
         )
+    }.onEach { state ->
+        // 자리를 옮겼으면 편집 대상도 곧바로 옮긴다. 페이저가 정착하며 알려주기를 기다리면
+        // 그 사이의 삭제·즐겨찾기가 사라진 항목을 가리켜 아무 일도 하지 않는다.
+        state.current?.let { if (it.id != currentId.value) currentId.value = it.id }
     }.catch { throwable ->
         Timber.e(throwable, "viewer failed")
         emit(MediaViewerUiState(isLoading = false))
     }
-
-    /** 현재 항목이 목록에서 사라졌을 때 유지할 인덱스 */
-    private fun currentIndex(list: List<MediaItem>): Int =
-        uiState.value.currentIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))
 
     /** 정보 패널·업로드·카테고리처럼 목록과 무관하게 바뀌는 값 묶음(combine 인자 수 제한) */
     private class Extras(
@@ -228,6 +235,18 @@ class MediaViewerViewModel @Inject constructor(
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
     }
+}
+
+/**
+ * 보고 있던 항목이 [removedIndex] 에서 사라졌을 때 갈 자리 — **바로 이전** 사진이다.
+ *
+ * 앞쪽 항목은 자리가 밀리지 않으므로 지워지기 전 인덱스에서 하나만 빼면 된다.
+ * 첫 번째를 지웠으면 이전이 없어 그 자리(= 다음 사진)에 머문다. 목록이 비면 0
+ * (화면은 `MediaViewerRoute` 가 닫는다).
+ */
+internal fun previousIndexAfterRemoval(removedIndex: Int, newSize: Int): Int {
+    if (newSize <= 0) return 0
+    return (removedIndex - 1).coerceIn(0, newSize - 1)
 }
 
 data class MediaViewerUiState(
