@@ -336,7 +336,9 @@ class GalleryViewModel @Inject constructor(
             latestItems = items
             Catalog(
                 items = items,
-                sections = groupByDate(items),
+                // '다른 앱' 탭은 날짜 대신 앱으로 묶는다 — 카카오톡 사진 1000여 장이
+                // 날짜순으로 흩어져 있으면 어느 앱 것인지 알아볼 수 없다
+                sections = if (f.tab == GalleryTab.OTHER) groupByApp(items) else groupByDate(items),
                 // 탭 적용 전 목록에서 뽑는다. 이동 대상 폴더까지 탭으로 걸리면
                 // 카메라 탭에서 다른 폴더로 옮길 수 없다
                 albums = albumsFrom(all),

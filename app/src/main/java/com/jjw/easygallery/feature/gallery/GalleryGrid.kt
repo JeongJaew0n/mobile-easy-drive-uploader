@@ -60,7 +60,6 @@ import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.categoryColor
 import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -118,13 +117,14 @@ internal fun GalleryGrid(
     ) {
         sections.forEach { section ->
             item(
-                key = "header-${section.date}",
+                key = "header-${section.header}",
                 span = { GridItemSpan(maxLineSpan) },
                 contentType = "header",
             ) {
                 val sectionIds = section.items.map { it.id }
-                DateHeader(
-                    date = section.date,
+                SectionHeaderRow(
+                    header = section.header,
+                    count = section.items.size,
                     formatter = dateFormatter,
                     allSelected = sectionIds.isNotEmpty() && sectionIds.all { it in selectedIds },
                     anySelected = sectionIds.any { it in selectedIds },
@@ -162,8 +162,9 @@ internal fun GalleryGrid(
 }
 
 @Composable
-private fun DateHeader(
-    date: LocalDate,
+private fun SectionHeaderRow(
+    header: SectionHeader,
+    count: Int,
     formatter: DateTimeFormatter,
     allSelected: Boolean,
     anySelected: Boolean,
@@ -176,13 +177,29 @@ private fun DateHeader(
             .padding(start = 12.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = remember(date, formatter) { formatter.format(date) },
-            style = MaterialTheme.typography.titleSmall,
+        Row(
             modifier = Modifier
                 .weight(1f)
                 .padding(vertical = 8.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = when (header) {
+                    is SectionHeader.ByDate -> remember(header, formatter) { formatter.format(header.date) }
+                    is SectionHeader.ByApp -> appName(header.folder)
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            // 앱별 묶음은 개수가 바로 보여야 한다 — 어느 앱이 목록을 채우고 있는지가 이 탭의 핵심이다
+            if (header is SectionHeader.ByApp) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.gallery_app_section_count, count),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Spacer(Modifier.width(8.dp))
         SectionSelectButton(
             allSelected = allSelected,
@@ -192,7 +209,12 @@ private fun DateHeader(
     }
 }
 
-/** 날짜별 전체 선택 토글. 일부만 선택된 상태는 테두리를 굵게 해서 구분한다. */
+/** 표에 있는 폴더만 한국어로, 나머지는 폴더 이름 그대로 */
+@Composable
+private fun appName(folder: String): String =
+    AppFolders.displayNameRes(folder)?.let { stringResource(it) } ?: folder
+
+/** 묶음 전체 선택 토글. 일부만 선택된 상태는 테두리를 굵게 해서 구분한다. */
 @Composable
 private fun SectionSelectButton(
     allSelected: Boolean,

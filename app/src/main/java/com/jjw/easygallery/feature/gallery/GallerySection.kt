@@ -5,9 +5,20 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** 같은 날짜에 촬영된 항목 묶음. 최신 날짜가 먼저 온다. */
+/** 묶음 머리글. 갤러리는 날짜로 묶지만 '다른 앱' 탭은 앱(폴더)으로 묶는다 */
+sealed interface SectionHeader {
+    data class ByDate(val date: LocalDate) : SectionHeader
+
+    /**
+     * [folder] 는 `relativePath` 에서 뽑은 폴더 이름 원문(`KakaoTalk`).
+     * 화면에 보일 때만 [AppFolders.displayNameRes] 로 한국어를 찾는다 — 표에 없으면 원문 그대로다.
+     */
+    data class ByApp(val folder: String) : SectionHeader
+}
+
+/** 머리글 하나와 그 아래 항목들. 항목 순서는 입력(최신순)을 그대로 따른다 */
 data class GallerySection(
-    val date: LocalDate,
+    val header: SectionHeader,
     val items: List<MediaItem>,
 )
 
@@ -26,13 +37,13 @@ fun groupByDate(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): 
     for (item in items) {
         val date = Instant.ofEpochMilli(item.dateTakenMillis).atZone(zone).toLocalDate()
         if (date != currentDate) {
-            if (currentDate != null) sections += GallerySection(currentDate, bucket)
+            if (currentDate != null) sections += GallerySection(SectionHeader.ByDate(currentDate), bucket)
             currentDate = date
             bucket = ArrayList()
         }
         bucket += item
     }
-    currentDate?.let { sections += GallerySection(it, bucket) }
+    currentDate?.let { sections += GallerySection(SectionHeader.ByDate(it), bucket) }
     return sections
 }
 
@@ -45,3 +56,25 @@ fun countByDay(items: List<MediaItem>, zone: ZoneId = ZoneId.systemDefault()): M
     }
     return counts
 }
+
+/**
+ * 앱(폴더)별로 묶는다. '다른 앱' 탭에서 날짜 대신 쓴다 — 카카오톡 사진 1000여 장이
+ * 날짜순으로 흩어져 있으면 어느 앱 것인지 알아볼 수 없다.
+ *
+ * 묶음은 **항목이 많은 순**으로, 같으면 이름순. 묶음 안 순서는 입력(최신순) 그대로다.
+ * 폴더를 알 수 없는 항목(경로가 빈 레거시 행)은 맨 뒤 한 묶음으로 모은다.
+ */
+fun groupByApp(items: List<MediaItem>): List<GallerySection> {
+    if (items.isEmpty()) return emptyList()
+    val buckets = LinkedHashMap<String, MutableList<MediaItem>>()
+    for (item in items) {
+        val folder = AppFolders.folderOf(item.relativePath) ?: UNKNOWN_FOLDER
+        buckets.getOrPut(folder) { ArrayList() } += item
+    }
+    return buckets.entries
+        .sortedWith(compareByDescending<Map.Entry<String, List<MediaItem>>> { it.value.size }.thenBy { it.key })
+        .map { (folder, group) -> GallerySection(SectionHeader.ByApp(folder), group) }
+}
+
+/** 경로가 없어 앱을 알 수 없는 항목의 묶음 이름 */
+internal const val UNKNOWN_FOLDER = "?"

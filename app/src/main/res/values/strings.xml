@@ -66,6 +66,12 @@
     <string name="gallery_date_preset_7days">최근 7일</string>
     <string name="gallery_date_preset_30days">최근 30일</string>
     <string name="gallery_date_preset_year">올해</string>
+    <string name="gallery_app_section_count">%1$d장</string>
+    <string name="gallery_app_kakaotalk">카카오톡</string>
+    <string name="gallery_app_kakaotalk_download">카카오톡 받은 파일</string>
+    <string name="gallery_app_download">다운로드</string>
+    <string name="gallery_app_documents">문서</string>
+    <string name="gallery_app_screenshots">스크린샷</string>
     <string name="gallery_tab_all">전체</string>
     <string name="gallery_tab_camera">카메라</string>
     <string name="gallery_tab_screenshot">스크린샷</string>

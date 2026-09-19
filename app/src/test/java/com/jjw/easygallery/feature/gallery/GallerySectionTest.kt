@@ -30,7 +30,7 @@ class GallerySectionTest {
         val sections = groupByDate(listOf(a, b), zone)
 
         assertEquals(1, sections.size)
-        assertEquals(day, sections[0].date)
+        assertEquals(SectionHeader.ByDate(day), sections[0].header)
         assertEquals(listOf(a, b), sections[0].items)
     }
 
@@ -42,7 +42,10 @@ class GallerySectionTest {
 
         val sections = groupByDate(listOf(newer, older, oldest), zone)
 
-        assertEquals(listOf(newer.date(), older.date(), oldest.date()), sections.map { it.date })
+        assertEquals(
+            listOf(newer.date(), older.date(), oldest.date()),
+            sections.map { (it.header as SectionHeader.ByDate).date },
+        )
         assertEquals(listOf(1, 1, 1), sections.map { it.items.size })
     }
 
@@ -54,8 +57,8 @@ class GallerySectionTest {
         val utcSections = groupByDate(listOf(utcLate), ZoneOffset.UTC)
         val kstSections = groupByDate(listOf(utcLate), ZoneId.of("Asia/Seoul"))
 
-        assertEquals(LocalDate.of(2026, 9, 6), utcSections.single().date)
-        assertEquals(LocalDate.of(2026, 9, 7), kstSections.single().date)
+        assertEquals(LocalDate.of(2026, 9, 6), (utcSections.single().header as SectionHeader.ByDate).date)
+        assertEquals(LocalDate.of(2026, 9, 7), (kstSections.single().header as SectionHeader.ByDate).date)
     }
 
     @Test
@@ -117,4 +120,57 @@ class GallerySectionTest {
         bucketId = 1,
         bucketName = "Camera",
     )
+
+    /** 앱별 묶기는 경로만 본다 — 날짜는 아무 값이나 */
+    private fun item(id: Long, relativePath: String): MediaItem =
+        item(id, LocalDate.of(2026, 9, 7), LocalTime.NOON).copy(relativePath = relativePath)
+
+    // ---------- 앱별 묶기 ('다른 앱' 탭) ----------
+
+    @Test
+    fun `앱별로 묶고 항목이 많은 순으로 놓는다`() {
+        val sections = groupByApp(
+            listOf(
+                item(1, "Download/"),
+                item(2, "Pictures/KakaoTalk/"),
+                item(3, "Pictures/KakaoTalk/"),
+                item(4, "Pictures/KakaoTalk/"),
+                item(5, "Documents/obsidian/pictures/"),
+                item(6, "Documents/obsidian/pictures/"),
+            ),
+        )
+
+        assertEquals(
+            listOf(SectionHeader.ByApp("KakaoTalk"), SectionHeader.ByApp("obsidian"), SectionHeader.ByApp("Download")),
+            sections.map { it.header },
+        )
+        assertEquals(listOf(2L, 3L, 4L), sections[0].items.map { it.id })
+    }
+
+    @Test
+    fun `묶음 안 순서는 입력을 그대로 따른다`() {
+        val sections = groupByApp(listOf(item(3, "Pictures/A/"), item(1, "Pictures/A/"), item(2, "Pictures/A/")))
+        assertEquals(listOf(3L, 1L, 2L), sections.single().items.map { it.id })
+    }
+
+    @Test
+    fun `개수가 같으면 이름순`() {
+        val sections = groupByApp(listOf(item(1, "Pictures/Zeta/"), item(2, "Pictures/Alpha/")))
+        assertEquals(
+            listOf(SectionHeader.ByApp("Alpha"), SectionHeader.ByApp("Zeta")),
+            sections.map { it.header },
+        )
+    }
+
+    @Test
+    fun `경로 없는 항목은 한 묶음으로 모은다`() {
+        val sections = groupByApp(listOf(item(1, "Pictures/A/"), item(2, ""), item(3, "")))
+        assertEquals(SectionHeader.ByApp(UNKNOWN_FOLDER), sections.first().header)
+        assertEquals(2, sections.first().items.size)
+    }
+
+    @Test
+    fun `빈 목록은 빈 묶음`() {
+        assertEquals(emptyList<GallerySection>(), groupByApp(emptyList()))
+    }
 }

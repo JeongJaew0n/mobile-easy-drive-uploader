@@ -34,6 +34,7 @@
 | 업로드 대상 | 지금 기본으로 올릴 저장소 계정과 폴더. 갤러리에서 ⋮ 로 이번 배치만 다른 곳에 올릴 수도 있다 | `UserPreferences.uploadAccountId` (null = Google Drive) |
 | 출처 (MediaSource) | 사진이 **어디서 온 것인지**. `relativePath` 로만 판정한다 — `DCIM/` 아래는 카메라, 경로에 `Screenshots` 가 있으면 스크린샷, 나머지는 다른 앱 | 갤러리 상단 탭의 기준. 앨범(폴더)보다 거친 단위다 |
 | 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것 |
+| 앱 폴더 (AppFolders.folderOf) | 표준 최상위 폴더 바로 아래 칸(`Documents/obsidian/pictures/` → `obsidian`). '다른 앱' 탭의 묶음 이름 | 앨범과 다름 — 앨범은 전체 경로, 앱 폴더는 그중 한 칸이다 |
 
 ## 규칙
 
