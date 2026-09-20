@@ -202,6 +202,7 @@ private fun SectionHeaderRow(
         }
         Spacer(Modifier.width(8.dp))
         SectionSelectButton(
+            byApp = header is SectionHeader.ByApp,
             allSelected = allSelected,
             anySelected = anySelected,
             onClick = onToggleSection,
@@ -217,17 +218,23 @@ private fun appName(folder: String): String =
 /** 묶음 전체 선택 토글. 일부만 선택된 상태는 테두리를 굵게 해서 구분한다. */
 @Composable
 private fun SectionSelectButton(
+    byApp: Boolean,
     allSelected: Boolean,
     anySelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val selectAllLabel = stringResource(R.string.gallery_section_select_all)
+    // 앱 묶음에 "이 날짜 전체 선택" 이라고 읽어주면 안 된다
+    val selectAllLabel = stringResource(
+        if (byApp) R.string.gallery_app_section_select_all else R.string.gallery_section_select_all,
+    )
     IconButton(onClick = onClick, modifier = modifier) {
         if (allSelected) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
-                contentDescription = stringResource(R.string.gallery_section_deselect_all),
+                contentDescription = stringResource(
+                    if (byApp) R.string.gallery_app_section_deselect_all else R.string.gallery_section_deselect_all,
+                ),
                 tint = MaterialTheme.colorScheme.primary,
             )
         } else {
