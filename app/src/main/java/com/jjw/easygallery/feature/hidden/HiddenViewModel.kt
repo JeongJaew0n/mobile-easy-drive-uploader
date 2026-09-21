@@ -67,6 +67,9 @@ class HiddenViewModel @Inject constructor(
 
     private var latestItems: List<MediaItem> = emptyList()
 
+    /** 조회가 실패했을 때 설정/입력 중 무엇을 보여줄지 판단하는 근거 */
+    private var lastKnownPinSet = false
+
     val uiState: StateFlow<HiddenUiState> = combine(
         unlocked,
         pinRepository.observeGate(),
@@ -74,6 +77,7 @@ class HiddenViewModel @Inject constructor(
         hiddenMedia.observeHiddenIds(),
         selectedIds,
     ) { isUnlocked, gate, all, hiddenIds, selected ->
+        lastKnownPinSet = gate.isSet
         if (!isUnlocked) {
             HiddenUiState.Locked(
                 isSetup = !gate.isSet,
@@ -90,7 +94,9 @@ class HiddenViewModel @Inject constructor(
             )
         }
     }
-        .catch { emit(HiddenUiState.Locked(isSetup = false)) }
+        // 조회가 실패해도 PIN 미설정자에게 "입력" 화면을 띄우면 안 된다 —
+        // 넣을 비밀번호가 없는 채로 갇힌다. 마지막으로 본 설정 여부를 쓴다
+        .catch { emit(HiddenUiState.Locked(isSetup = !lastKnownPinSet)) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), HiddenUiState.Loading)
 
     /** 처음 설정. 형식이 맞고 두 번 입력이 같아야 한다 */

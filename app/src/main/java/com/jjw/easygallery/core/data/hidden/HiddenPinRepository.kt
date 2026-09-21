@@ -69,35 +69,34 @@ class HiddenPinRepository @Inject constructor(
      * 맞으면 실패 기록을 지우고 true. 틀리면 실패 횟수를 올리고 잠금 시각을 다시 잡는다.
      * 잠겨 있는 동안은 아예 검사하지 않는다 — 안 그러면 잠금이 무의미하다.
      */
+    /**
+     * 읽기와 쓰기를 **한 `edit` 블록 안에서** 한다. 밖에서 읽고 안에서 쓰면 빠르게 두 번
+     * 눌렀을 때 둘이 같은 실패 횟수를 읽어 같은 값으로 덮어써 집계가 샌다.
+     */
     suspend fun verify(pin: String, nowMillis: Long = System.currentTimeMillis()): VerifyResult {
-        val prefs = store.data.first()
-        // 잠긴 동안에는 검사도, 실패 집계도 하지 않는다. 기다리는 사이 잠금이 늘어나면 안 된다
-        if (HiddenPin.remainingLockMillis(prefs[KEY_LOCKED_UNTIL] ?: 0, nowMillis) > 0) return VerifyResult.Locked
-        val salt = prefs[KEY_SALT]?.decode()
-        val hash = prefs[KEY_HASH]?.decode()
-
-        return if (salt != null && hash != null && HiddenPin.matches(pin, salt, hash)) {
-            onSuccess()
-            VerifyResult.Ok
-        } else {
-            onFailure((prefs[KEY_FAILED] ?: 0) + 1, nowMillis)
-            VerifyResult.Wrong
+        var result = VerifyResult.Wrong
+        store.edit { prefs ->
+            // 잠긴 동안에는 검사도, 실패 집계도 하지 않는다. 기다리는 사이 잠금이 늘어나면 안 된다
+            if (HiddenPin.remainingLockMillis(prefs[KEY_LOCKED_UNTIL] ?: 0, nowMillis) > 0) {
+                result = VerifyResult.Locked
+                return@edit
+            }
+            val salt = prefs[KEY_SALT]?.decode()
+            val hash = prefs[KEY_HASH]?.decode()
+            if (salt != null && hash != null && HiddenPin.matches(pin, salt, hash)) {
+                result = VerifyResult.Ok
+                prefs[KEY_FAILED] = 0
+                prefs[KEY_LOCKED_UNTIL] = 0
+            } else {
+                result = VerifyResult.Wrong
+                val failed = (prefs[KEY_FAILED] ?: 0) + 1
+                val lockSeconds = HiddenPin.lockSecondsFor(failed)
+                prefs[KEY_FAILED] = failed
+                prefs[KEY_LOCKED_UNTIL] =
+                    if (lockSeconds > 0) nowMillis + lockSeconds * MILLIS_PER_SECOND else 0
+            }
         }
-    }
-
-    private suspend fun onSuccess() {
-        store.edit {
-            it[KEY_FAILED] = 0
-            it[KEY_LOCKED_UNTIL] = 0
-        }
-    }
-
-    private suspend fun onFailure(failed: Int, nowMillis: Long) {
-        val lockSeconds = HiddenPin.lockSecondsFor(failed)
-        store.edit {
-            it[KEY_FAILED] = failed
-            it[KEY_LOCKED_UNTIL] = if (lockSeconds > 0) nowMillis + lockSeconds * MILLIS_PER_SECOND else 0
-        }
+        return result
     }
 
     /** "자동 태그 전부 지우기" 처럼 사용자가 명시적으로 초기화할 때만 */

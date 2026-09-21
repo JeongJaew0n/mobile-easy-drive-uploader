@@ -2,7 +2,6 @@ package com.jjw.easygallery.feature.hidden
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,10 +15,12 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.hidden.VerifyResult
+import com.jjw.easygallery.core.domain.model.MediaItem
 
 @Composable
 fun HiddenRoute(
     onBackClick: () -> Unit,
+    onOpenItem: (MediaItem) -> Unit,
     viewModel: HiddenViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -31,13 +32,10 @@ fun HiddenRoute(
     val mismatch = stringResource(R.string.hidden_pin_mismatch)
     val wrong = stringResource(R.string.hidden_pin_wrong)
 
-    // 화면을 벗어나면 다시 잠근다 — 뒤로 갔다 오면 또 물어야 숨김이다.
-    // ON_STOP 이 핵심이다. onDispose 만 두면 홈 버튼·앱 전환으로 나갈 때는 컴포지션이
-    // 살아 있어 잠기지 않고, 앱에 돌아왔을 때 PIN 없이 숨긴 사진이 그대로 보인다.
+    // 앱을 벗어나면 다시 잠근다. 뒤로가기로 이 화면을 떠나면 NavEntry 와 함께 ViewModel 이
+    // 죽어 자연히 잠긴다 — `onDispose` 로 잠그면 상세보기를 열 때도 컴포지션이 해제돼
+    // 사진 한 장 볼 때마다 PIN 을 다시 묻게 된다.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.lock() }
-    DisposableEffect(Unit) {
-        onDispose { viewModel.lock() }
-    }
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -76,5 +74,6 @@ fun HiddenRoute(
         onSelectionChange = viewModel::setSelection,
         onClearSelection = viewModel::clearSelection,
         onUnhideSelected = viewModel::unhideSelected,
+        onOpenItem = onOpenItem,
     )
 }

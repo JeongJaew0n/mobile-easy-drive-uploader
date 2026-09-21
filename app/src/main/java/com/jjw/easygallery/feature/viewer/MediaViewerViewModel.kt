@@ -63,6 +63,7 @@ class MediaViewerViewModel @Inject constructor(
     private val filter = MutableStateFlow<MediaFilter?>(null)
     private var dateRange: DateRange? = null
     private var categoryFilter: CategoryFilter? = null
+    private var hiddenOnly = false
     private val currentId = MutableStateFlow<Long?>(null)
     private val details = MutableStateFlow<Map<Long, MediaDetails>>(emptyMap())
     private val showInfo = MutableStateFlow(false)
@@ -81,11 +82,18 @@ class MediaViewerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), MediaViewerUiState())
 
     /** 진입 시 한 번. 갤러리와 같은 필터로 목록을 다시 관찰해 좌우 스와이프를 지원한다. */
-    fun load(mediaId: Long, favoritesOnly: Boolean, range: DateRange? = null, category: CategoryFilter? = null) {
+    fun load(
+        mediaId: Long,
+        favoritesOnly: Boolean,
+        range: DateRange? = null,
+        category: CategoryFilter? = null,
+        hiddenOnly: Boolean = false,
+    ) {
         if (filter.value != null) return
         currentId.value = mediaId
         dateRange = range
         categoryFilter = category
+        this.hiddenOnly = hiddenOnly
         filter.value = if (favoritesOnly) MediaFilter.Favorites else MediaFilter.All
     }
 
@@ -236,7 +244,10 @@ class MediaViewerViewModel @Inject constructor(
         val visible = combine(
             mediaRepository.observeMedia(mediaFilter),
             hiddenMedia.observeHiddenIds(),
-        ) { list, hidden -> if (hidden.isEmpty()) list else list.filterNot { it.id in hidden } }
+        ) { list, hidden ->
+            // 숨긴 사진 화면에서 열었으면 반대로 숨긴 것만 본다 — 그래야 좌우 스와이프가 그 목록과 맞는다
+            if (hiddenOnly) list.filter { it.id in hidden } else list.filterNot { it.id in hidden }
+        }
         val category = categoryFilter ?: return visible.map { it.filterByDate(dateRange) }
         return combine(visible, categoryRepository.observeAssignments()) { list, assignments ->
             list.filter { category.matches(assignments[it.id]) }.filterByDate(dateRange)

@@ -45,7 +45,7 @@ fun MediaViewerRoute(
             !key.categoryIds.isNullOrEmpty() -> CategoryFilter.Any(key.categoryIds.toSet())
             else -> null
         }
-        viewModel.load(key.mediaId, key.favoritesOnly, range, category)
+        viewModel.load(key.mediaId, key.favoritesOnly, range, category, key.hiddenOnly)
     }
 
     MediaActionEffect(

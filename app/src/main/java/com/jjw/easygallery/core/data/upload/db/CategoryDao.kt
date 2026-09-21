@@ -21,10 +21,15 @@ data class MediaCategoryRef(
 @Dao
 abstract class CategoryDao {
 
+    /**
+     * 장수에서 **숨긴 사진을 뺀다**(`docs/PHOTO_HIDING.md` §4).
+     * "여행 12장" 인데 걸러 보면 11장이면, 그 카테고리에 숨긴 사진이 있다는 사실이 숫자로 드러난다.
+     */
     @Query(
         """
         SELECT c.*, COUNT(mc.mediaId) AS itemCount FROM category c
         LEFT JOIN media_category mc ON mc.categoryId = c.id
+            AND mc.mediaId NOT IN (SELECT mediaId FROM hidden_media)
         GROUP BY c.id ORDER BY c.sortOrder, c.id
         """,
     )

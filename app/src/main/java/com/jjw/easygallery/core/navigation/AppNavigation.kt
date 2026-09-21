@@ -123,7 +123,10 @@ fun AppNavigation() {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<HiddenKey> {
-                HiddenRoute(onBackClick = { backStack.removeLastOrNull() })
+                HiddenRoute(
+                    onBackClick = { backStack.removeLastOrNull() },
+                    onOpenItem = { item -> backStack.add(MediaViewerKey(mediaId = item.id, hiddenOnly = true)) },
+                )
             }
             entry<MediaViewerKey> { key ->
                 MediaViewerRoute(

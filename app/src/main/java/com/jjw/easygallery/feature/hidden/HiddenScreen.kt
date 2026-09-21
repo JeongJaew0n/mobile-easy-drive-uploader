@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.feature.gallery.GalleryGrid
 
 /**
@@ -46,6 +47,7 @@ internal fun HiddenScreen(
     onSelectionChange: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
     onUnhideSelected: () -> Unit,
+    onOpenItem: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val unlocked = uiState as? HiddenUiState.Unlocked
@@ -114,6 +116,7 @@ internal fun HiddenScreen(
                     uiState = uiState,
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
+                    onOpenItem = onOpenItem,
                 )
             }
         }
@@ -125,6 +128,7 @@ private fun HiddenList(
     uiState: HiddenUiState.Unlocked,
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
+    onOpenItem: (MediaItem) -> Unit,
 ) {
     if (uiState.sections.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -147,6 +151,8 @@ private fun HiddenList(
             selectedIds = uiState.selectedIds,
             onToggleSelection = onToggleSelection,
             onSelectionChange = onSelectionChange,
+            // "숨긴 사진 보기" 인데 원본을 못 보면 반쪽이다. 보려고 숨김을 풀게 만들 수는 없다
+            onOpenItem = { item, _ -> onOpenItem(item) },
             modifier = Modifier.fillMaxSize(),
         )
     }

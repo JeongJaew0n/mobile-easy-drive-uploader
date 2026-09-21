@@ -62,6 +62,8 @@ data class MediaViewerKey(
     /** 카테고리 필터(OR). null 이면 없음 */
     val categoryIds: List<Long>? = null,
     val uncategorizedOnly: Boolean = false,
+    /** 숨긴 사진 화면에서 열었다. 이때는 **숨긴 것만** 보여준다(`docs/PHOTO_HIDING.md`) */
+    val hiddenOnly: Boolean = false,
     val hero: HeroOrigin? = null,
 ) : AppNavKey
 
