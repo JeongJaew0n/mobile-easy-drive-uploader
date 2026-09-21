@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -57,9 +60,13 @@ internal fun HiddenPinGate(
     }
     val locked = remaining > 0
 
+    // 키보드가 올라오면 "한 번 더 입력" 과 확인 버튼이 가려진다(실기기 확인).
+    // imePadding 으로 키보드만큼 띄우고, 그래도 모자라면 스크롤로 닿게 한다.
     Column(
         modifier = modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -95,10 +102,11 @@ internal fun HiddenPinGate(
         }
         val message = when {
             locked -> stringResource(R.string.hidden_pin_locked, remaining)
-            errorText != null -> errorText
-            // 5회까지는 같은 문구만 보다가 6회째에 갑자기 잠기면 당황스럽다
-            state.failedAttempts > 0 ->
+            // 5회까지 같은 문구만 보다가 6회째에 갑자기 잠기면 당황스러우므로 횟수를 함께 보여준다.
+            // 이 분기가 errorText 보다 **앞**이어야 한다 — 뒤에 두면 영영 닿지 않는다(실기기 확인).
+            errorText != null && state.failedAttempts > 0 ->
                 stringResource(R.string.hidden_pin_wrong_with_attempts, state.failedAttempts)
+            errorText != null -> errorText
             else -> null
         }
         if (message != null) {
