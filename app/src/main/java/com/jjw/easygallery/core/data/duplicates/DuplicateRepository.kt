@@ -1,5 +1,6 @@
 package com.jjw.easygallery.core.data.duplicates
 
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
@@ -27,12 +28,22 @@ class DuplicateRepository @Inject constructor(
     private val hashDao: MediaHashDao,
     private val hasher: MediaHasher,
     private val ledger: UploadLedgerRepository,
+    private val hiddenMedia: HiddenMediaRepository,
 ) {
     data class ScanResult(val candidates: Int, val hashed: Int, val failed: Int)
 
+    /**
+     * 숨긴 사진은 뺀다. 이 화면은 **썸네일을 보여주므로** 넣으면 숨김이 그대로 새어 나간다
+     * (`docs/PHOTO_HIDING.md` §4). 대가로 숨긴 사진과 보이는 사진이 중복이어도 잡히지 않는다.
+     */
+    private fun visibleMedia(): Flow<List<MediaItem>> = combine(
+        media.observeMedia(MediaFilter.All),
+        hiddenMedia.observeHiddenIds(),
+    ) { items, hidden -> if (hidden.isEmpty()) items else items.filterNot { it.id in hidden } }
+
     /** 현재 갤러리 항목 + 해시 캐시 + 백업 원장으로 그룹을 만든다. 셋 중 무엇이 바뀌어도 갱신 */
     fun observeGroups(): Flow<List<DuplicateGroup>> = combine(
-        media.observeMedia(MediaFilter.All),
+        visibleMedia(),
         hashDao.observeAll(),
         ledger.observeUploadedIds(),
     ) { items, hashes, uploaded ->
@@ -45,7 +56,7 @@ class DuplicateRepository @Inject constructor(
      * [onProgress] 는 (완료, 전체) — 워커가 알림·진행률에 쓴다.
      */
     suspend fun scan(onProgress: suspend (done: Int, total: Int) -> Unit = { _, _ -> }): ScanResult {
-        val items = media.observeMedia(MediaFilter.All).first()
+        val items = visibleMedia().first()
         val candidates = items
             .filter { it.sizeBytes > 0 }
             .groupBy { it.sizeBytes }

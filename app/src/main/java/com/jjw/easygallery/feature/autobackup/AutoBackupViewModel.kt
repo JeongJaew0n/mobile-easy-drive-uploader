@@ -2,6 +2,7 @@ package com.jjw.easygallery.feature.autobackup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
@@ -17,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,6 +29,7 @@ import javax.inject.Inject
 class AutoBackupViewModel @Inject constructor(
     private val prefs: UserPreferencesRepository,
     mediaRepository: MediaRepository,
+    hiddenMedia: HiddenMediaRepository,
     private val autoBackup: AutoBackupUseCase,
     private val scheduler: AutoBackupScheduler,
     remoteAccounts: RemoteAccountRepository,
@@ -40,7 +41,11 @@ class AutoBackupViewModel @Inject constructor(
 
     val uiState: StateFlow<AutoBackupUiState> = combine(
         prefs.preferences,
-        mediaRepository.observeMedia(MediaFilter.All).map { albumsFrom(it) },
+        // 숨긴 사진만 있는 폴더가 목록에 뜨면 있다는 사실이 새어 나간다(갤러리 앨범 목록과 같은 이유)
+        combine(
+            mediaRepository.observeMedia(MediaFilter.All),
+            hiddenMedia.observeHiddenIds(),
+        ) { items, hidden -> albumsFrom(items.filterNot { it.id in hidden }) },
         isBusy,
         remoteAccounts.observeAccounts(),
     ) { p, albums, busy, accounts ->

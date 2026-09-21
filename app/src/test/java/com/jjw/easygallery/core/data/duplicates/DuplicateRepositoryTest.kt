@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.db.AppDatabase
@@ -44,7 +45,13 @@ class DuplicateRepositoryTest {
     fun setUp() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         val hasher = MediaHasher(context, UnconfinedTestDispatcher())
-        repository = DuplicateRepository(media, db.mediaHashDao(), hasher, ledger)
+        repository = DuplicateRepository(
+            media,
+            db.mediaHashDao(),
+            hasher,
+            ledger,
+            HiddenMediaRepository(db.hiddenMediaDao()),
+        )
     }
 
     @After
