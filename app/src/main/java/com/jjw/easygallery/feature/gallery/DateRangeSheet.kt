@@ -50,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -152,7 +151,6 @@ internal fun DateRangeSheet(
                 RangeCalendar(
                     state = calendarState,
                     dayCounts = dayCounts,
-                    today = today,
                     selection = selection,
                     onDayClick = { selection = selection.select(it) },
                     // 세로에서는 400dp, 가로처럼 낮은 화면에서는 남는 만큼만 쓴다.
@@ -240,7 +238,6 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
 private fun RangeCalendar(
     state: CalendarState,
     dayCounts: Map<LocalDate, Int>,
-    today: LocalDate,
     selection: DateRangeSelection,
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
@@ -252,12 +249,11 @@ private fun RangeCalendar(
             .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp),
         monthHeader = { month -> MonthHeader(month) },
         dayContent = { day ->
+            // 사진이 없는 날도 고를 수 있다. 없다는 것은 점이 없고 흐린 것으로 알린다 —
+            // 막아 두면 "9월 1일부터" 같은 기간을 아예 지정할 수 없다.
             DayCell(
                 day = day,
                 count = dayCounts[day.date] ?: 0,
-                enabled = day.position == DayPosition.MonthDate &&
-                    (dayCounts[day.date] ?: 0) > 0 &&
-                    !day.date.isAfter(today),
                 selection = selection,
                 onClick = onDayClick,
             )
@@ -282,7 +278,6 @@ private fun MonthHeader(month: CalendarMonth) {
 private fun BoxScope.DayCell(
     day: CalendarDay,
     count: Int,
-    enabled: Boolean,
     selection: DateRangeSelection,
     onClick: (LocalDate) -> Unit,
 ) {
@@ -291,7 +286,7 @@ private fun BoxScope.DayCell(
         return
     }
     val date = day.date
-    val style = dayCellStyle(MaterialTheme.colorScheme, date, count, enabled, selection)
+    val style = dayCellStyle(MaterialTheme.colorScheme, date, count, selection)
     val description = if (count > 0) {
         stringResource(R.string.gallery_date_day_with_count, date.dayOfMonth, count)
     } else {
@@ -302,11 +297,8 @@ private fun BoxScope.DayCell(
             .aspectRatio(1f)
             .padding(vertical = 2.dp)
             .background(style.band, style.bandShape)
-            .semantics {
-                contentDescription = description
-                if (!enabled) disabled()
-            }
-            .clickable(enabled = enabled) { onClick(date) },
+            .semantics { contentDescription = description }
+            .clickable { onClick(date) },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -345,7 +337,6 @@ private fun dayCellStyle(
     colors: ColorScheme,
     date: LocalDate,
     count: Int,
-    enabled: Boolean,
     selection: DateRangeSelection,
 ): DayCellStyle {
     val inRange = selection.contains(date)
@@ -364,17 +355,19 @@ private fun dayCellStyle(
             bottomEndPercent = endPercent,
         ),
         circle = if (isEndpoint) colors.primary else Color.Transparent,
-        text = dayTextColor(colors, isEndpoint, inRange, enabled),
+        text = dayTextColor(colors, isEndpoint, inRange, hasPhotos = count > 0),
         dot = dayDotColor(colors, count, isEndpoint),
     )
 }
 
-private fun dayTextColor(colors: ColorScheme, isEndpoint: Boolean, inRange: Boolean, enabled: Boolean): Color = when {
-    isEndpoint -> colors.onPrimary
-    inRange -> colors.onPrimaryContainer
-    enabled -> colors.onSurface
-    else -> colors.onSurface.copy(alpha = DISABLED_ALPHA)
-}
+/** 사진이 없는 날도 고를 수 있다. 흐리게만 해서 "여기엔 없다" 를 알린다 */
+private fun dayTextColor(colors: ColorScheme, isEndpoint: Boolean, inRange: Boolean, hasPhotos: Boolean): Color =
+    when {
+        isEndpoint -> colors.onPrimary
+        inRange -> colors.onPrimaryContainer
+        hasPhotos -> colors.onSurface
+        else -> colors.onSurface.copy(alpha = EMPTY_ALPHA)
+    }
 
 private fun dayDotColor(colors: ColorScheme, count: Int, isEndpoint: Boolean): Color = when {
     count == 0 -> Color.Transparent
@@ -394,7 +387,9 @@ private const val CALENDAR_HORIZONTAL_PADDING_DP = 12
 private const val ENDPOINT_SIZE_DP = 40
 private const val DOT_SIZE_DP = 4
 private const val HALF_PERCENT = 50
-private const val DISABLED_ALPHA = 0.38f
+
+/** 사진이 없는 날·달을 흐리게 하는 정도. 고를 수는 있다 */
+private const val EMPTY_ALPHA = 0.38f
 
 /** 달력 위 고정 헤더 — 지금 보이는 달을 보여주고, 누르면 연·월 점프 패널을 연다 */
 @Composable
@@ -431,15 +426,10 @@ private fun MonthJumpPanel(
     onPick: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val years = remember(dayCounts, startMonth, endMonth) {
-        DateJump.yearsWithPhotos(dayCounts, startMonth, endMonth)
-    }
+    // 사진 없는 날도 고를 수 있게 됐으니 그 자리로 갈 수도 있어야 한다 → 범위 안 모든 해를 담는다
+    val years = remember(startMonth, endMonth) { DateJump.yearsInRange(startMonth, endMonth) }
     // 패널이 열려 있는 동안만 유지한다. 열 때의 연도로 시작하고, 이후 사용자가 고른 값을 지킨다
-    // 달력 범위는 연속이지만 사진이 있는 연도는 띄엄띄엄일 수 있다. 사진 없는 해에서 패널을 열면
-    // 고른 연도 칩이 하나도 없고 열두 달이 전부 비활성이라 화면이 죽은 것처럼 보인다 → 가장 가까운 해로 당긴다.
-    var selectedYear by rememberSaveable(years) {
-        mutableStateOf(DateJump.nearestYear(years, initialYear) ?: initialYear)
-    }
+    var selectedYear by rememberSaveable { mutableStateOf(initialYear) }
     val activeMonths = remember(dayCounts, selectedYear, startMonth, endMonth) {
         DateJump.monthsWithPhotos(dayCounts, selectedYear, startMonth, endMonth)
     }
@@ -476,7 +466,9 @@ private fun MonthJumpPanel(
                         val month = row * MONTH_GRID_COLS + col + 1
                         MonthCell(
                             month = month,
-                            enabled = month in activeMonths,
+                            // 달력이 다루지 않는 달만 막는다. 사진이 없을 뿐인 달은 고를 수 있다
+                            enabled = DateJump.inRange(selectedYear, month, startMonth, endMonth),
+                            hasPhotos = month in activeMonths,
                             modifier = Modifier.weight(1f),
                             onClick = { onPick(DateJump.target(selectedYear, month, startMonth, endMonth)) },
                         )
@@ -488,14 +480,20 @@ private fun MonthJumpPanel(
 }
 
 @Composable
-private fun MonthCell(month: Int, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun MonthCell(
+    month: Int,
+    enabled: Boolean,
+    hasPhotos: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     TextButton(onClick = onClick, enabled = enabled, modifier = modifier) {
         Text(
             text = stringResource(R.string.gallery_date_month_only_label, month),
-            // onSurfaceVariant 로는 어두운 테마에서 활성과 구별되지 않는다(실기기 확인).
-            // 날짜 셀의 비활성 표현과 같은 투명도를 쓴다.
+            // onSurfaceVariant 로는 어두운 테마에서 구별되지 않는다(실기기 확인).
+            // 날짜 셀과 같은 투명도로 "사진 없음" 을 알린다.
             color = MaterialTheme.colorScheme.onSurface.let {
-                if (enabled) it else it.copy(alpha = DISABLED_ALPHA)
+                if (enabled && hasPhotos) it else it.copy(alpha = EMPTY_ALPHA)
             },
         )
     }

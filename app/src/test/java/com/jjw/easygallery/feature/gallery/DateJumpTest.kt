@@ -1,7 +1,8 @@
 package com.jjw.easygallery.feature.gallery
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
@@ -18,9 +19,24 @@ class DateJumpTest {
     private val start = YearMonth.of(2021, 5)
     private val end = YearMonth.of(2026, 2)
 
+    /** 사진 없는 날도 고를 수 있으니, 사진 없는 해로도 갈 수 있어야 한다 */
     @Test
-    fun `사진 있는 연도만 최신순으로`() {
-        assertEquals(listOf(2026, 2023, 2021), DateJump.yearsWithPhotos(counts, start, end))
+    fun `범위 안 모든 연도를 최신순으로 담는다`() {
+        assertEquals(listOf(2026, 2025, 2024, 2023, 2022, 2021), DateJump.yearsInRange(start, end))
+    }
+
+    @Test
+    fun `한 해짜리 범위`() {
+        assertEquals(listOf(2026), DateJump.yearsInRange(YearMonth.of(2026, 1), YearMonth.of(2026, 9)))
+    }
+
+    @Test
+    fun `달력이 다루지 않는 달만 막는다`() {
+        assertTrue(DateJump.inRange(2023, 7, start, end)) // 사진은 없지만 범위 안 → 갈 수 있다
+        assertTrue(DateJump.inRange(2021, 5, start, end)) // 경계 포함
+        assertTrue(DateJump.inRange(2026, 2, start, end))
+        assertFalse(DateJump.inRange(2021, 4, start, end)) // 범위 이전
+        assertFalse(DateJump.inRange(2026, 3, start, end)) // 범위 이후
     }
 
     @Test
@@ -31,25 +47,10 @@ class DateJumpTest {
     }
 
     @Test
-    fun `달력 범위 밖 사진은 연도 칩에 넣지 않는다`() {
+    fun `달력 범위 밖 사진은 세지 않는다`() {
         // 기기 시계가 틀린 채 찍혀 타임스탬프가 미래인 파일
         val withFuture = counts + (LocalDate.of(2030, 1, 1) to 1)
-        assertEquals(listOf(2026, 2023, 2021), DateJump.yearsWithPhotos(withFuture, start, end))
         assertEquals(emptySet<Int>(), DateJump.monthsWithPhotos(withFuture, 2030, start, end))
-    }
-
-    @Test
-    fun `사진 없는 해에서 열면 가장 가까운 해로 당긴다`() {
-        val years = DateJump.yearsWithPhotos(counts, start, end) // 2026, 2023, 2021
-        assertEquals(2023, DateJump.nearestYear(years, 2022)) // 2021 보다 2023 이 가깝다
-        assertEquals(2021, DateJump.nearestYear(years, 2020))
-        assertEquals(2026, DateJump.nearestYear(years, 2030))
-        assertEquals(2023, DateJump.nearestYear(years, 2023)) // 있는 해는 그대로
-    }
-
-    @Test
-    fun `사진이 하나도 없으면 당길 해가 없다`() {
-        assertNull(DateJump.nearestYear(emptyList(), 2024))
     }
 
     @Test

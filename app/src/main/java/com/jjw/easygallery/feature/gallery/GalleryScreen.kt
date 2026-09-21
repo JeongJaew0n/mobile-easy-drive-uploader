@@ -373,7 +373,7 @@ private fun GalleryContent(
                     stringResource(
                         when {
                             uiState.notBackedUpOnly -> R.string.gallery_not_backed_up_empty
-                            uiState.categoryFilter != null -> R.string.gallery_date_empty
+                            uiState.categoryFilter != null -> R.string.gallery_category_empty
                             uiState.dateRange != null -> R.string.gallery_date_empty
                             uiState.favoritesOnly -> R.string.gallery_favorites_empty
                             else -> R.string.gallery_empty
