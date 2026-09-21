@@ -1,6 +1,7 @@
 package com.jjw.easygallery.feature.hidden
 
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -9,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -42,7 +42,7 @@ fun HiddenRoute(
     // 주는 생명주기를 따르므로 상세보기를 열기만 해도 ON_STOP 이 떠서, 사진 한 장 볼 때마다
     // PIN 을 다시 묻게 된다(실기기 확인). 단일 액티비티라 액티비티의 ON_STOP 은
     // "앱이 백그라운드로 갔다" 와 같다.
-    val activity = LocalContext.current as? ComponentActivity
+    val activity = LocalActivity.current as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) viewModel.lock()
