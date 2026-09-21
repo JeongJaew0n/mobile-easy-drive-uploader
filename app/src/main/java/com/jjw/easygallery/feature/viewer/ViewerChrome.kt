@@ -69,6 +69,7 @@ internal fun ViewerTopBar(
     onMoveClick: () -> Unit,
     onUpload: () -> Unit,
     onDelete: () -> Unit,
+    onHide: () -> Unit,
     onCategoriesClick: () -> Unit = {},
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -123,6 +124,16 @@ internal fun ViewerTopBar(
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_hide)) },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.ic_visibility_off), contentDescription = null)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onHide()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_rename)) },
                     leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },

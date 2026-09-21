@@ -56,6 +56,7 @@ internal fun SelectionBottomBar(
     onRename: () -> Unit,
     onMove: () -> Unit,
     onCategories: () -> Unit,
+    onHide: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BottomAppBar(modifier = modifier) {
@@ -76,6 +77,12 @@ internal fun SelectionBottomBar(
             Icon(
                 painterResource(R.drawable.ic_delete_forever),
                 contentDescription = stringResource(R.string.action_delete_forever),
+            )
+        }
+        IconButton(onClick = onHide, enabled = enabled) {
+            Icon(
+                painterResource(R.drawable.ic_visibility_off),
+                contentDescription = stringResource(R.string.action_hide),
             )
         }
         IconButton(onClick = onRename, enabled = enabled && selectedCount == 1) {
@@ -107,6 +114,7 @@ internal fun GalleryOverflowMenu(
     onOpenTrash: () -> Unit,
     onOpenDrive: () -> Unit,
     onOpenDuplicates: () -> Unit,
+    onOpenHidden: () -> Unit,
     onPickCategory: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -115,6 +123,14 @@ internal fun GalleryOverflowMenu(
     }
     // 기간 선택은 자주 쓰는 것이라 여기 두지 않고 상단바 아이콘으로 뺐다(GalleryTopBar)
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.hidden_menu_open)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_visibility_off), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onOpenHidden()
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.gallery_menu_category)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },

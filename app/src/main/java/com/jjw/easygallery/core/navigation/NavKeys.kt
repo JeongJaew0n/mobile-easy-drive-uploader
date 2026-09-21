@@ -33,6 +33,10 @@ data object CategoriesKey : AppNavKey
 @Serializable
 data object AutoTagKey : AppNavKey
 
+/** 숨긴 사진. 들어가려면 PIN 이 필요하다. `docs/PHOTO_HIDING.md` */
+@Serializable
+data object HiddenKey : AppNavKey
+
 /**
  * 탭한 썸네일의 화면(윈도우) 좌표와 원본 정보. 상세보기가 이 사각형에서 확대되는 히어로 연출을 그린다.
  * 회전·복원 시 좌표가 어긋날 수 있어 상세보기는 첫 진입 1회만 사용하고 이후 무시한다.

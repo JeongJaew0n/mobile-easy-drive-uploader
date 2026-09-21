@@ -39,6 +39,9 @@ object DatabaseModule {
     fun providesAutoTagDao(db: AppDatabase): AutoTagDao = db.autoTagDao()
 
     @Provides
+    fun providesHiddenMediaDao(db: AppDatabase): HiddenMediaDao = db.hiddenMediaDao()
+
+    @Provides
     @Singleton
     fun providesVideoCompressor(impl: Media3VideoCompressor): VideoCompressor = impl
 }

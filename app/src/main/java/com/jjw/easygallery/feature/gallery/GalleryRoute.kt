@@ -35,6 +35,7 @@ fun GalleryRoute(
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
+    onHiddenClick: () -> Unit,
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit,
     onManageCategories: () -> Unit = {},
     viewModel: GalleryViewModel = hiltViewModel(),
@@ -102,6 +103,9 @@ fun GalleryRoute(
                 is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
                     resources.getQuantityString(R.plurals.category_assigned, event.count, event.count),
                 )
+                is GalleryEvent.Hidden -> snackbarHostState.showSnackbar(
+                    resources.getQuantityString(R.plurals.gallery_hidden_done, event.count, event.count),
+                )
                 is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }
@@ -138,6 +142,8 @@ fun GalleryRoute(
         onTrashClick = onTrashClick,
         onDriveClick = onDriveClick,
         onDuplicatesClick = onDuplicatesClick,
+        onHiddenClick = onHiddenClick,
+        onHideSelected = viewModel::hideSelected,
         onOpenItem = onOpenItem,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionEvent
@@ -65,6 +66,7 @@ class GalleryViewModel @Inject constructor(
     private val assignCategories: AssignCategoriesUseCase,
     orphanCleaner: OrphanAssignmentCleaner,
     private val prefs: UserPreferencesRepository,
+    private val hiddenMedia: HiddenMediaRepository,
     remoteAccounts: RemoteAccountRepository,
 ) : ViewModel() {
 
@@ -213,6 +215,17 @@ class GalleryViewModel @Inject constructor(
         selectedIds.value = emptySet()
     }
 
+    /** 선택한 항목을 숨긴다. 파일은 건드리지 않으므로 동의 창이 없다 */
+    fun hideSelected() {
+        val ids = selectedIds.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            hiddenMedia.hide(ids)
+            clearSelection()
+            events.send(GalleryEvent.Hidden(ids.size))
+        }
+    }
+
     /** 드래그 범위 선택 결과를 통째로 반영 */
     fun setSelection(ids: Set<Long>) {
         selectedIds.value = ids
@@ -312,13 +325,21 @@ class GalleryViewModel @Inject constructor(
         val notBackedUpOnly: Boolean,
         val category: CategoryFilter?,
         val tab: GalleryTab,
+        /** 숨긴 사진. 어느 탭·필터에서도 보이지 않는다 */
+        val hidden: Set<Long>,
     )
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
         // 원장(uploadedIds)은 업로드가 끝날 때만 바뀌므로 여기서 결합해도 선택 토글과 무관하다.
-        val filters = combine(dateRange, notBackedUpOnly, categoryFilter, tab) { range, pending, category, t ->
-            MemoryFilters(range, pending, category, t)
+        val filters = combine(
+            dateRange,
+            notBackedUpOnly,
+            categoryFilter,
+            tab,
+            hiddenMedia.observeHiddenIds(),
+        ) { range, pending, category, t, hidden ->
+            MemoryFilters(range, pending, category, t, hidden)
         }
         val catalog = combine(
             mediaRepository.observeMedia(filter),
@@ -327,9 +348,11 @@ class GalleryViewModel @Inject constructor(
             categoryRepository.observeCategories(),
             categoryRepository.observeAssignments(),
         ) { all, f, uploaded, categories, assignments ->
-            // 순서: 탭(출처) → 백업 → 카테고리 → 기간. 기간 달력(dayCounts)은 기간 직전 목록으로 센다.
-            // 탭이 가장 바깥 범위라 제일 먼저 거른다 — 그래야 달력도 그 탭의 날짜만 보여준다.
-            val inTab = if (f.tab == GalleryTab.ALL) all else all.filter { f.tab.matches(it) }
+            // 순서: 숨김 → 탭(출처) → 백업 → 카테고리 → 기간.
+            // 기간 달력(dayCounts)은 기간 직전 목록으로 센다.
+            // 숨김이 가장 바깥이다 — 탭을 바꾸거나 필터를 걸어도 숨긴 사진은 나오면 안 된다.
+            val visible = if (f.hidden.isEmpty()) all else all.filterNot { it.id in f.hidden }
+            val inTab = if (f.tab == GalleryTab.ALL) visible else visible.filter { f.tab.matches(it) }
             val pending = if (f.notBackedUpOnly) inTab.filter { it.id !in uploaded } else inTab
             val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
             val items = categorized.filterByDate(f.range)
@@ -340,8 +363,9 @@ class GalleryViewModel @Inject constructor(
                 // 날짜순으로 흩어져 있으면 어느 앱 것인지 알아볼 수 없다
                 sections = if (f.tab == GalleryTab.OTHER) groupByApp(items) else groupByDate(items),
                 // 탭 적용 전 목록에서 뽑는다. 이동 대상 폴더까지 탭으로 걸리면
-                // 카메라 탭에서 다른 폴더로 옮길 수 없다
-                albums = albumsFrom(all),
+                // 카메라 탭에서 다른 폴더로 옮길 수 없다. 숨김은 제외한다 —
+                // 숨긴 사진만 있는 폴더가 목록에 뜨면 있다는 사실이 새어 나간다
+                albums = albumsFrom(visible),
                 byId = items.associateBy { it.id },
                 range = f.range,
                 uploadedIds = uploaded,
@@ -448,5 +472,6 @@ sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
     data class CategoriesAssigned(val count: Int) : GalleryEvent
+    data class Hidden(val count: Int) : GalleryEvent
     data class Error(val message: String) : GalleryEvent
 }

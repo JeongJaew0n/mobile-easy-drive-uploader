@@ -45,6 +45,7 @@ internal fun MediaViewerScreen(
     onToggleFavorite: () -> Unit,
     onTrash: () -> Unit,
     onDelete: () -> Unit,
+    onHide: () -> Unit = {},
     onRename: (String) -> Unit,
     onMove: (String) -> Unit,
     onUpload: () -> Unit,
@@ -126,6 +127,7 @@ internal fun MediaViewerScreen(
                     onCategoriesClick = { showCategories = true },
                     onUpload = onUpload,
                     onDelete = onDelete,
+                    onHide = onHide,
                 )
             }
         },

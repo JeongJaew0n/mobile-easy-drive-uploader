@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.category.CategoryRepository
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
@@ -50,6 +51,7 @@ class MediaViewerViewModel @Inject constructor(
     uploadLedger: UploadLedgerRepository,
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
+    private val hiddenMedia: HiddenMediaRepository,
     prefs: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -114,6 +116,11 @@ class MediaViewerViewModel @Inject constructor(
 
     fun delete() = withCurrent { item ->
         actionController.perform(viewModelScope, MediaAction.Delete(listOf(item)))
+    }
+
+    /** 이 사진을 숨긴다. 목록에서 빠지면 삭제와 같은 경로로 이전 사진으로 넘어간다 */
+    fun hide() = withCurrent { item ->
+        viewModelScope.launch { hiddenMedia.hide(listOf(item.id)) }
     }
 
     fun rename(newName: String) = withCurrent { item ->
@@ -215,11 +222,17 @@ class MediaViewerViewModel @Inject constructor(
         viewModelScope.launch { assignCategories(listOf(item.id), add, remove) }
     }
 
-    /** 갤러리와 같은 순서로 거른다: 카테고리 → 기간 */
+    /**
+     * 갤러리와 같은 순서로 거른다: 숨김 → 카테고리 → 기간.
+     * 갤러리에서 안 보이는 사진이 스와이프로 나오면 숨김이 아니다.
+     */
     private fun filteredMedia(mediaFilter: MediaFilter): Flow<List<MediaItem>> {
-        val base = mediaRepository.observeMedia(mediaFilter)
-        val category = categoryFilter ?: return base.map { it.filterByDate(dateRange) }
-        return combine(base, categoryRepository.observeAssignments()) { list, assignments ->
+        val visible = combine(
+            mediaRepository.observeMedia(mediaFilter),
+            hiddenMedia.observeHiddenIds(),
+        ) { list, hidden -> if (hidden.isEmpty()) list else list.filterNot { it.id in hidden } }
+        val category = categoryFilter ?: return visible.map { it.filterByDate(dateRange) }
+        return combine(visible, categoryRepository.observeAssignments()) { list, assignments ->
             list.filter { category.matches(assignments[it.id]) }.filterByDate(dateRange)
         }
     }

@@ -196,6 +196,7 @@ class MediaViewerViewModelTest {
         uploadLedger = uploadLedger,
         categoryRepository = categoryRepository,
         assignCategories = AssignCategoriesUseCase(categoryRepository),
+        hiddenMedia = mockk { every { observeHiddenIds() } returns MutableStateFlow(emptySet()) },
         prefs = mockk { every { preferences } returns MutableStateFlow(UserPreferences()) },
     )
 

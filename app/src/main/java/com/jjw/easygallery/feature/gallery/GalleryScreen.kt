@@ -70,6 +70,8 @@ internal fun GalleryScreen(
     onTrashClick: () -> Unit = {},
     onDriveClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
+    onHiddenClick: () -> Unit = {},
+    onHideSelected: () -> Unit = {},
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -116,6 +118,7 @@ internal fun GalleryScreen(
                             onTrashClick = onTrashClick,
                             onDriveClick = onDriveClick,
                             onDuplicatesClick = onDuplicatesClick,
+                            onHiddenClick = onHiddenClick,
                             onPickDateRange = { showDateRange = true },
                             onPickCategory = { showCategoryFilter = true },
                         )
@@ -143,6 +146,7 @@ internal fun GalleryScreen(
                         onRename = { showRename = true },
                         onMove = { showMove = true },
                         onCategories = { showCategoryPicker = true },
+                        onHide = onHideSelected,
                     )
                 }
             }

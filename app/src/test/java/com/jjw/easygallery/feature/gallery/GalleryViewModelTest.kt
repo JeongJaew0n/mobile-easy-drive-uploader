@@ -4,6 +4,7 @@ import android.net.Uri
 import app.cash.turbine.test
 import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
+import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
 import com.jjw.easygallery.core.data.media.MediaRepository
@@ -64,6 +65,11 @@ class GalleryViewModelTest {
         coEvery { removeMedia(any()) } returns Unit
     }
     private val assignCategories = AssignCategoriesUseCase(categoryRepository)
+    private val hiddenIds = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
+    private val hiddenMedia: HiddenMediaRepository = mockk {
+        every { observeHiddenIds() } returns hiddenIds
+        coEvery { hide(any()) } answers { hiddenIds.value = hiddenIds.value + firstArg<Collection<Long>>() }
+    }
     private val prefs: UserPreferencesRepository = mockk {
         every { preferences } returns kotlinx.coroutines.flow.MutableStateFlow(UserPreferences())
     }
@@ -93,6 +99,7 @@ class GalleryViewModelTest {
             assignCategories,
             OrphanAssignmentCleaner(repository, categoryRepository),
             prefs,
+            hiddenMedia,
             remoteAccounts,
         )
 
@@ -283,6 +290,60 @@ class GalleryViewModelTest {
         bucketName = "Camera",
         relativePath = relativePath,
     )
+
+    // ---------- 숨김 (docs/PHOTO_HIDING.md) ----------
+
+    @Test
+    fun `숨긴 사진은 목록에서 빠진다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2), sampleItem(3)))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+
+            hiddenIds.value = setOf(2L)
+            (awaitItem() as GalleryUiState.Content).let {
+                assertEquals(2, it.itemCount)
+                assertEquals(listOf(1L, 3L), it.sections.flatMap { s -> s.items }.map { m -> m.id })
+            }
+        }
+    }
+
+    /** 탭을 바꾸거나 필터를 걸어도 숨긴 사진은 나오면 안 된다 */
+    @Test
+    fun `숨김은 탭보다 바깥이다`() = runTest(testDispatcher) {
+        val camera = sampleItem(1, "DCIM/Camera/")
+        val kakao = sampleItem(2, "Pictures/KakaoTalk/")
+        every { repository.observeMedia(any()) } returns flowOf(listOf(camera, kakao))
+        hiddenIds.value = setOf(2L)
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+
+            viewModel.setTab(GalleryTab.OTHER)
+            assertEquals(0, (awaitItem() as GalleryUiState.Content).itemCount)
+        }
+    }
+
+    @Test
+    fun `기간 달력의 날짜별 개수도 숨김을 뺀다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2)))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(2, (awaitItem() as GalleryUiState.Content).dayCounts.values.sum())
+
+            hiddenIds.value = setOf(1L)
+            assertEquals(1, (awaitItem() as GalleryUiState.Content).dayCounts.values.sum())
+        }
+    }
 
     // ---------- 출처 탭 (docs/plans/gallery-source-tabs) ----------
 

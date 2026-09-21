@@ -38,6 +38,7 @@ internal fun GalleryTopBar(
     onTrashClick: () -> Unit,
     onDriveClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
+    onHiddenClick: () -> Unit,
     onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit = {},
 ) {
@@ -91,6 +92,7 @@ internal fun GalleryTopBar(
                 onOpenTrash = onTrashClick,
                 onOpenDrive = onDriveClick,
                 onOpenDuplicates = onDuplicatesClick,
+                onOpenHidden = onHiddenClick,
                 onPickCategory = onPickCategory,
             )
         },

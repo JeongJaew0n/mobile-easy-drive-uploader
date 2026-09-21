@@ -23,6 +23,7 @@ import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
+import com.jjw.easygallery.feature.hidden.HiddenRoute
 import com.jjw.easygallery.feature.remote.AddRemoteAccountRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
@@ -66,6 +67,7 @@ fun AppNavigation() {
                     onSettingsClick = { backStack.add(SettingsKey) },
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onTrashClick = { backStack.add(TrashKey) },
+                    onHiddenClick = { backStack.add(HiddenKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
                     onDuplicatesClick = { backStack.add(DuplicatesKey) },
                     onOpenItem = { item, filters, hero ->
@@ -119,6 +121,9 @@ fun AppNavigation() {
             }
             entry<TrashKey> {
                 TrashRoute(onBackClick = { backStack.removeLastOrNull() })
+            }
+            entry<HiddenKey> {
+                HiddenRoute(onBackClick = { backStack.removeLastOrNull() })
             }
             entry<MediaViewerKey> { key ->
                 MediaViewerRoute(

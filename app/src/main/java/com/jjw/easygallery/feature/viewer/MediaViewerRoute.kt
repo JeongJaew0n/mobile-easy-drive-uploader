@@ -90,6 +90,7 @@ fun MediaViewerRoute(
             onToggleFavorite = viewModel::toggleFavorite,
             onTrash = viewModel::trash,
             onDelete = viewModel::delete,
+            onHide = viewModel::hide,
             onRename = viewModel::rename,
             onMove = viewModel::move,
             onUpload = viewModel::upload,
