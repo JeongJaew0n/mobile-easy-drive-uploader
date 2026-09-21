@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.hidden.HiddenPin
 import com.jjw.easygallery.core.data.hidden.HiddenPinRepository
+import com.jjw.easygallery.core.data.hidden.VerifyResult
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.domain.model.MediaItem
@@ -28,11 +29,14 @@ import javax.inject.Inject
 sealed interface HiddenUiState {
     data object Loading : HiddenUiState
 
-    /** [isSetup] 이면 처음 설정, 아니면 입력. [lockedSeconds] 가 0 보다 크면 기다려야 한다 */
+    /**
+     * [isSetup] 이면 처음 설정, 아니면 입력.
+     * [lockedUntilMillis] 는 절대 시각이다 — 남은 초는 화면이 직접 센다.
+     */
     data class Locked(
         val isSetup: Boolean,
         val failedAttempts: Int = 0,
-        val lockedSeconds: Long = 0,
+        val lockedUntilMillis: Long = 0,
     ) : HiddenUiState
 
     data class Unlocked(
@@ -74,13 +78,11 @@ class HiddenViewModel @Inject constructor(
             HiddenUiState.Locked(
                 isSetup = !gate.isSet,
                 failedAttempts = gate.failedAttempts,
-                lockedSeconds = (gate.remainingMillis + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND,
+                lockedUntilMillis = gate.lockedUntilMillis,
             )
         } else {
             val items = all.filter { it.id in hiddenIds }
             latestItems = items
-            // 영구 삭제된 사진의 기록이 남지 않게 훑을 때 정리한다
-            pruneGone(all, hiddenIds)
             HiddenUiState.Unlocked(
                 sections = groupByDate(items),
                 itemCount = items.size,
@@ -108,9 +110,11 @@ class HiddenViewModel @Inject constructor(
         }
     }
 
-    fun verify(pin: String, onWrong: () -> Unit) {
+    fun verify(pin: String, onResult: (VerifyResult) -> Unit) {
         viewModelScope.launch {
-            if (pinRepository.verify(pin)) unlocked.value = true else onWrong()
+            val result = pinRepository.verify(pin)
+            if (result == VerifyResult.Ok) unlocked.value = true
+            onResult(result)
         }
     }
 
@@ -140,15 +144,9 @@ class HiddenViewModel @Inject constructor(
         }
     }
 
-    private suspend fun pruneGone(all: List<MediaItem>, hiddenIds: Set<Long>) {
-        val alive = all.mapTo(HashSet()) { it.id }
-        if (hiddenIds.any { it !in alive }) hiddenMedia.prune(alive)
-    }
-
     enum class SetPinResult { Ok, BadFormat, Mismatch }
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
-        const val MILLIS_PER_SECOND = 1_000L
     }
 }

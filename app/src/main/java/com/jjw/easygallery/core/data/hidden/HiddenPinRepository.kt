@@ -19,12 +19,18 @@ import javax.inject.Singleton
 // 환경설정(user_prefs)과 섞지 않는다 — 백업·초기화 범위를 따로 가져갈 수 있게
 private val Context.hiddenPinStore: DataStore<Preferences> by preferencesDataStore(name = "hidden_pin")
 
-/** 잠금 상태. [remainingMillis] 가 0 보다 크면 지금은 시도할 수 없다 */
+/**
+ * 잠금 상태. [lockedUntilMillis] 는 **절대 시각**이다 — 남은 초로 들고 다니면
+ * 상한(600초)에 닿았을 때 값이 안 바뀌어 화면이 카운트다운을 다시 시작하지 못한다.
+ */
 data class PinGate(
     val isSet: Boolean,
     val failedAttempts: Int,
-    val remainingMillis: Long,
+    val lockedUntilMillis: Long,
 )
+
+/** [Locked] 는 "틀렸다" 가 아니다 — 잠긴 동안에는 검사 자체를 하지 않는다 */
+enum class VerifyResult { Ok, Wrong, Locked }
 
 /**
  * 숨긴 사진 PIN 보관(`docs/PHOTO_HIDING.md` §3).
@@ -36,12 +42,12 @@ class HiddenPinRepository @Inject constructor(
 ) {
     private val store get() = context.hiddenPinStore
 
-    fun observeGate(nowMillis: () -> Long = System::currentTimeMillis): Flow<PinGate> =
+    fun observeGate(): Flow<PinGate> =
         store.data.map { prefs ->
             PinGate(
                 isSet = prefs[KEY_HASH] != null,
                 failedAttempts = prefs[KEY_FAILED] ?: 0,
-                remainingMillis = HiddenPin.remainingLockMillis(prefs[KEY_LOCKED_UNTIL] ?: 0, nowMillis()),
+                lockedUntilMillis = prefs[KEY_LOCKED_UNTIL] ?: 0,
             )
         }
 
@@ -63,19 +69,20 @@ class HiddenPinRepository @Inject constructor(
      * 맞으면 실패 기록을 지우고 true. 틀리면 실패 횟수를 올리고 잠금 시각을 다시 잡는다.
      * 잠겨 있는 동안은 아예 검사하지 않는다 — 안 그러면 잠금이 무의미하다.
      */
-    suspend fun verify(pin: String, nowMillis: Long = System.currentTimeMillis()): Boolean {
+    suspend fun verify(pin: String, nowMillis: Long = System.currentTimeMillis()): VerifyResult {
         val prefs = store.data.first()
-        val locked = HiddenPin.remainingLockMillis(prefs[KEY_LOCKED_UNTIL] ?: 0, nowMillis) > 0
+        // 잠긴 동안에는 검사도, 실패 집계도 하지 않는다. 기다리는 사이 잠금이 늘어나면 안 된다
+        if (HiddenPin.remainingLockMillis(prefs[KEY_LOCKED_UNTIL] ?: 0, nowMillis) > 0) return VerifyResult.Locked
         val salt = prefs[KEY_SALT]?.decode()
         val hash = prefs[KEY_HASH]?.decode()
-        val ok = !locked && salt != null && hash != null && HiddenPin.matches(pin, salt, hash)
 
-        when {
-            ok -> onSuccess()
-            // 잠긴 동안에는 실패로 세지 않는다. 안 그러면 기다리는 사이에 잠금이 계속 늘어난다
-            !locked -> onFailure((prefs[KEY_FAILED] ?: 0) + 1, nowMillis)
+        return if (salt != null && hash != null && HiddenPin.matches(pin, salt, hash)) {
+            onSuccess()
+            VerifyResult.Ok
+        } else {
+            onFailure((prefs[KEY_FAILED] ?: 0) + 1, nowMillis)
+            VerifyResult.Wrong
         }
-        return ok
     }
 
     private suspend fun onSuccess() {

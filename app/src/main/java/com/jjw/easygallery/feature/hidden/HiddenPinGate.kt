@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.hidden.HiddenPin
+import kotlinx.coroutines.delay
 
 /**
  * PIN 게이트. 처음이면 설정, 아니면 입력. 잠겨 있으면 남은 시간을 1초마다 줄여 보여준다.
@@ -40,13 +42,18 @@ internal fun HiddenPinGate(
 ) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
-    // 남은 시간은 화면에서 직접 센다 — 저장소를 1초마다 깨우지 않는다
-    var remaining by remember(state.lockedSeconds) { mutableStateOf(state.lockedSeconds) }
-    LaunchedEffect(state.lockedSeconds) {
-        while (remaining > 0) {
-            kotlinx.coroutines.delay(ONE_SECOND_MILLIS)
-            remaining -= 1
+    // 남은 시간은 화면에서 직접 센다 — 저장소를 1초마다 깨우지 않는다.
+    // 기준은 **절대 시각**이다. 남은 초를 키로 쓰면 상한(600초)에 닿았을 때 값이 안 바뀌어
+    // 카운트다운이 0 에 멈춘 채로 남고, 잠겨 있는데 안 잠긴 것처럼 보인다.
+    var remaining by remember(state.lockedUntilMillis) {
+        mutableLongStateOf(secondsLeft(state.lockedUntilMillis))
+    }
+    LaunchedEffect(state.lockedUntilMillis) {
+        while (secondsLeft(state.lockedUntilMillis) > 0) {
+            delay(ONE_SECOND_MILLIS)
+            remaining = secondsLeft(state.lockedUntilMillis)
         }
+        remaining = 0
     }
     val locked = remaining > 0
 
@@ -89,6 +96,9 @@ internal fun HiddenPinGate(
         val message = when {
             locked -> stringResource(R.string.hidden_pin_locked, remaining)
             errorText != null -> errorText
+            // 5회까지는 같은 문구만 보다가 6회째에 갑자기 잠기면 당황스럽다
+            state.failedAttempts > 0 ->
+                stringResource(R.string.hidden_pin_wrong_with_attempts, state.failedAttempts)
             else -> null
         }
         if (message != null) {
@@ -125,3 +135,9 @@ private fun PinField(
 }
 
 private const val ONE_SECOND_MILLIS = 1_000L
+
+/** [lockedUntilMillis] 까지 남은 초(올림). 지났으면 0 */
+private fun secondsLeft(lockedUntilMillis: Long): Long {
+    val left = lockedUntilMillis - System.currentTimeMillis()
+    return if (left <= 0) 0 else (left + ONE_SECOND_MILLIS - 1) / ONE_SECOND_MILLIS
+}

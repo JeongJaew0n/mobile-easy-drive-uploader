@@ -64,6 +64,8 @@ fun MediaViewerRoute(
                     snackbarHostState.showSnackbar(resources.getString(R.string.gallery_sign_in_required))
                     onSettingsClick()
                 }
+                MediaViewerEvent.Hidden ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.viewer_hidden_done))
                 is MediaViewerEvent.Error -> snackbarHostState.showSnackbar(event.message)
             }
         }

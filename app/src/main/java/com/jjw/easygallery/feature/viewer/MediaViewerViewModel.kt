@@ -118,9 +118,15 @@ class MediaViewerViewModel @Inject constructor(
         actionController.perform(viewModelScope, MediaAction.Delete(listOf(item)))
     }
 
-    /** 이 사진을 숨긴다. 목록에서 빠지면 삭제와 같은 경로로 이전 사진으로 넘어간다 */
+    /**
+     * 이 사진을 숨긴다. 목록에서 빠지면 삭제와 같은 경로로 이전 사진으로 넘어간다.
+     * 말없이 사진이 바뀌면 삭제와 구분이 안 되므로 반드시 알린다.
+     */
     fun hide() = withCurrent { item ->
-        viewModelScope.launch { hiddenMedia.hide(listOf(item.id)) }
+        viewModelScope.launch {
+            hiddenMedia.hide(listOf(item.id))
+            events.send(MediaViewerEvent.Hidden)
+        }
     }
 
     fun rename(newName: String) = withCurrent { item ->
@@ -283,5 +289,6 @@ data class MediaViewerUiState(
 sealed interface MediaViewerEvent {
     data class Enqueued(val added: Int) : MediaViewerEvent
     data object SignInRequired : MediaViewerEvent
+    data object Hidden : MediaViewerEvent
     data class Error(val message: String) : MediaViewerEvent
 }

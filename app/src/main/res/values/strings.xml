@@ -74,6 +74,7 @@
     <string name="action_unhide">숨김 해제</string>
     <string name="hidden_empty">숨긴 사진이 없습니다</string>
     <string name="hidden_count">%1$d장</string>
+    <string name="viewer_hidden_done">숨긴 사진으로 옮겼습니다</string>
     <string name="hidden_note">이 앱에서만 숨겨집니다. 다른 갤러리 앱에서는 보입니다.</string>
     <plurals name="gallery_hidden_done">
         <item quantity="other">%1$d개를 숨겼습니다</item>
