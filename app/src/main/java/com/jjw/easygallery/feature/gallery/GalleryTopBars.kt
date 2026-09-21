@@ -73,6 +73,12 @@ internal fun GalleryTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onPickDateRange) {
+                Icon(
+                    painterResource(R.drawable.ic_date_range),
+                    contentDescription = stringResource(R.string.gallery_menu_date_range),
+                )
+            }
             IconButton(onClick = onSettingsClick) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.action_settings))
             }
@@ -85,7 +91,6 @@ internal fun GalleryTopBar(
                 onOpenTrash = onTrashClick,
                 onOpenDrive = onDriveClick,
                 onOpenDuplicates = onDuplicatesClick,
-                onPickDateRange = onPickDateRange,
                 onPickCategory = onPickCategory,
             )
         },

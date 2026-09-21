@@ -107,22 +107,14 @@ internal fun GalleryOverflowMenu(
     onOpenTrash: () -> Unit,
     onOpenDrive: () -> Unit,
     onOpenDuplicates: () -> Unit,
-    onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
     }
+    // 기간 선택은 자주 쓰는 것이라 여기 두지 않고 상단바 아이콘으로 뺐다(GalleryTopBar)
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.gallery_menu_date_range)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_date_range), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onPickDateRange()
-            },
-        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.gallery_menu_category)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },
