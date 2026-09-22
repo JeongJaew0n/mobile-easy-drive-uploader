@@ -43,6 +43,8 @@ internal fun HiddenScreen(
     onBackClick: () -> Unit,
     onSetPin: (pin: String, confirm: String) -> Unit,
     onVerify: (String) -> Unit,
+    onForgot: () -> Unit,
+    isResetting: Boolean,
     onToggleSelection: (Long) -> Unit,
     onSelectionChange: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
@@ -110,6 +112,8 @@ internal fun HiddenScreen(
                     state = uiState,
                     onSetPin = onSetPin,
                     onVerify = onVerify,
+                    onForgot = onForgot,
+                    isResetting = isResetting,
                     errorText = pinError,
                 )
                 is HiddenUiState.Unlocked -> HiddenList(

@@ -61,6 +61,9 @@ class HiddenViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val unlocked = MutableStateFlow(false)
+
+    /** 기기 잠금으로 본인 확인을 마쳤다. PIN 을 잊었을 때 새로 정하는 길 */
+    private val resetting = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val events = Channel<HiddenEvent>(Channel.BUFFERED)
     val eventFlow: Flow<HiddenEvent> = events.receiveAsFlow()
@@ -71,18 +74,19 @@ class HiddenViewModel @Inject constructor(
     private var lastKnownPinSet = false
 
     val uiState: StateFlow<HiddenUiState> = combine(
-        unlocked,
+        combine(unlocked, resetting) { u, r -> u to r },
         pinRepository.observeGate(),
         mediaRepository.observeMedia(MediaFilter.All),
         hiddenMedia.observeHiddenIds(),
         selectedIds,
-    ) { isUnlocked, gate, all, hiddenIds, selected ->
+    ) { (isUnlocked, isResetting), gate, all, hiddenIds, selected ->
         lastKnownPinSet = gate.isSet
         if (!isUnlocked) {
             HiddenUiState.Locked(
-                isSetup = !gate.isSet,
-                failedAttempts = gate.failedAttempts,
-                lockedUntilMillis = gate.lockedUntilMillis,
+                // 기기 잠금을 통과했으면 새 PIN 을 정하는 화면으로 바꾼다
+                isSetup = !gate.isSet || isResetting,
+                failedAttempts = if (isResetting) 0 else gate.failedAttempts,
+                lockedUntilMillis = if (isResetting) 0 else gate.lockedUntilMillis,
             )
         } else {
             val items = all.filter { it.id in hiddenIds }
@@ -111,9 +115,18 @@ class HiddenViewModel @Inject constructor(
         }
         viewModelScope.launch {
             pinRepository.set(pin)
+            resetting.value = false
             unlocked.value = true
             onResult(SetPinResult.Ok)
         }
+    }
+
+    /**
+     * 기기 잠금으로 본인 확인을 마쳤다. 잠겨 있어도 여기로는 들어올 수 있어야 한다 —
+     * 잊어버린 사람이 정작 되찾지 못하면 복구 장치가 아니다.
+     */
+    fun onDeviceCredentialConfirmed() {
+        resetting.value = true
     }
 
     fun verify(pin: String, onResult: (VerifyResult) -> Unit) {
@@ -127,6 +140,7 @@ class HiddenViewModel @Inject constructor(
     /** 화면을 벗어나면 다시 잠근다 — 뒤로 갔다 오면 또 물어야 숨김이다 */
     fun lock() {
         unlocked.value = false
+        resetting.value = false
         selectedIds.value = emptySet()
     }
 

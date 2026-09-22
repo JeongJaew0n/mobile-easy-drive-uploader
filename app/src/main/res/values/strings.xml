@@ -92,6 +92,11 @@
     <string name="hidden_pin_wrong">비밀번호가 틀렸습니다</string>
     <string name="hidden_pin_wrong_with_attempts">비밀번호가 틀렸습니다 (%1$d회 실패)</string>
     <string name="hidden_pin_locked">%1$d초 뒤에 다시 시도할 수 있습니다</string>
+    <string name="hidden_pin_forgot">비밀번호를 잊으셨나요?</string>
+    <string name="hidden_pin_recover_title">기기 잠금으로 확인</string>
+    <string name="hidden_pin_recover_subtitle">확인되면 새 비밀번호를 정할 수 있습니다</string>
+    <string name="hidden_pin_recover_unavailable">기기에 화면 잠금이 없어 되찾을 수 없습니다</string>
+    <string name="hidden_pin_reset_hint">본인 확인이 끝났습니다. 새 비밀번호를 정하세요.</string>
     <string name="action_confirm">확인</string>
     <string name="gallery_app_section_count">%1$d장</string>
     <string name="gallery_app_kakaotalk">카카오톡</string>

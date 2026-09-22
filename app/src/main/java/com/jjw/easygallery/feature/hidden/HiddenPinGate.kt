@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,6 +41,8 @@ internal fun HiddenPinGate(
     state: HiddenUiState.Locked,
     onSetPin: (pin: String, confirm: String) -> Unit,
     onVerify: (String) -> Unit,
+    onForgot: () -> Unit,
+    isResetting: Boolean,
     errorText: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -79,7 +82,9 @@ internal fun HiddenPinGate(
         )
         if (state.isSetup) {
             Text(
-                text = stringResource(R.string.hidden_pin_setup_hint),
+                text = stringResource(
+                    if (isResetting) R.string.hidden_pin_reset_hint else R.string.hidden_pin_setup_hint,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -100,15 +105,7 @@ internal fun HiddenPinGate(
                 imeAction = ImeAction.Done,
             )
         }
-        val message = when {
-            locked -> stringResource(R.string.hidden_pin_locked, remaining)
-            // 5회까지 같은 문구만 보다가 6회째에 갑자기 잠기면 당황스러우므로 횟수를 함께 보여준다.
-            // 이 분기가 errorText 보다 **앞**이어야 한다 — 뒤에 두면 영영 닿지 않는다(실기기 확인).
-            errorText != null && state.failedAttempts > 0 ->
-                stringResource(R.string.hidden_pin_wrong_with_attempts, state.failedAttempts)
-            errorText != null -> errorText
-            else -> null
-        }
+        val message = gateMessage(remaining, locked, state.failedAttempts, errorText)
         if (message != null) {
             Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
@@ -118,6 +115,13 @@ internal fun HiddenPinGate(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.action_confirm))
+        }
+        // 잊었을 때의 유일한 길. **잠긴 동안에도 눌려야 한다** —
+        // 정작 잊어버린 사람이 10분을 기다려야 하면 복구 장치가 아니다.
+        if (!state.isSetup) {
+            TextButton(onClick = onForgot) {
+                Text(stringResource(R.string.hidden_pin_forgot))
+            }
         }
     }
 }
@@ -148,4 +152,18 @@ private const val ONE_SECOND_MILLIS = 1_000L
 private fun secondsLeft(lockedUntilMillis: Long): Long {
     val left = lockedUntilMillis - System.currentTimeMillis()
     return if (left <= 0) 0 else (left + ONE_SECOND_MILLIS - 1) / ONE_SECOND_MILLIS
+}
+
+/**
+ * 게이트에 보여줄 한 줄. 잠김 > 실패 횟수 > 그 밖의 오류 순이다.
+ *
+ * 실패 횟수 분기가 [errorText] 보다 **앞**이어야 한다 — 뒤에 두면 영영 닿지 않는다(실기기 확인).
+ * 5회까지 같은 문구만 보다가 6회째에 갑자기 잠기면 무슨 일인지 알 수 없다.
+ */
+@Composable
+private fun gateMessage(remaining: Long, locked: Boolean, failedAttempts: Int, errorText: String?): String? = when {
+    locked -> stringResource(R.string.hidden_pin_locked, remaining)
+    errorText != null && failedAttempts > 0 ->
+        stringResource(R.string.hidden_pin_wrong_with_attempts, failedAttempts)
+    else -> errorText
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -19,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.hidden.VerifyResult
 import com.jjw.easygallery.core.domain.model.MediaItem
+import kotlinx.coroutines.launch
 
 @Composable
 fun HiddenRoute(
@@ -30,7 +32,12 @@ fun HiddenRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     var pinError by remember { mutableStateOf<String?>(null) }
+    var isResetting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
+    val recoverTitle = stringResource(R.string.hidden_pin_recover_title)
+    val recoverSubtitle = stringResource(R.string.hidden_pin_recover_subtitle)
+    val recoverUnavailable = stringResource(R.string.hidden_pin_recover_unavailable)
     val badFormat = stringResource(R.string.hidden_pin_format_error)
     val mismatch = stringResource(R.string.hidden_pin_mismatch)
     val wrong = stringResource(R.string.hidden_pin_wrong)
@@ -69,6 +76,7 @@ fun HiddenRoute(
         onBackClick = onBackClick,
         onSetPin = { pin, confirm ->
             viewModel.setPin(pin, confirm) { result ->
+                if (result == HiddenViewModel.SetPinResult.Ok) isResetting = false
                 pinError = when (result) {
                     HiddenViewModel.SetPinResult.Ok -> null
                     HiddenViewModel.SetPinResult.BadFormat -> badFormat
@@ -76,6 +84,21 @@ fun HiddenRoute(
                 }
             }
         },
+        onForgot = {
+            // 기기 잠금이 없으면 확인이 확인이 아니다. 되찾을 길이 없다고 솔직히 알린다
+            if (activity == null || !DeviceCredential.isAvailable(activity)) {
+                pinError = recoverUnavailable
+            } else {
+                scope.launch {
+                    if (DeviceCredential.confirm(activity, recoverTitle, recoverSubtitle)) {
+                        pinError = null
+                        isResetting = true
+                        viewModel.onDeviceCredentialConfirmed()
+                    }
+                }
+            }
+        },
+        isResetting = isResetting,
         onVerify = { pin ->
             pinError = null
             viewModel.verify(pin) { result ->
