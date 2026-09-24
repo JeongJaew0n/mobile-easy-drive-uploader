@@ -53,9 +53,9 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 | DRV-P4 | `PICKER_MIMETYPES` 에 폴더 MIME 만 지정 | 폴더만 보인다 | ❌ 2026-09-24 | 폴더 목록은 나오지만 폴더 안이 항상 비어 보이고 선택 바도 뜨지 않는다. 이 값은 "고를 수 있는 형식"이라 폴더만 주면 아무것도 고를 수 없는 상태가 된다 |
 | DRV-P5 | 피커로 고른 **파일의 부모 폴더**까지 권한이 미치는가 | 부모에 업로드할 수 있는지 | ✅ 2026-09-24 | **된다.** 고른 `Build.zip` → `parents=[1Wna7…]` 는 읽힌다. 그 폴더를 `files.get` 하면 **404**(폴더 자체는 못 읽는다), `files.list` 하면 접근권 있는 항목만 나온다(고른 파일 하나), 그런데 그 폴더를 `parents` 로 준 **`files.create` 는 성공**한다. Drive 앱에서 `Games` 안에 `EG-probe` 폴더가 실제로 생긴 것을 눈으로 확인하고 지웠다 |
 | DRV-P6 | 부모 폴더의 **이름**을 얻을 수 있는가 | 화면에 무슨 폴더인지 보여줄 수 있는지 | ❌ 2026-09-24 | `files.get(parentId)` 가 404 라 이름을 알 길이 없다. 업로드는 되는데 "어디에 올리는지" 를 앱이 말해줄 수 없다 — 사용자가 직접 이름을 붙이게 하는 수밖에 |
-| DRV-P7 | 설정에서 "Drive 폴더 지정" → 파일 선택 → 별칭 입력 | 지정 폴더 목록에 뜬다 | ⬜ | 기기 잠금이 걸려 확인 못 함 |
-| DRV-P8 | Drive 화면 루트 | 지정 폴더 + Easy Gallery 만 보인다 | ⬜ | 내 드라이브의 다른 폴더는 보이면 안 된다 |
-| DRV-P9 | 루트에서 새 폴더 버튼 | 보이지 않는다 | ⬜ | 루트는 실제 폴더가 아니라 목록이다 |
-| DRV-P10 | 지정 폴더 행의 ⋮ | 이름 변경·이동·삭제가 없다 | ⬜ | 앱에 그 폴더 권한이 없어 눌러도 실패한다 |
-| DRV-P11 | 지정 폴더로 업로드 | 올라가고, Drive 앱에서 그 폴더에 보인다 | ⬜ | 우리 앱에서는 우리가 올린 것만 보인다 |
-| DRV-P12 | `setOptOutIncludingGrantedScopes(true)` 적용 후 로그인 | `grantedScopes=[drive.file]` 만 | ⬜ | SS-10 의 누적이 막히는지 |
+| DRV-P7 | 설정에서 "Drive 폴더 지정" → 파일 선택 → 별칭 입력 | 지정 폴더 목록에 뜬다 | ✅ 2026-09-25 | 피커 → Games 안의 Build.zip 선택 → "이 폴더를 뭐라고 부를까요?" → GamesFolder 로 등록 |
+| DRV-P8 | Drive 화면 루트 | 지정 폴더 + Easy Gallery 만 보인다 | ✅ 2026-09-25 | 루트에 GamesFolder 와 Easy Gallery 만. 사용자의 다른 폴더(상해·거제·Notability 등)는 하나도 안 보인다 |
+| DRV-P9 | 루트에서 새 폴더 버튼 | 보이지 않는다 | ✅ 2026-09-25 | 루트 상단은 뒤로·검색·새로 고침 셋뿐. 다른 폴더 안에서는 새 폴더가 그대로 있다 |
+| DRV-P10 | 지정 폴더 행의 ⋮ | 이름 변경·이동·삭제가 없다 | ✅ 2026-09-25 | 메뉴가 통째로 없다. 처음엔 빈 팝업이 떠서 `EntryMenu.hasAny` 로 ⋮ 자체를 내렸다 — `menu.delete` 가 화면에서 쓰이지 않던 것도 이때 드러났다 |
+| DRV-P11 | 지정 폴더로 업로드 | 올라가고, Drive 앱에서 그 폴더에 보인다 | ✅ 2026-09-25 | GamesFolder 를 업로드 폴더로 지정 → 사진 1장 업로드 → **Drive 앱의 Games 안에 원래 파일들과 나란히** 들어갔다. 우리 앱에서는 그 사진과 피커로 고른 Build.zip 만 보이고 kokoa_day10.css/html 은 안 보인다 — 설계대로 |
+| DRV-P12 | `setOptOutIncludingGrantedScopes(true)` 적용 후 로그인 | `grantedScopes=[drive.file]` 만 | ✅ 2026-09-25 | `grantedScopes=[drive.file]` 만. 이전 `drive` 가 딸려 오지 않는다 |

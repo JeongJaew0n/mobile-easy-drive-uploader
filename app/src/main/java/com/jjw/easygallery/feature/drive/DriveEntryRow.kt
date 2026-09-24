@@ -94,65 +94,89 @@ internal fun DriveEntryRow(
             }
         }
         if (entry.isFolder) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-        if (selecting) return@Row
+        if (selecting || !menu.hasAny) return@Row
         Box {
             IconButton(onClick = { menuExpanded = true }, enabled = enabled) {
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
             }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                if (menu.open) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_open)) },
-                        onClick = {
-                            menuExpanded = false
-                            onOpen()
-                        },
-                    )
-                }
-                if (menu.download) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_download)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_file_download), contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDownload()
-                        },
-                    )
-                }
-                if (menu.rename) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_rename)) },
-                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onRename()
-                        },
-                    )
-                }
-                if (menu.move) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.drive_menu_move)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null)
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onMove()
-                        },
-                    )
-                }
-                DropdownMenuItem(
-                    text = {
-                        val label = if (menu.deleteIsTrash) R.string.action_trash else R.string.action_delete_forever
-                        Text(stringResource(label))
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onTrash()
-                    },
-                )
-            }
+            EntryDropdownMenu(
+                expanded = menuExpanded,
+                onDismiss = { menuExpanded = false },
+                menu = menu,
+                onOpen = onOpen,
+                onDownload = onDownload,
+                onRename = onRename,
+                onMove = onMove,
+                onTrash = onTrash,
+            )
+        }
+    }
+}
+
+/** 행 ⋮ 의 내용. [DriveEntryRow] 에서 떼어냈다 — 항목마다 조건이 붙어 한 함수에 두면 분기가 너무 많아진다 */
+@Composable
+private fun EntryDropdownMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    menu: EntryMenu,
+    onOpen: () -> Unit,
+    onDownload: () -> Unit,
+    onRename: () -> Unit,
+    onMove: () -> Unit,
+    onTrash: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (menu.open) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.drive_menu_open)) },
+                onClick = {
+                    onDismiss()
+                    onOpen()
+                },
+            )
+        }
+        if (menu.download) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.drive_menu_download)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_file_download), contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onDownload()
+                },
+            )
+        }
+        if (menu.rename) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_rename)) },
+                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onRename()
+                },
+            )
+        }
+        if (menu.move) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.drive_menu_move)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_drive_file_move), contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onMove()
+                },
+            )
+        }
+        if (menu.delete) {
+            DropdownMenuItem(
+                text = {
+                    val label = if (menu.deleteIsTrash) R.string.action_trash else R.string.action_delete_forever
+                    Text(stringResource(label))
+                },
+                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onTrash()
+                },
+            )
         }
     }
 }

@@ -11,7 +11,10 @@ internal data class EntryMenu(
     val move: Boolean,
     val delete: Boolean,
     val deleteIsTrash: Boolean,
-)
+) {
+    /** 보일 것이 하나도 없으면 ⋮ 버튼 자체를 내린다 — 빈 팝업이 뜨면 고장으로 보인다 */
+    val hasAny: Boolean get() = open || download || rename || move || delete
+}
 
 /**
  * [isPickedRoot] 는 Drive 루트 자리 — 거기 놓인 것은 실제 자식이 아니라 **지정 폴더와 기본 폴더의 목록**이다.
