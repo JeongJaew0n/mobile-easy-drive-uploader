@@ -1,7 +1,11 @@
 package com.jjw.easygallery.feature.drive
 
+import android.app.PendingIntent
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jjw.easygallery.core.data.auth.AuthRepository
+import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.MutationProgress
@@ -36,6 +40,7 @@ class DriveBrowserViewModel @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val downloads: DownloadScheduler,
     private val ledger: UploadLedgerRepository,
+    private val auth: AuthRepository,
 ) : ViewModel() {
 
     private lateinit var drive: RemoteStorage
@@ -124,6 +129,22 @@ class DriveBrowserViewModel @Inject constructor(
     }
 
     // ---- 검색(`docs/DRIVE_FILE_CRUD.md` §8) ----
+
+    /**
+     * 재동의 창이 닫힌 뒤. 성공했으면 토큰이 새로 잡히므로 그대로 다시 읽는다.
+     * 취소했으면 오류 화면이 그대로 남는다 — 사용자가 다시 누를 수 있다.
+     */
+    fun onAuthRecoveryResult(data: Intent?) {
+        viewModelScope.launch {
+            val ok = runCatching { auth.completeSignIn(data) }
+                .onFailure { Timber.i(it, "auth recovery not completed") }
+                .isSuccess
+            if (ok) {
+                _uiState.update { it.copy(error = null, authRecovery = null, isLoading = true) }
+                fetchPage(reset = true)
+            }
+        }
+    }
 
     private val remoteSearch: Boolean get() = Capability.SEARCH in _uiState.value.capabilities
 
@@ -456,6 +477,7 @@ class DriveBrowserViewModel @Inject constructor(
                         isRefreshing = false,
                         isLoadingMore = false,
                         error = if (reset) message else null,
+                        authRecovery = (e as? AuthorizationRequiredException)?.pendingIntent,
                     )
                 }
                 if (!reset) events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
@@ -485,6 +507,11 @@ data class DriveBrowserUiState(
     /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
     val mutationProgress: MutationProgress? = null,
     val error: String? = null,
+    /**
+     * 권한이 끊겨서 재동의가 필요할 때 띄울 인텐트. 있으면 오류 화면이 "다시 시도" 대신
+     * 재동의 버튼을 보여준다 — 없으면 앱 안에서 빠져나갈 길이 없다(SS-11).
+     */
+    val authRecovery: PendingIntent? = null,
     /** 저장소가 지원하는 동작 — 메뉴 구성에 쓴다 */
     val capabilities: Set<Capability> = emptySet(),
     /**

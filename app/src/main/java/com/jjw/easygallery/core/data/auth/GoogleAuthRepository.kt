@@ -99,7 +99,7 @@ class GoogleAuthRepository @Inject constructor(
             cached?.takeIf { it.isFresh() }?.let { return it.token }
             val email = prefs.current().accountEmail ?: throw NotSignedInException()
             val result = authorize(Account(email, GOOGLE_ACCOUNT_TYPE))
-            if (result.hasResolution()) throw AuthorizationRequiredException()
+            if (result.hasResolution()) throw AuthorizationRequiredException(result.pendingIntent)
             cache(result).token
         }
     }

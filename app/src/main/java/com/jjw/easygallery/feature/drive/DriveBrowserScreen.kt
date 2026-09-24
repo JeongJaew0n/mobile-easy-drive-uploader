@@ -1,8 +1,12 @@
 package com.jjw.easygallery.feature.drive
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -84,6 +88,10 @@ fun DriveBrowserRoute(
     val storageRootName = stringResource(R.string.storage_root_name)
     val rootName = if (key.accountId == null) driveRootName else storageRootName
 
+    val authRecoveryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> viewModel.onAuthRecoveryResult(result.data) }
+
     LaunchedEffect(key) { viewModel.load(key.accountId, key.folderId, key.folderName, rootName) }
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -108,6 +116,9 @@ fun DriveBrowserRoute(
         },
         onLoadMore = viewModel::loadMore,
         onRefresh = viewModel::refresh,
+        onRecoverAuth = { pendingIntent ->
+            authRecoveryLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+        },
         onCreateFolder = viewModel::createFolder,
         onSelectAsUploadFolder = viewModel::selectAsUploadFolder,
         entryActions = DriveEntryActions(
@@ -165,6 +176,7 @@ internal fun DriveBrowserScreen(
     onEntryClick: (DriveEntry) -> Unit,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
+    onRecoverAuth: (PendingIntent) -> Unit,
     onCreateFolder: (String) -> Unit,
     onSelectAsUploadFolder: () -> Unit,
     modifier: Modifier = Modifier,
@@ -219,7 +231,15 @@ internal fun DriveBrowserScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(uiState.error, color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = onRefresh) { Text(stringResource(R.string.action_retry)) }
+                    // 권한이 끊긴 것이면 새로고침은 같은 오류만 반복한다 — 재동의를 띄워야 빠져나간다(SS-11)
+                    val recovery = uiState.authRecovery
+                    if (recovery != null) {
+                        TextButton(onClick = { onRecoverAuth(recovery) }) {
+                            Text(stringResource(R.string.drive_reauthorize))
+                        }
+                    } else {
+                        TextButton(onClick = onRefresh) { Text(stringResource(R.string.action_retry)) }
+                    }
                 }
 
                 uiState.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -466,6 +486,7 @@ private fun DriveBrowserScreenPreview() {
             onEntryClick = {},
             onLoadMore = {},
             onRefresh = {},
+            onRecoverAuth = {},
             onCreateFolder = {},
             onSelectAsUploadFolder = {},
         )

@@ -252,6 +252,7 @@
     <string name="storage_root_name">최상위 폴더</string>
     <string name="drive_folder_empty">비어 있는 폴더입니다. 오른쪽 위에서 새 폴더를 만들 수 있습니다.</string>
     <string name="drive_folder_empty_scoped">이 앱으로 올린 파일만 보입니다. Drive 에 원래 있던 파일은 Drive 앱에서 확인하세요.</string>
+    <string name="drive_reauthorize">권한 다시 허용</string>
     <string name="drive_root_empty">올릴 폴더가 없습니다. 설정에서 Drive 폴더를 지정하거나, 그냥 올리면 Easy Gallery 폴더가 만들어집니다.</string>
     <string name="drive_use_as_upload_folder">이 폴더를 업로드 폴더로 지정</string>
     <string name="drive_folder_created">%1$s 폴더를 만들었습니다</string>

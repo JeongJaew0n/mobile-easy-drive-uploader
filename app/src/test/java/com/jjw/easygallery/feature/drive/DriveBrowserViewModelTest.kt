@@ -1,6 +1,9 @@
 package com.jjw.easygallery.feature.drive
 
+import android.app.PendingIntent
 import app.cash.turbine.test
+import com.jjw.easygallery.core.data.auth.AuthRepository
+import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
@@ -49,6 +52,7 @@ class DriveBrowserViewModelTest {
     private val prefs: UserPreferencesRepository = mockk()
     private val downloads: DownloadScheduler = mockk(relaxed = true)
     private val ledger: UploadLedgerRepository = mockk { every { observeRemoteIds(null) } returns flowOf(setOf("f2")) }
+    private val auth: AuthRepository = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -58,7 +62,7 @@ class DriveBrowserViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger)
+        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger, auth)
         viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
@@ -272,4 +276,30 @@ class DriveBrowserViewModelTest {
     }
 
     private fun entry(id: String, name: String, mime: String) = DriveEntry(id, name, mime, null, null, null)
+
+    @Test
+    fun `권한이 끊기면 재동의 인텐트를 상태에 싣는다`() = runTest(testDispatcher) {
+        val pending: PendingIntent = mockk()
+        coEvery { drive.listChildren("root", null, false) } throws AuthorizationRequiredException(pending)
+
+        val viewModel = loadedViewModel()
+
+        // 이게 null 이면 화면은 "다시 시도" 만 보여주고, 눌러도 같은 오류가 반복된다(SS-11)
+        assertEquals(pending, viewModel.uiState.value.authRecovery)
+    }
+
+    @Test
+    fun `재동의가 끝나면 오류를 지우고 다시 읽는다`() = runTest(testDispatcher) {
+        val pending: PendingIntent = mockk()
+        coEvery { drive.listChildren("root", null, false) } throws AuthorizationRequiredException(pending)
+        val viewModel = loadedViewModel()
+        coEvery { drive.listChildren("root", null, false) } returns DrivePage(listOf(fileA), null)
+
+        viewModel.onAuthRecoveryResult(mockk())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.error)
+        assertEquals(null, viewModel.uiState.value.authRecovery)
+        assertEquals(listOf("a.jpg"), viewModel.uiState.value.entries.map { it.name })
+    }
 }
