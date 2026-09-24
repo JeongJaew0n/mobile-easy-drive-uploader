@@ -36,6 +36,8 @@
 | 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것 |
 | 숨김 (hidden) | 우리 앱 목록에서만 빼는 표시(`hidden_media`). 파일은 그대로고 다른 갤러리 앱에서는 보인다 | 휴지통과 다름 — 휴지통은 MediaStore 의 `IS_TRASHED` 라 기기 전체에 적용된다 |
 | PIN | 숨긴 사진을 보기 위한 4~6자리 숫자. PBKDF2 해시로만 저장한다 | 암호화 키가 아니다 — 파일 자체는 잠기지 않는다 |
+| 기본 폴더 (Easy Gallery) | 앱이 Drive 에 직접 만드는 폴더. 지정한 곳이 없으면 여기에 올린다 | 앱이 만들었으므로 이름도 알고 안을 볼 수도 있다 |
+| 지정 폴더 (picked folder) | 사용자가 피커로 골라 업로드 대상에 추가한 **남의** Drive 폴더. `drive.file` 에서는 ID 만 알 뿐 **이름을 읽을 수 없어** 사용자가 별칭을 붙인다 | 기본 폴더와 다름 — 그 안에 원래 있던 파일은 끝까지 보이지 않는다(`docs/DRIVE_FILE_SCOPE.md`) |
 | 앱 폴더 (AppFolders.folderOf) | 표준 최상위 폴더 바로 아래 칸(`Documents/obsidian/pictures/` → `obsidian`). '다른 앱' 탭의 묶음 이름 | 앨범과 다름 — 앨범은 전체 경로, 앱 폴더는 그중 한 칸이다 |
 
 ## 규칙

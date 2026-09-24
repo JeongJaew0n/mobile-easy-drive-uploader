@@ -13,14 +13,23 @@ internal data class EntryMenu(
     val deleteIsTrash: Boolean,
 )
 
-internal fun entryMenu(entry: DriveEntry, capabilities: Set<Capability>, allowMove: Boolean = true): EntryMenu {
+/**
+ * [isPickedRoot] 는 Drive 루트 자리 — 거기 놓인 것은 실제 자식이 아니라 **지정 폴더와 기본 폴더의 목록**이다.
+ * 지정 폴더는 앱에 권한이 없어 이름 변경·이동·삭제가 모두 실패하므로 메뉴에서 뺀다(`docs/DRIVE_FILE_SCOPE.md` §2).
+ */
+internal fun entryMenu(
+    entry: DriveEntry,
+    capabilities: Set<Capability>,
+    allowMove: Boolean = true,
+    isPickedRoot: Boolean = false,
+): EntryMenu {
     val folderOk = !entry.isFolder || Capability.FOLDER_MUTATION in capabilities
     return EntryMenu(
         open = !entry.isFolder && Capability.WEB_LINK in capabilities && entry.webViewLink != null,
         download = !entry.isFolder && Capability.DOWNLOAD in capabilities,
-        rename = Capability.RENAME in capabilities && folderOk,
-        move = allowMove && Capability.MOVE in capabilities && folderOk,
-        delete = true,
+        rename = !isPickedRoot && Capability.RENAME in capabilities && folderOk,
+        move = !isPickedRoot && allowMove && Capability.MOVE in capabilities && folderOk,
+        delete = !isPickedRoot,
         deleteIsTrash = Capability.TRASH in capabilities,
     )
 }

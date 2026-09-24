@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.auth
 import android.accounts.Account
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.os.SystemClock
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
@@ -58,6 +59,40 @@ class GoogleAuthRepository @Inject constructor(
         cache(result)
     }
 
+    override suspend fun beginFolderPick(): SignInStep {
+        val email = prefs.current().accountEmail ?: throw NotSignedInException()
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
+            .setAccount(Account(email, GOOGLE_ACCOUNT_TYPE))
+            // 이전에 동의한 넓은 scope 가 토큰에 딸려 오는 것을 막는다 (SS-10)
+            .setOptOutIncludingGrantedScopes(true)
+            .setPrompt(AuthorizationRequest.Prompt.CONSENT)
+            // 폴더 선택(PICKER_ALLOW_FOLDER_SELECTION)은 줘도 동작하지 않는다(DRV-P3).
+            // 그래서 폴더 안의 파일을 하나 고르게 하고 그 parents 를 쓴다 — docs/DRIVE_FILE_SCOPE.md §4
+            .addResourceParameter(AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
+            .build()
+        val result = try {
+            client.authorize(request).await()
+        } catch (e: ApiException) {
+            Timber.w(e, "folder picker failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        val pending = result.pendingIntent
+        return if (pending != null) SignInStep.NeedsConsent(pending) else SignInStep.Completed
+    }
+
+    override suspend fun completeFolderPick(data: Intent?): List<String> {
+        if (data == null) return emptyList()
+        val result = try {
+            client.getAuthorizationResultFromIntent(data)
+        } catch (e: ApiException) {
+            Timber.w(e, "picker result parse failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        result.accessToken?.let { cache(result) }
+        return parsePicked(result.tokenResponseParams)
+    }
+
     override suspend fun getAccessToken(): String {
         cached?.takeIf { it.isFresh() }?.let { return it.token }
         return mutex.withLock {
@@ -86,12 +121,18 @@ class GoogleAuthRepository @Inject constructor(
     private suspend fun authorize(account: Account?): AuthorizationResult {
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
+            // 계정에 남은 이전 동의(`drive` 전체)가 토큰에 딸려 오는 것을 막는다 — SS-10
+            .setOptOutIncludingGrantedScopes(true)
             .apply { if (account != null) setAccount(account) }
             .build()
         Timber.i("authorize scope=%s account=%s", DRIVE_SCOPE, account?.name?.let { "set" } ?: "picker")
         return try {
             val result = client.authorize(request).await()
-            Timber.i("authorize result: hasResolution=%s", result.hasResolution())
+            Timber.i(
+                "authorize result: hasResolution=%s grantedScopes=%s",
+                result.hasResolution(),
+                result.grantedScopes,
+            )
             result
         } catch (e: ApiException) {
             Timber.w(e, "authorize failed: status=%d", e.statusCode)
@@ -104,18 +145,30 @@ class GoogleAuthRepository @Inject constructor(
         return CachedToken(token, SystemClock.elapsedRealtime()).also { cached = it }
     }
 
+    /** 피커는 고른 항목의 ID 를 [PICKED_IDS_KEY] 에 콤마로 이어 담아 준다(2026-09-24 기기에서 확인). */
+    private fun parsePicked(params: Bundle?): List<String> {
+        if (params == null) {
+            Timber.w("picker returned no params")
+            return emptyList()
+        }
+        val raw = params.getString(PICKED_IDS_KEY).orEmpty()
+        Timber.i("picker picked=%s keys=%s", raw, params.keySet())
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
     private class CachedToken(val token: String, private val obtainedAt: Long) {
         fun isFresh(): Boolean = SystemClock.elapsedRealtime() - obtainedAt < TOKEN_TTL_MILLIS
     }
 
     companion object {
         /**
-         * Drive 전체 접근. 사용자의 기존 파일·폴더를 탐색하고 어디든 폴더를 만들 수 있어야 해서 필요하다.
-         * restricted scope 라 스토어 공개 시 Google 검증이 필요하고, 테스트 모드에서는 테스트 사용자만 로그인 가능.
-         * 앱이 만든 파일만 다루는 것으로 축소하려면 "https://www.googleapis.com/auth/drive.file" 로 바꾼다.
+         * 앱이 만든 파일과 사용자가 피커로 고른 항목만 접근한다.
+         * restricted 가 아닌 scope 라 스토어 공개 시 Google 보안 심사(CASA)를 받지 않는다.
+         * 대신 사용자의 기존 파일·폴더는 보이지 않는다 — 어디에 올릴지는 피커로 고르게 한다.
          */
-        const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
+        const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
         private const val GOOGLE_ACCOUNT_TYPE = "com.google"
+        private const val PICKED_IDS_KEY = "picked_file_ids"
 
         // 실제 만료는 1시간. 여유를 두고 갱신하고, 그래도 401 이 오면 Authenticator 가 재시도.
         private const val TOKEN_TTL_MILLIS = 45L * 60 * 1_000

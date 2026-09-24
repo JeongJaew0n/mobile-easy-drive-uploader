@@ -12,6 +12,14 @@ data class DriveFileDto(
     /** Drive 는 int64 를 문자열로 내려준다 */
     val size: String? = null,
     val webViewLink: String? = null,
+    val capabilities: DriveCapabilitiesDto? = null,
+)
+
+/** 이 항목에 무엇을 할 수 있는지. `drive.file` 에서 접근권이 어디까지 미치는지 보는 데 쓴다. */
+@Serializable
+data class DriveCapabilitiesDto(
+    val canAddChildren: Boolean? = null,
+    val canEdit: Boolean? = null,
 )
 
 @Serializable

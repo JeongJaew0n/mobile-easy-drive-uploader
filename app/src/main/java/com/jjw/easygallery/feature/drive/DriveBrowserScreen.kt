@@ -252,6 +252,7 @@ internal fun DriveBrowserScreen(
                                     entry,
                                     uiState.capabilities,
                                     allowMove = !uiState.isRemoteSearchResult,
+                                    isPickedRoot = uiState.isPickedRoot,
                                 ),
                                 uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
                                 onOpen = { entryActions.onOpen(entry) },
@@ -357,6 +358,9 @@ private fun searchHintRes(uiState: DriveBrowserUiState): Int =
 private fun emptyMessageRes(uiState: DriveBrowserUiState): Int = when {
     uiState.searchQuery?.isBlank() == true && Capability.SEARCH in uiState.capabilities -> R.string.drive_search_prompt
     uiState.isSearching -> R.string.drive_search_empty
+    uiState.isPickedRoot -> R.string.drive_root_empty
+    // drive.file 에서는 남이 넣은 파일이 보이지 않는다 — 고장이 아니라는 것을 화면이 말해야 한다
+    Capability.SEARCH in uiState.capabilities -> R.string.drive_folder_empty_scoped
     else -> R.string.drive_folder_empty
 }
 
@@ -412,14 +416,17 @@ private fun BrowserTopBar(
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
             }
-            IconButton(
-                onClick = onCreateFolder,
-                enabled = uiState.current != null && !uiState.isMutating,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_create_new_folder),
-                    contentDescription = stringResource(R.string.folder_picker_new_folder),
-                )
+            // 루트 자리는 실제 폴더가 아니라 목록이라 거기에 폴더를 만들 수 없다
+            if (!uiState.isPickedRoot) {
+                IconButton(
+                    onClick = onCreateFolder,
+                    enabled = uiState.current != null && !uiState.isMutating,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_create_new_folder),
+                        contentDescription = stringResource(R.string.folder_picker_new_folder),
+                    )
+                }
             }
         },
     )

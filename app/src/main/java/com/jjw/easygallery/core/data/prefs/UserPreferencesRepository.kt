@@ -10,11 +10,13 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.jjw.easygallery.core.domain.model.PickedFolder
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,6 +31,8 @@ data class UserPreferences(
     val accountName: String? = null,
     val uploadFolderId: String? = null,
     val uploadFolderName: String? = null,
+    /** 피커로 지정한 남의 Drive 폴더들(`docs/DRIVE_FILE_SCOPE.md` §4) */
+    val pickedFolders: List<PickedFolder> = emptyList(),
     /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
     val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
@@ -59,11 +63,20 @@ data class UserPreferences(
     val canUpload: Boolean get() = uploadAccountId != null || isSignedIn
 }
 
+// TooManyFunctions: 설정 항목 하나에 setter 하나라 항목이 늘면 함수도 는다. 나누면 "어느 저장소에 있더라" 를 매번 찾게 된다
+@Suppress("TooManyFunctions")
 @Singleton
 class UserPreferencesRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     private val store get() = context.userPreferencesStore
+    private val json = Json { ignoreUnknownKeys = true }
+
+    /** 저장된 값이 깨졌으면 빈 목록으로 본다 — 폴더 목록 하나 때문에 설정 전체를 못 읽으면 안 된다. */
+    private fun decodeFolders(raw: String?): List<PickedFolder> {
+        if (raw.isNullOrEmpty()) return emptyList()
+        return runCatching { json.decodeFromString<List<PickedFolder>>(raw) }.getOrElse { emptyList() }
+    }
 
     val preferences: Flow<UserPreferences> = store.data.map { prefs ->
         UserPreferences(
@@ -71,6 +84,7 @@ class UserPreferencesRepository @Inject constructor(
             accountName = prefs[KEY_ACCOUNT_NAME],
             uploadFolderId = prefs[KEY_UPLOAD_FOLDER_ID],
             uploadFolderName = prefs[KEY_UPLOAD_FOLDER_NAME],
+            pickedFolders = decodeFolders(prefs[KEY_PICKED_FOLDERS]),
             uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
@@ -90,6 +104,29 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     suspend fun current(): UserPreferences = preferences.first()
+
+    /**
+     * 지정 폴더를 더한다. 같은 폴더를 또 고르면 별칭만 갈아끼운다 —
+     * 사용자가 이름을 고치려고 다시 고르는 경우가 그렇다.
+     */
+    suspend fun addPickedFolder(folder: PickedFolder) = editFolders { current ->
+        current.filterNot { it.id == folder.id } + folder
+    }
+
+    suspend fun removePickedFolder(id: String) = editFolders { current ->
+        current.filterNot { it.id == id }
+    }
+
+    private suspend fun editFolders(transform: (List<PickedFolder>) -> List<PickedFolder>) {
+        store.edit { prefs ->
+            val next = transform(decodeFolders(prefs[KEY_PICKED_FOLDERS]))
+            if (next.isEmpty()) {
+                prefs.remove(KEY_PICKED_FOLDERS)
+            } else {
+                prefs[KEY_PICKED_FOLDERS] = json.encodeToString(next)
+            }
+        }
+    }
 
     suspend fun setAccount(email: String, displayName: String?) {
         store.edit { prefs ->
@@ -213,5 +250,6 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_ACCOUNT_NAME = stringPreferencesKey("account_name")
         val KEY_UPLOAD_FOLDER_ID = stringPreferencesKey("upload_folder_id")
         val KEY_UPLOAD_FOLDER_NAME = stringPreferencesKey("upload_folder_name")
+        val KEY_PICKED_FOLDERS = stringPreferencesKey("picked_folders")
     }
 }

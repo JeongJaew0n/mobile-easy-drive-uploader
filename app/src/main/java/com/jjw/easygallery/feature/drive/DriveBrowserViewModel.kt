@@ -12,6 +12,7 @@ import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
+import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -75,6 +76,8 @@ class DriveBrowserViewModel @Inject constructor(
                         isLoading = true,
                         error = null,
                         capabilities = drive.capabilities,
+                        isPickedRoot = folder.id == drive.rootId &&
+                            drive.account.kind == RemoteAccountKind.GOOGLE_DRIVE,
                         accountName = drive.account.displayName,
                     )
                 }
@@ -484,6 +487,11 @@ data class DriveBrowserUiState(
     val error: String? = null,
     /** 저장소가 지원하는 동작 — 메뉴 구성에 쓴다 */
     val capabilities: Set<Capability> = emptySet(),
+    /**
+     * Drive 루트 자리인가. 여기 놓인 것은 실제 자식이 아니라 **지정 폴더와 기본 폴더의 목록**이라
+     * 새 폴더 만들기·이름 변경·삭제가 모두 성립하지 않는다(`docs/DRIVE_FILE_SCOPE.md` §2).
+     */
+    val isPickedRoot: Boolean = false,
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
     val accountName: String? = null,
 ) {

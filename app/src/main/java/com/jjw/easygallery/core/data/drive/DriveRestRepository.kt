@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.DrivePage
 import retrofit2.HttpException
+import timber.log.Timber
 import java.io.InputStream
 import java.time.Instant
 import java.time.format.DateTimeParseException
@@ -113,6 +114,11 @@ class DriveRestRepository @Inject constructor(
 
     // Drive 쿼리 문자열 안의 작은따옴표/백슬래시 이스케이프
     private fun escape(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
+
+    override suspend fun parentOf(fileId: String): String? =
+        runCatching { api.getFile(fileId).parents?.firstOrNull() }
+            .onFailure { Timber.w(it, "parentOf failed: %s", fileId) }
+            .getOrNull()
 
     companion object {
         const val APP_ROOT_FOLDER_NAME = "Easy Gallery"

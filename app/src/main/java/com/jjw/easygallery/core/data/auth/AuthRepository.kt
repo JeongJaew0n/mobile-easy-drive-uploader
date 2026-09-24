@@ -26,5 +26,14 @@ interface AuthRepository : TokenProvider {
     /** 동의 화면 결과 인텐트를 넘긴다. 취소면 [SignInCancelledException]. */
     suspend fun completeSignIn(data: Intent?)
 
+    /**
+     * Drive 폴더 피커를 띄운다. `drive.file` 에서 앱이 남의 폴더에 접근할 수 있는 유일한 경로다.
+     * 항상 사용자 UI 가 필요하므로 [SignInStep.NeedsConsent] 를 기대한다.
+     */
+    suspend fun beginFolderPick(): SignInStep
+
+    /** 피커 결과 인텐트에서 고른 항목의 Drive 파일 ID 를 꺼낸다. 아무것도 고르지 않았으면 빈 목록. */
+    suspend fun completeFolderPick(data: Intent?): List<String>
+
     suspend fun signOut()
 }

@@ -24,6 +24,13 @@ interface DriveApi {
     @GET("drive/v3/files/{fileId}")
     suspend fun download(@Path("fileId") fileId: String, @Query("alt") alt: String = "media"): ResponseBody
 
+    /** 단건 메타데이터. 앱에 그 항목 접근권이 없으면 404 다 — `drive.file` 에서 접근 범위를 재는 데 쓴다. */
+    @GET("drive/v3/files/{fileId}")
+    suspend fun getFile(
+        @Path("fileId") fileId: String,
+        @Query("fields") fields: String = "id,name,mimeType,parents,capabilities(canAddChildren,canEdit)",
+    ): DriveFileDto
+
     @GET("drive/v3/files")
     suspend fun listFiles(
         @Query("q") query: String,

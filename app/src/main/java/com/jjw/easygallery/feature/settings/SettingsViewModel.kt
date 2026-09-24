@@ -15,6 +15,7 @@ import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveAccount
+import com.jjw.easygallery.core.domain.model.PickedFolder
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountInfo
 import com.jjw.easygallery.core.domain.model.VideoCompression
@@ -68,6 +69,7 @@ class SettingsViewModel @Inject constructor(
             storageUsedBytes = acc?.storageUsedBytes,
             storageLimitBytes = acc?.storageLimitBytes,
             uploadFolderName = p.uploadFolderName,
+            pickedFolders = p.pickedFolders,
             uploadAccountId = p.uploadAccountId,
             uploadAccountName = remotes.firstOrNull { it.id == p.uploadAccountId }?.displayName,
             remoteAccounts = remotes,
@@ -118,6 +120,39 @@ class SettingsViewModel @Inject constructor(
         signInUseCase.complete(data)
         events.send(SettingsEvent.SignedIn)
     }
+
+    fun pickDriveFolders() = runBusy {
+        when (val step = auth.beginFolderPick()) {
+            is SignInStep.NeedsConsent -> events.send(SettingsEvent.LaunchFolderPicker(step.pendingIntent))
+            SignInStep.Completed -> events.send(SettingsEvent.FolderPickCancelled)
+        }
+    }
+
+    fun onFolderPickResult(resultCode: Int, data: Intent?) = runBusy {
+        if (resultCode != Activity.RESULT_OK) {
+            events.send(SettingsEvent.FolderPickCancelled)
+            return@runBusy
+        }
+        val fileId = auth.completeFolderPick(data).firstOrNull()
+        if (fileId == null) {
+            events.send(SettingsEvent.FolderPickCancelled)
+            return@runBusy
+        }
+        val parentId = drive.parentOf(fileId)
+        if (parentId == null) {
+            events.send(SettingsEvent.FolderPickFailed)
+            return@runBusy
+        }
+        events.send(SettingsEvent.AskFolderAlias(parentId))
+    }
+
+    /** 별칭을 받아 지정 폴더로 등록한다. 이름을 읽을 수 없어 사용자가 붙인다(`docs/DRIVE_FILE_SCOPE.md` §4). */
+    fun confirmPickedFolder(id: String, alias: String) = runBusy {
+        prefs.addPickedFolder(PickedFolder(id, alias.trim()))
+        events.send(SettingsEvent.FolderAdded(alias.trim()))
+    }
+
+    fun removePickedFolder(id: String) = runBusy { prefs.removePickedFolder(id) }
 
     fun signOut() = runBusy {
         manageQueue.cancelAll()
@@ -190,6 +225,7 @@ data class SettingsUiState(
     val storageUsedBytes: Long? = null,
     val storageLimitBytes: Long? = null,
     val uploadFolderName: String? = null,
+    val pickedFolders: List<PickedFolder> = emptyList(),
     /** 업로드 대상 계정(null = Google Drive)과 표시 이름 */
     val uploadAccountId: String? = null,
     val uploadAccountName: String? = null,
@@ -208,6 +244,14 @@ data class SettingsUiState(
 
 sealed interface SettingsEvent {
     data class LaunchConsent(val pendingIntent: PendingIntent) : SettingsEvent
+
+    data class LaunchFolderPicker(val pendingIntent: PendingIntent) : SettingsEvent
+
+    /** 고른 파일의 부모 폴더. 이름을 읽을 수 없으니 화면이 별칭을 받아야 한다 */
+    data class AskFolderAlias(val folderId: String) : SettingsEvent
+    data class FolderAdded(val alias: String) : SettingsEvent
+    data object FolderPickCancelled : SettingsEvent
+    data object FolderPickFailed : SettingsEvent
 
     /** Play 서비스 상태 코드. 화면이 사람이 읽을 문구로 바꾼다 */
     data class SignInFailed(val statusCode: Int) : SettingsEvent

@@ -34,4 +34,7 @@ interface DriveRepository {
 
     /** 앱 전용 루트 폴더("Easy Gallery"). 없으면 만든다. */
     suspend fun ensureAppRootFolder(): DriveFolder
+
+    /** 피커로 고른 파일의 부모 폴더 ID. `drive.file` 에서 남의 폴더를 업로드 대상으로 삼는 유일한 길이다. */
+    suspend fun parentOf(fileId: String): String?
 }

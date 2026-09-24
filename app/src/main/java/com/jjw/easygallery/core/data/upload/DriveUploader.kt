@@ -8,6 +8,7 @@ import com.jjw.easygallery.core.data.drive.DriveApi
 import com.jjw.easygallery.core.data.drive.DriveFileDto
 import com.jjw.easygallery.core.data.drive.DriveFileMetadata
 import com.jjw.easygallery.core.data.drive.DriveHttpClient
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -75,6 +76,7 @@ class DriveUploader @Inject constructor(
     private val api: DriveApi,
     @param:DriveHttpClient private val client: OkHttpClient,
     private val json: Json,
+    private val prefs: UserPreferencesRepository,
     @param:Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
 ) : RemoteUploader {
 
@@ -91,7 +93,7 @@ class DriveUploader @Inject constructor(
             metadata = DriveFileMetadata(
                 name = source.displayName,
                 parents = listOf(folderId),
-                appProperties = mapOf(PROP_MEDIA_STORE_ID to source.mediaId.toString()),
+                appProperties = uploadProperties(source, folderId),
             ),
             contentType = source.mimeType.ifBlank { DEFAULT_MIME_TYPE },
             contentLength = length,
@@ -100,6 +102,22 @@ class DriveUploader @Inject constructor(
             throw DriveUploadException("업로드 세션 생성 실패 (${response.code()})", response.code())
         }
         return response.headers()["Location"] ?: throw DriveUploadException("업로드 세션 URI 가 없습니다")
+    }
+
+    /**
+     * 올린 파일에 남기는 표식.
+     *
+     * [PROP_APP] 은 값이 고정이라 `appProperties has { key=... and value='1' }` 로 **전부 찾을 수 있다**.
+     * 앱을 지웠다 깔면 지정 폴더 목록이 사라지는데, 이 표식과 파일의 `parents` 로 되살린다
+     * (`docs/DRIVE_FILE_SCOPE.md` §6). 지정 폴더가 아니면 [PROP_TARGET_ALIAS] 는 붙지 않는다.
+     */
+    private suspend fun uploadProperties(source: UploadSource, folderId: String): Map<String, String> {
+        val alias = prefs.current().pickedFolders.firstOrNull { it.id == folderId }?.alias
+        return buildMap {
+            put(PROP_MEDIA_STORE_ID, source.mediaId.toString())
+            put(PROP_APP, "1")
+            if (alias != null) put(PROP_TARGET_ALIAS, alias)
+        }
     }
 
     /** `Content-Range: bytes *\/total` 로 서버가 받은 범위를 묻는다. */
@@ -160,6 +178,12 @@ class DriveUploader @Inject constructor(
         const val DEFAULT_MIME_TYPE = "application/octet-stream"
         val DEFAULT_MEDIA_TYPE = DEFAULT_MIME_TYPE.toMediaTypeOrNull()!!
         const val PROP_MEDIA_STORE_ID = "mediaStoreId"
+
+        /** 이 앱이 올렸다는 고정 표식 — 값이 고정이라야 Drive 쿼리로 찾을 수 있다 */
+        const val PROP_APP = "easyGallery"
+
+        /** 지정 폴더에 올린 경우 그 별칭. 폴더 이름을 읽을 수 없어 이것이 유일한 단서다 */
+        const val PROP_TARGET_ALIAS = "egTarget"
         const val HTTP_RESUME_INCOMPLETE = 308
         const val HTTP_GONE = 410
     }

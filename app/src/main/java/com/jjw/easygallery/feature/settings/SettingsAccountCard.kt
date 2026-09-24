@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -31,12 +32,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.PickedFolder
 
 @Composable
 internal fun AccountCard(
     uiState: SettingsUiState,
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit,
+    onPickFoldersClick: () -> Unit,
+    onRemovePickedFolder: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -78,6 +82,13 @@ internal fun AccountCard(
                 OutlinedButton(onClick = onSignOutClick, enabled = !uiState.isBusy) {
                     Text(stringResource(R.string.settings_sign_out))
                 }
+                HorizontalDivider()
+                PickedFolders(
+                    folders = uiState.pickedFolders,
+                    isBusy = uiState.isBusy,
+                    onPickClick = onPickFoldersClick,
+                    onRemove = onRemovePickedFolder,
+                )
             } else {
                 Text(
                     text = stringResource(R.string.settings_account_description),
@@ -128,5 +139,50 @@ internal fun UploadFolderRow(
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         }
         HorizontalDivider()
+    }
+}
+
+/**
+ * 지정한 Drive 폴더 목록. 이름은 사용자가 붙인 별칭이다 — `drive.file` 에서는
+ * 폴더 이름을 읽을 수 없다(`docs/DRIVE_FILE_SCOPE.md` §4).
+ */
+@Composable
+private fun PickedFolders(
+    folders: List<PickedFolder>,
+    isBusy: Boolean,
+    onPickClick: () -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.settings_picked_folders),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    if (folders.isEmpty()) {
+        Text(
+            text = stringResource(R.string.settings_picked_folders_empty),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        folders.forEach { folder ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(folder.alias, style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = { onRemove(folder.id) }, enabled = !isBusy) {
+                    Text(stringResource(R.string.settings_picked_folder_remove))
+                }
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.settings_pick_drive_folders_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedButton(onClick = onPickClick, enabled = !isBusy) {
+        Text(stringResource(R.string.settings_pick_drive_folders))
     }
 }

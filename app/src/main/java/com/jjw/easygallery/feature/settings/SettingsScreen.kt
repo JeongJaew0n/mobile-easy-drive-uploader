@@ -87,11 +87,27 @@ fun SettingsRoute(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result -> viewModel.onConsentResult(result.resultCode, result.data) }
 
+    var aliasTarget by remember { mutableStateOf<String?>(null) }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> viewModel.onFolderPickResult(result.resultCode, result.data) }
+
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is SettingsEvent.LaunchConsent ->
                     consentLauncher.launch(IntentSenderRequest.Builder(event.pendingIntent).build())
+                is SettingsEvent.LaunchFolderPicker ->
+                    folderPickerLauncher.launch(IntentSenderRequest.Builder(event.pendingIntent).build())
+                is SettingsEvent.AskFolderAlias -> aliasTarget = event.folderId
+                is SettingsEvent.FolderAdded -> snackbarHostState.showSnackbar(
+                    resources.getString(R.string.settings_folder_added, event.alias),
+                )
+                SettingsEvent.FolderPickCancelled ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.settings_folder_pick_cancelled))
+                SettingsEvent.FolderPickFailed ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.settings_folder_pick_failed))
                 SettingsEvent.SignedIn ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.settings_signed_in))
                 SettingsEvent.SignInCancelled ->
@@ -104,12 +120,24 @@ fun SettingsRoute(
         }
     }
 
+    aliasTarget?.let { folderId ->
+        FolderAliasDialog(
+            onDismiss = { aliasTarget = null },
+            onConfirm = { alias ->
+                aliasTarget = null
+                viewModel.confirmPickedFolder(folderId, alias)
+            },
+        )
+    }
+
     SettingsScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
         onBackClick = onBackClick,
         onSignInClick = viewModel::signIn,
         onSignOutClick = viewModel::signOut,
+        onPickFoldersClick = viewModel::pickDriveFolders,
+        onRemovePickedFolder = viewModel::removePickedFolder,
         onUploadFolderClick = onUploadFolderClick,
         onUploadQueueClick = onUploadQueueClick,
         onDriveClick = onDriveClick,
@@ -142,6 +170,8 @@ internal fun SettingsScreen(
     onBackClick: () -> Unit,
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit,
+    onPickFoldersClick: () -> Unit,
+    onRemovePickedFolder: (String) -> Unit,
     onUploadFolderClick: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
@@ -193,6 +223,8 @@ internal fun SettingsScreen(
                 uiState = uiState,
                 onSignInClick = onSignInClick,
                 onSignOutClick = onSignOutClick,
+                onPickFoldersClick = onPickFoldersClick,
+                onRemovePickedFolder = onRemovePickedFolder,
             )
             RemoteAccountsSection(
                 accounts = uiState.remoteAccounts,
@@ -447,6 +479,8 @@ private fun SettingsScreenSignedOutPreview() {
             onBackClick = {},
             onSignInClick = {},
             onSignOutClick = {},
+            onPickFoldersClick = {},
+            onRemovePickedFolder = {},
             onUploadFolderClick = {},
             onUploadQueueClick = {},
             onWifiOnlyChange = {},
@@ -471,6 +505,8 @@ private fun SettingsScreenSignedInPreview() {
             onBackClick = {},
             onSignInClick = {},
             onSignOutClick = {},
+            onPickFoldersClick = {},
+            onRemovePickedFolder = {},
             onUploadFolderClick = {},
             onUploadQueueClick = {},
             onWifiOnlyChange = {},

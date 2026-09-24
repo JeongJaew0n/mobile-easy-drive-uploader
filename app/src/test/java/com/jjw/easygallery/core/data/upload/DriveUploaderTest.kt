@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import com.jjw.easygallery.core.data.drive.DriveApi
+import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -59,7 +60,14 @@ class DriveUploaderTest {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(DriveApi::class.java)
-        uploader = DriveUploader(context, api, client, json, UnconfinedTestDispatcher())
+        uploader = DriveUploader(
+            context,
+            api,
+            client,
+            json,
+            UserPreferencesRepository(context),
+            UnconfinedTestDispatcher(),
+        )
         shadowOf(context.contentResolver).registerInputStream(uri, ByteArrayInputStream(payload))
     }
 
