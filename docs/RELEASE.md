@@ -23,6 +23,9 @@ keytool -genkeypair -v -keystore ~/keys/easygallery-release.jks -alias easygalle
 ```
 
 - **Play App Signing 을 쓴다.** 위 키는 "업로드 키"가 되고, 실제 앱 서명 키는 Google 이 보관한다. 업로드 키를 잃어도 재설정할 수 있다.
+
+> 앱 안에서 GitHub Release 로 업데이트하는 것은 이 결정과 충돌한다 — Play App Signing 을 쓰면
+> 기기의 앱은 Google 의 키로 서명돼 있어 우리가 같은 서명의 APK 를 만들 수 없다. `docs/SELF_UPDATE.md`.
 - 키 파일과 비밀번호는 비밀번호 관리자에. 저장소·CI 로그에 남기지 않는다.
 - 릴리스 키 SHA-1 은 GCP OAuth Android 클라이언트에 **패키지 `com.jjw.easygallery`(접미사 없음)** 로 따로 등록해야 로그인이 된다. 디버그 등록(`.debug` + 디버그 SHA-1)과 별개.
 
