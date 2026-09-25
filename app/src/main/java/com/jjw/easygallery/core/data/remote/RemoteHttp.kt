@@ -20,7 +20,17 @@ open class RemoteStorageException(message: String, val httpCode: Int? = null, ca
         get() = httpCode == TOO_MANY_REQUESTS ||
             (httpCode == FORBIDDEN && RATE_LIMIT_HINTS.any { message.orEmpty().contains(it, ignoreCase = true) })
 
+    /**
+     * 4xx 지만 다시 하면 될 수 있는 것들. 여기 해당하면 영구 실패로 버리지 않는다.
+     *
+     * 401 은 토큰이 만료된 것이다. 대량 업로드가 토큰 수명을 넘기면 실제로 만나고,
+     * 새 토큰을 받아 다시 하면 된다 — 버리면 사용자는 "몇 장이 빠졌다" 를 겪는다.
+     */
+    val isRetryable: Boolean
+        get() = isRateLimited || httpCode == UNAUTHORIZED
+
     private companion object {
+        const val UNAUTHORIZED = 401
         const val FORBIDDEN = 403
         const val TOO_MANY_REQUESTS = 429
         val RATE_LIMIT_HINTS = listOf("rateLimitExceeded", "userRateLimitExceeded", "rate limit")

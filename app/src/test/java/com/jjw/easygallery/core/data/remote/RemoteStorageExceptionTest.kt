@@ -37,4 +37,20 @@ class RemoteStorageExceptionTest {
     fun `404 는 한도와 무관`() {
         assertFalse(RemoteStorageException("없음", 404).isRateLimited)
     }
+
+    @Test
+    fun `401 은 토큰 만료라 다시 하면 된다`() {
+        // 대량 업로드가 토큰 수명을 넘기면 실제로 만난다. 버리면 그 파일만 조용히 빠진다
+        assertTrue(RemoteStorageException("업로드 실패 (401): invalid authentication credentials", 401).isRetryable)
+    }
+
+    @Test
+    fun `404 는 다시 해도 소용없다`() {
+        assertFalse(RemoteStorageException("없음", 404).isRetryable)
+    }
+
+    @Test
+    fun `한도 초과도 재시도 대상에 포함된다`() {
+        assertTrue(RemoteStorageException("업로드 실패 (429)", 429).isRetryable)
+    }
 }

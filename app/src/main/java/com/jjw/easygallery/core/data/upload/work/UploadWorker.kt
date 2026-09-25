@@ -228,7 +228,7 @@ class UploadWorker @AssistedInject constructor(
         }
         is RemoteStorageException -> {
             // 한도 초과는 4xx 지만 다시 하면 되는 오류다. 병렬로 올리면 실제로 닿는다
-            val isClientError = e.httpCode?.let { it in CLIENT_ERROR_RANGE } == true && !e.isRateLimited
+            val isClientError = e.httpCode?.let { it in CLIENT_ERROR_RANGE } == true && !e.isRetryable
             if (isClientError) failPermanently(task, e) else retryTransient(task, e)
         }
         is IOException -> retryTransient(task, e)

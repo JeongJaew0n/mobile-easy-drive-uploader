@@ -37,6 +37,10 @@ class GoogleAuthRepository @Inject constructor(
     @Volatile
     private var cached: CachedToken? = null
 
+    /** 방금 401 을 받아 버린 토큰. 같은 것이 또 오면 Play 서비스 캐시까지 비운다 */
+    @Volatile
+    private var rejectedToken: String? = null
+
     override suspend fun beginSignIn(): SignInStep {
         val result = authorize(account = null)
         return if (result.hasResolution()) {
@@ -98,13 +102,28 @@ class GoogleAuthRepository @Inject constructor(
         return mutex.withLock {
             cached?.takeIf { it.isFresh() }?.let { return it.token }
             val email = prefs.current().accountEmail ?: throw NotSignedInException()
-            val result = authorize(Account(email, GOOGLE_ACCOUNT_TYPE))
+            val account = Account(email, GOOGLE_ACCOUNT_TYPE)
+            var result = authorize(account)
             if (result.hasResolution()) throw AuthorizationRequiredException(result.pendingIntent)
+
+            // 401 을 받아 버린 토큰을 Play 서비스가 그대로 다시 주는 경우가 있다. 우리 캐시만
+            // 비워서는 소용없고 GMS 쪽도 비워야 진짜 새 토큰이 나온다 — 그러지 않으면 대량
+            // 업로드 중 토큰이 만료됐을 때 401 이 반복된다.
+            val rejected = rejectedToken
+            if (rejected != null && result.accessToken == rejected) {
+                Timber.i("token unchanged after invalidate; clearing Play services cache")
+                runCatching { client.clearToken(ClearTokenRequest.builder().setToken(rejected).build()).await() }
+                    .onFailure { Timber.w(it, "clearToken failed") }
+                result = authorize(account)
+                if (result.hasResolution()) throw AuthorizationRequiredException(result.pendingIntent)
+            }
+            rejectedToken = null
             cache(result).token
         }
     }
 
     override fun invalidateToken() {
+        rejectedToken = cached?.token
         cached = null
     }
 
