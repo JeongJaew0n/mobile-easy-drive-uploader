@@ -191,6 +191,16 @@ class DriveUploader @Inject constructor(
         }
     }
 
+    /**
+     * 같은 `mediaStoreId` 표식을 가진 파일이 그 폴더에 이미 있는지 묻는다.
+     * 올리기 직전 한 번만 부르므로 평소 업로드에는 비용이 없다.
+     */
+    override suspend fun findUploaded(mediaId: Long, folderId: String): String? = runCatching {
+        val query = "appProperties has { key = '$PROP_MEDIA_STORE_ID' and value = '$mediaId' }" +
+            " and '$folderId' in parents and trashed = false"
+        api.listFiles(query).files.firstOrNull()?.id
+    }.onFailure { Timber.w(it, "findUploaded failed: %d", mediaId) }.getOrNull()
+
     /** [offset] 부터 끝까지 스트리밍 PUT. 진행률은 절대 바이트로 보고한다. */
     override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
         channelFlow {

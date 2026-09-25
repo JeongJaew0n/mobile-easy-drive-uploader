@@ -35,7 +35,10 @@ interface UploadTaskDao {
      * 워커가 시작할 때 RUNNING 을 PENDING 으로 되돌린다. 앱이 죽어 RUNNING 인 채 남은 항목은
      * [claimNext] 가 PENDING 만 보므로 그대로 두면 영원히 집히지 않는다.
      */
-    @Query("UPDATE upload_tasks SET state = 'PENDING', updatedAt = :now WHERE state = 'RUNNING'")
+    @Query(
+        "UPDATE upload_tasks SET state = 'PENDING', attemptCount = attemptCount + 1, updatedAt = :now " +
+            "WHERE state = 'RUNNING'",
+    )
     suspend fun releaseRunning(now: Long)
 
     @Query("SELECT COUNT(*) FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")

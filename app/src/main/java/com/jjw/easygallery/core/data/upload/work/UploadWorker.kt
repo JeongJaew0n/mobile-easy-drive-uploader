@@ -147,20 +147,10 @@ class UploadWorker @AssistedInject constructor(
         val length = uploader.resolveLength(source)
         val t1 = SystemClock.elapsedRealtime()
 
-        // 작은 파일은 왕복 한 번으로 끝낸다. 이어올리기를 포기하는 대신 세션 생성이 빠진다
-        // (`docs/UPLOAD_PERFORMANCE.md` §2-1). 이미 세션이 있으면 그쪽을 이어간다.
-        if (task.sessionUri == null && length in 1..WHOLE_UPLOAD_LIMIT) {
-            val wholeId = uploader.uploadWhole(source, folderId, length)
-            if (wholeId != null) {
-                markUploaded(task, wholeId)
-                compressor.cleanup(source)
-                Timber.d(
-                    "timing whole=%d total=%d",
-                    SystemClock.elapsedRealtime() - t1,
-                    SystemClock.elapsedRealtime() - t0,
-                )
-                return Outcome.Success
-            }
+        val shortcut = tryShortcuts(uploader, task, source, folderId, length)
+        if (shortcut != null) {
+            Timber.d("timing short=%d total=%d", SystemClock.elapsedRealtime() - t1, SystemClock.elapsedRealtime() - t0)
+            return shortcut
         }
 
         val (sessionUri, offset) = resolveSession(uploader, task, source, folderId, length) ?: run {
@@ -182,6 +172,42 @@ class UploadWorker @AssistedInject constructor(
         compressor.cleanup(source)
         val t4 = SystemClock.elapsedRealtime()
         Timber.d("timing len=%d session=%d put=%d finish=%d total=%d", t1 - t0, t2 - t1, t3 - t2, t4 - t3, t4 - t0)
+        return Outcome.Success
+    }
+
+    /**
+     * 세션을 만들지 않고 끝낼 수 있는 두 경우. 해당하지 않으면 null 을 돌려 재개 경로로 보낸다.
+     *
+     * 하나는 앱이 죽어 되살아난 항목이다. 한 번에 올리는 경로는 재개가 없어서, 서버에는 파일이
+     * 생겼는데 우리 기록만 없는 상태로 다시 올리면 같은 파일이 두 벌 된다.
+     *
+     * 다른 하나는 작은 파일이다. 왕복 한 번으로 끝나 세션 생성 시간이 통째로 빠진다.
+     */
+    @Suppress("ReturnCount") // 빠른 경로를 찾는 즉시 돌려주는 편이 중첩보다 읽기 쉽다
+    private suspend fun tryShortcuts(
+        uploader: RemoteUploader,
+        task: UploadTask,
+        source: UploadSource,
+        folderId: String,
+        length: Long,
+    ): Outcome? {
+        if (task.sessionUri != null) return null
+
+        if (task.attemptCount > 0) {
+            val existing = uploader.findUploaded(task.mediaId, folderId)
+            if (existing != null) {
+                Timber.i("already on server, skipping: %s", task.displayName)
+                return finish(task, source, existing)
+            }
+        }
+        if (length !in 1..WHOLE_UPLOAD_LIMIT) return null
+        val wholeId = uploader.uploadWhole(source, folderId, length) ?: return null
+        return finish(task, source, wholeId)
+    }
+
+    private suspend fun finish(task: UploadTask, source: UploadSource, fileId: String): Outcome {
+        markUploaded(task, fileId)
+        compressor.cleanup(source)
         return Outcome.Success
     }
 

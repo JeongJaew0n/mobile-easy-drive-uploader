@@ -89,6 +89,17 @@ interface RemoteUploader {
      */
     suspend fun uploadWhole(source: UploadSource, folderId: String, length: Long): String? = null
 
+    /**
+     * 이 미디어를 **이미 올린 적이 있는지** 서버에 묻는다.
+     *
+     * [uploadWhole] 은 재개가 없어서, 올리는 도중 앱이 죽으면 서버에는 파일이 생겼는데 우리
+     * 기록은 남지 않는다. 그대로 다시 올리면 같은 파일이 두 벌 생긴다 — 실제로 겪었다.
+     * 되살아난 항목만 이걸 먼저 물어본다.
+     *
+     * @return 이미 있으면 그 파일 ID. 없거나 확인할 수 없으면 null.
+     */
+    suspend fun findUploaded(mediaId: Long, folderId: String): String? = null
+
     /** 영구 실패로 버리는 세션의 서버 쪽 잔재 정리(S3 미완료 멀티파트 등). 기본은 할 일 없음 */
     suspend fun abort(sessionUri: String) = Unit
 }

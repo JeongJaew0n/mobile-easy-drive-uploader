@@ -73,6 +73,7 @@ class UploadWorkerTest {
         coEvery { uploader.resolveLength(any()) } answers { firstArg<UploadSource>().sizeBytes }
         // 기본은 "한 번에 올리기를 지원하지 않음" — 각 테스트가 재개 경로를 그대로 검증한다
         coEvery { uploader.uploadWhole(any(), any(), any()) } returns null
+        coEvery { uploader.findUploaded(any(), any()) } returns null
     }
 
     @After
@@ -308,6 +309,7 @@ class UploadWorkerTest {
     fun `한 번에 올리기를 지원하지 않으면 세션 경로로 간다`() = runTest {
         insert(mediaId = 1)
         coEvery { uploader.uploadWhole(any(), any(), any()) } returns null
+        coEvery { uploader.findUploaded(any(), any()) } returns null
         coEvery { uploader.startSession(any(), "f", 1_000) } returns "https://session/1"
         every { uploader.upload(any(), "https://session/1", 0, 1_000) } returns flowOf(
             UploadEvent.Completed("drive-1"),
@@ -328,5 +330,32 @@ class UploadWorkerTest {
         assertEquals(ListenableWorker.Result.retry(), result)
         // FAILED 로 떨어지면 사용자가 손으로 다시 걸어야 한다
         assertEquals(UploadState.PENDING, rows().single().state)
+    }
+
+    @Test
+    fun `되살아난 항목이 이미 서버에 있으면 다시 올리지 않는다`() = runTest {
+        // 앱이 죽어 RUNNING 이 PENDING 으로 돌아온 상황. 한 번에 올리는 경로는 재개가 없어
+        // 그냥 올리면 같은 파일이 두 벌 된다
+        insert(mediaId = 1, attemptCount = 1)
+        coEvery { uploader.findUploaded(1, "f") } returns "already-there"
+
+        assertEquals(ListenableWorker.Result.success(), buildWorker().doWork())
+
+        coVerify(exactly = 0) { uploader.uploadWhole(any(), any(), any()) }
+        coVerify(exactly = 0) { uploader.startSession(any(), any(), any()) }
+        val row = rows().single()
+        assertEquals(UploadState.COMPLETED, row.state)
+        assertEquals("already-there", row.driveFileId)
+    }
+
+    @Test
+    fun `처음 올리는 항목은 서버에 묻지 않는다`() = runTest {
+        insert(mediaId = 1)
+        coEvery { uploader.uploadWhole(any(), "f", 1_000) } returns "drive-1"
+
+        assertEquals(ListenableWorker.Result.success(), buildWorker().doWork())
+
+        // 평소 업로드에 왕복을 더하면 빨라진 의미가 없다
+        coVerify(exactly = 0) { uploader.findUploaded(any(), any()) }
     }
 }
