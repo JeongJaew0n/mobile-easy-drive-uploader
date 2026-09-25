@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- adaptive icon 의 배경. 그림 속 파란 그림자와 어울리고, 흰 카드가 떠 보이도록 아주 연하게 -->
+    <color name="ic_launcher_background">#EAF2FB</color>
+</resources>

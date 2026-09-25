@@ -31,6 +31,9 @@
 | `10-categories.md` | 카테고리: 지정(tri-state)·필터·관리·배지·고아 정리 |
 | `11-remote-storage.md` | 다중 클라우드(S3 호환: Naver·KT·AWS)·NAS(WebDAV Basic/Digest·SMB mDNS): 계정 추가/수정·연결 테스트·탐색·CRUD·업로드·인증서 고정·용량·다른 저장소로 업로드 |
 | `12-auto-tagging.md` | 자동 태그(ML Kit): 모델 준비·전체 분석·라벨 정확도·카테고리로 만들기·매일 실행 |
+| `13-photo-hiding.md` | 사진 숨기기: PIN 설정·잠금·목록 누수·PIN 분실 복구 |
+| `14-samsung-interop.md` | 삼성 갤러리 연동(즐겨찾기·앨범)과 Drive `drive.file` scope 측정 |
+| `15-app-icon.md` | 런처 아이콘 |
 
 ## 실기기 연결
 
