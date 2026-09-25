@@ -1,5 +1,7 @@
 # 릴리스 빌드
 
+> Play 내부 테스트로 배포하는 절차와 함정은 `docs/PLAY_INTERNAL_TESTING.md`.
+
 > 2026-09-08 `assembleRelease`/`bundleRelease` 첫 통과. R8(minify + shrinkResources) 적용, 디버그 49MB → 릴리스 APK 5.5MB.
 
 ## 서명
@@ -60,6 +62,6 @@ keytool -genkeypair -v -keystore ~/keys/easygallery-release.jks -alias easygalle
 
 ## 스토어 공개 전 남은 일
 
-- OAuth scope 가 `drive`(전체, restricted) 이므로 **Google OAuth 검증 심사** + 개인정보처리방침 URL 필요. 테스트 모드(테스트 사용자 ≤100명)에서는 불필요.
+- ~~OAuth scope 가 `drive`(전체, restricted)~~ → 2026-09-24 `drive.file` 로 좁혔다. restricted 가 아니라 **보안 심사(CASA)를 받지 않는다**(`docs/DRIVE_FILE_SCOPE.md`). 테스트 모드에서는 테스트 사용자 ≤100명.
 - 앱 아이콘(현재 템플릿 기본), 스토어 스크린샷, 설명.
 - `targetSdk` 37 검토(현재 36).
