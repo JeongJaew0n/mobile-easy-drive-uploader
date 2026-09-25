@@ -189,7 +189,8 @@
     <plurals name="gallery_upload_enqueued">
         <item quantity="other">%1$d개 항목을 업로드 대기열에 추가했습니다</item>
     </plurals>
-    <string name="gallery_upload_enqueued_skipped">%1$d개 추가, %2$d개는 이미 대기 중</string>
+    <string name="gallery_upload_enqueued_skipped">%1$d개 추가, %2$d개는 이미 올렸거나 대기 중</string>
+    <string name="gallery_upload_all_skipped">%1$d개 모두 이미 올렸습니다</string>
     <plurals name="gallery_upload_failed_banner">
         <item quantity="other">%1$d개 항목 업로드에 실패했습니다</item>
     </plurals>

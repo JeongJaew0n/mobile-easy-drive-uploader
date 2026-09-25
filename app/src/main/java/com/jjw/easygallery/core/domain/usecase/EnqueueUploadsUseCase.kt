@@ -2,6 +2,7 @@ package com.jjw.easygallery.core.domain.usecase
 
 import com.jjw.easygallery.core.data.auth.NotSignedInException
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.work.UploadScheduler
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -13,6 +14,7 @@ class EnqueueUploadsUseCase @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val queue: UploadQueueRepository,
     private val scheduler: UploadScheduler,
+    private val ledger: UploadLedgerRepository,
 ) {
     /** 설정의 기본 대상(계정 + 폴더)으로. @return 실제로 추가된 개수 (이미 대기 중인 항목은 제외) */
     suspend operator fun invoke(items: List<MediaItem>): Int {
@@ -45,7 +47,9 @@ class EnqueueUploadsUseCase @Inject constructor(
         if (accountId == null && !signedIn) throw NotSignedInException()
         // 새 배치를 시작하면 지난 배치의 완료 항목은 정리해 진행률 분모를 현재 배치로 맞춘다
         queue.deleteCompleted()
-        val added = queue.enqueue(items, folder, accountId)
+        // 이 계정에 이미 올린 것은 뺀다. 같은 이름으로 한 벌 더 생기는 것을 사용자는 원하지 않는다
+        val uploaded = ledger.uploadedAmong(items.map { it.id }, accountId)
+        val added = queue.enqueue(items, folder, accountId, uploaded)
         if (added > 0) scheduler.schedule()
         return added
     }

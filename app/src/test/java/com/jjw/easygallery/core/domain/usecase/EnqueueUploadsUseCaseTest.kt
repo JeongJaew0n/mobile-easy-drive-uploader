@@ -4,6 +4,7 @@ import android.net.Uri
 import com.jjw.easygallery.core.data.auth.NotSignedInException
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.work.UploadScheduler
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -22,7 +23,11 @@ class EnqueueUploadsUseCaseTest {
     private val prefs: UserPreferencesRepository = mockk()
     private val queue: UploadQueueRepository = mockk(relaxed = true)
     private val scheduler: UploadScheduler = mockk(relaxed = true)
-    private val useCase = EnqueueUploadsUseCase(prefs, queue, scheduler)
+    private val ledger: UploadLedgerRepository = mockk {
+        coEvery { uploadedAmong(any(), isNull<String>()) } returns emptySet()
+        coEvery { uploadedAmong(any(), any<String>()) } returns emptySet()
+    }
+    private val useCase = EnqueueUploadsUseCase(prefs, queue, scheduler, ledger)
     private val items = listOf(item(1), item(2))
 
     private val s3Default = UserPreferences(
@@ -35,7 +40,7 @@ class EnqueueUploadsUseCaseTest {
     @Test
     fun `default target uses the configured account and folder`() = runTest {
         coEvery { prefs.current() } returns s3Default
-        coEvery { queue.enqueue(items, DriveFolder("photos/2026/", "2026"), "s3") } returns 2
+        coEvery { queue.enqueue(items, DriveFolder("photos/2026/", "2026"), "s3", any()) } returns 2
 
         assertEquals(2, useCase(items))
 
@@ -49,13 +54,13 @@ class EnqueueUploadsUseCaseTest {
         coEvery { queue.enqueue(any(), any(), any()) } returns 2
 
         useCase.toAccount(items, "s3")
-        coVerify { queue.enqueue(items, DriveFolder("photos/2026/", "2026"), "s3") }
+        coVerify { queue.enqueue(items, DriveFolder("photos/2026/", "2026"), "s3", any()) }
 
         useCase.toAccount(items, "nas")
-        coVerify { queue.enqueue(items, null, "nas") } // 다른 계정은 루트
+        coVerify { queue.enqueue(items, null, "nas", any()) } // 다른 계정은 루트
 
         useCase.toAccount(items, null)
-        coVerify { queue.enqueue(items, null, null) } // Drive 는 워커가 앱 폴더를 만든다
+        coVerify { queue.enqueue(items, null, null, any()) } // Drive 는 워커가 앱 폴더를 만든다
     }
 
     @Test
@@ -83,4 +88,16 @@ class EnqueueUploadsUseCaseTest {
         bucketName = "Camera",
         relativePath = "DCIM/Camera/",
     )
+
+    @Test
+    fun `이미 올린 것은 큐에 넣지 않는다`() = runTest {
+        // 같은 사진을 다시 올리면 Drive 에 같은 이름으로 한 벌 더 생긴다
+        coEvery { prefs.current() } returns s3Default
+        coEvery { ledger.uploadedAmong(listOf(1L, 2L), "s3") } returns setOf(1L)
+        coEvery { queue.enqueue(items, any(), "s3", setOf(1L)) } returns 1
+
+        assertEquals(1, useCase(items))
+
+        coVerify { queue.enqueue(items, any(), "s3", setOf(1L)) }
+    }
 }

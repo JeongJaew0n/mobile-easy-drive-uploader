@@ -93,11 +93,15 @@ fun GalleryRoute(
                     )
                     if (result == SnackbarResult.ActionPerformed) onSettingsClick()
                 }
+                // 하나도 안 들어갔으면 "0개 추가" 라고 말하지 않는다 — 왜 아무 일도 없는지를 알려준다
                 is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(
-                    if (event.skipped == 0) {
-                        resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
-                    } else {
-                        resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
+                    when {
+                        event.added == 0 ->
+                            resources.getString(R.string.gallery_upload_all_skipped, event.skipped)
+                        event.skipped == 0 ->
+                            resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
+                        else ->
+                            resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
                 )
                 is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
