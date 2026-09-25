@@ -23,9 +23,14 @@ import com.jjw.easygallery.core.domain.usecase.GetUploadFolderUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 업로드 큐를 순서대로 비운다. 유니크 워크 하나가 큐 전체를 담당하고,
@@ -50,31 +55,68 @@ class UploadWorker @AssistedInject constructor(
     private var total = 0
     private var lastProgressAt = 0L
 
+    /** 이번 실행에서 일시 오류로 미뤄둔 항목. 다시 집어 제자리걸음 하지 않도록 기억한다 */
+    private val deferred = Collections.synchronizedSet(mutableSetOf<Long>())
+
+    /**
+     * 큐를 [PARALLELISM] 개 코루틴이 나눠 비운다. 장당 시간의 대부분이 서버를 기다리는 시간이라
+     * 동시에 보내면 그대로 처리량이 는다 — `docs/UPLOAD_PERFORMANCE.md` §2-2.
+     *
+     * 멈춰야 하는 결과(재시도·로그인 필요)가 하나라도 나오면 나머지도 곧 멈춘다.
+     */
     override suspend fun doWork(): Result {
         notifications.ensureChannel()
+        // 앱이 죽어 RUNNING 인 채 남은 항목을 되살린다. 그러지 않으면 claimNext 가 영영 건너뛴다
+        queue.releaseRunning()
         total = queue.countUnfinished()
-        var result: Result? = null
-        while (result == null) {
-            val task = queue.nextUnfinished()
-            if (task == null) {
-                if (succeeded + failed > 0) notifications.showSummary(succeeded, failed)
-                result = Result.success()
-            } else {
-                when (process(task)) {
-                    Outcome.Success -> succeeded++
-                    Outcome.Failed -> failed++
-                    Outcome.RetryLater -> {
-                        Timber.i("upload paused for retry (succeeded=%d failed=%d)", succeeded, failed)
-                        result = Result.retry()
-                    }
-                    Outcome.SignInRequired -> {
-                        notifications.showSignInRequired()
-                        result = Result.failure()
-                    }
+        val stopResult = AtomicReference<Result?>(null)
+
+        coroutineScope {
+            repeat(PARALLELISM) {
+                launch { drainQueue(stopResult) }
+            }
+        }
+
+        stopResult.get()?.let { return it }
+        // 일시 오류로 미뤄둔 것이 남았으면 백오프 후 이 워커가 다시 돈다
+        if (deferred.isNotEmpty()) {
+            Timber.i("upload deferred %d item(s) (succeeded=%d failed=%d)", deferred.size, succeeded, failed)
+            return Result.retry()
+        }
+        if (succeeded + failed > 0) notifications.showSummary(succeeded, failed)
+        return Result.success()
+    }
+
+    /**
+     * 큐가 비거나 멈출 이유가 생길 때까지 한 건씩 집어 처리한다.
+     *
+     * 일시 오류는 그 항목만 미뤄두고 **계속 간다**. 병렬에서 한 건의 타임아웃으로 전체를 세우면
+     * 나머지 수백 장이 백오프를 함께 기다리게 된다. 로그인 필요는 다르다 — 모든 항목이 같은
+     * 이유로 실패할 것이므로 그때는 멈춘다.
+     */
+    private suspend fun drainQueue(stopResult: AtomicReference<Result?>) {
+        while (stopResult.get() == null) {
+            val task = queue.claimNext(deferred.toList()) ?: return
+            when (process(task)) {
+                Outcome.Success -> countSuccess()
+                Outcome.Failed -> countFailure()
+                Outcome.RetryLater -> deferred.add(task.id)
+                Outcome.SignInRequired -> {
+                    notifications.showSignInRequired()
+                    stopResult.compareAndSet(null, Result.failure())
                 }
             }
         }
-        return result
+    }
+
+    @Synchronized
+    private fun countSuccess() {
+        succeeded++
+    }
+
+    @Synchronized
+    private fun countFailure() {
+        failed++
     }
 
     private suspend fun process(task: UploadTask): Outcome {
@@ -101,11 +143,31 @@ class UploadWorker @AssistedInject constructor(
         val source = compressor.compress(task.toSource(), prefs.current().videoCompression) { fraction ->
             updateForeground(task, fraction, compressing = true)
         } ?: task.toSource()
+        val t0 = SystemClock.elapsedRealtime()
         val length = uploader.resolveLength(source)
+        val t1 = SystemClock.elapsedRealtime()
+
+        // 작은 파일은 왕복 한 번으로 끝낸다. 이어올리기를 포기하는 대신 세션 생성이 빠진다
+        // (`docs/UPLOAD_PERFORMANCE.md` §2-1). 이미 세션이 있으면 그쪽을 이어간다.
+        if (task.sessionUri == null && length in 1..WHOLE_UPLOAD_LIMIT) {
+            val wholeId = uploader.uploadWhole(source, folderId, length)
+            if (wholeId != null) {
+                markUploaded(task, wholeId)
+                compressor.cleanup(source)
+                Timber.d(
+                    "timing whole=%d total=%d",
+                    SystemClock.elapsedRealtime() - t1,
+                    SystemClock.elapsedRealtime() - t0,
+                )
+                return Outcome.Success
+            }
+        }
+
         val (sessionUri, offset) = resolveSession(uploader, task, source, folderId, length) ?: run {
             compressor.cleanup(source)
             return Outcome.Success
         }
+        val t2 = SystemClock.elapsedRealtime()
 
         var driveFileId: String? = null
         uploader.upload(source, sessionUri, offset, length).collect { event ->
@@ -114,9 +176,12 @@ class UploadWorker @AssistedInject constructor(
                 is UploadEvent.Completed -> driveFileId = event.driveFileId
             }
         }
+        val t3 = SystemClock.elapsedRealtime()
         val fileId = requireNotNull(driveFileId) { "업로드가 파일 ID 없이 끝났습니다" }
         markUploaded(task, fileId)
         compressor.cleanup(source)
+        val t4 = SystemClock.elapsedRealtime()
+        Timber.d("timing len=%d session=%d put=%d finish=%d total=%d", t1 - t0, t2 - t1, t3 - t2, t4 - t3, t4 - t0)
         return Outcome.Success
     }
 
@@ -162,7 +227,8 @@ class UploadWorker @AssistedInject constructor(
             retryTransient(task, e)
         }
         is RemoteStorageException -> {
-            val isClientError = e.httpCode?.let { it in CLIENT_ERROR_RANGE } == true
+            // 한도 초과는 4xx 지만 다시 하면 되는 오류다. 병렬로 올리면 실제로 닿는다
+            val isClientError = e.httpCode?.let { it in CLIENT_ERROR_RANGE } == true && !e.isRateLimited
             if (isClientError) failPermanently(task, e) else retryTransient(task, e)
         }
         is IOException -> retryTransient(task, e)
@@ -187,6 +253,13 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private suspend fun retryTransient(task: UploadTask, e: Exception): Outcome {
+        // 한도에 걸린 코루틴은 잠깐 쉰다. 곧바로 다음 항목을 집으면 그것도 같은 한도에 걸린다.
+        // 넷 중 하나씩 쉬면서 전체 속도가 자연히 조절된다.
+        if (e is RemoteStorageException && e.isRateLimited) {
+            val backoff = (RATE_LIMIT_BACKOFF_MILLIS shl task.attemptCount.coerceAtMost(MAX_BACKOFF_SHIFT))
+            Timber.i("rate limited, pausing %dms: %s", backoff, task.displayName)
+            delay(backoff)
+        }
         val attempts = task.attemptCount + 1
         if (attempts >= MAX_ATTEMPTS) {
             Timber.e(e, "upload gave up after %d attempts: %s", attempts, task.displayName)
@@ -236,6 +309,19 @@ class UploadWorker @AssistedInject constructor(
     private enum class Outcome { Success, Failed, RetryLater, SignInRequired }
 
     companion object {
+        /** 이 크기 이하만 왕복 한 번(multipart). 넘으면 끊겼을 때 다시 올리는 비용이 더 크다 */
+        private const val WHOLE_UPLOAD_LIMIT = 4L * 1024 * 1024
+
+        /**
+         * 동시에 올리는 개수. OkHttp 의 호스트당 기본 동시 요청이 5라 그 안에 두어 커넥션을 재사용하고,
+         * 더 늘리면 종량제·약전계에서 역효과가 크다 — `docs/UPLOAD_PERFORMANCE.md` §2-2
+         */
+        private const val PARALLELISM = 4
+
+        /** 한도에 걸렸을 때 첫 대기. 재시도마다 두 배가 된다 */
+        private const val RATE_LIMIT_BACKOFF_MILLIS = 1_000L
+        private const val MAX_BACKOFF_SHIFT = 3
+
         const val UNIQUE_WORK_NAME = "upload-queue"
         const val MAX_ATTEMPTS = 5
         private const val PROGRESS_INTERVAL_MILLIS = 1_000L

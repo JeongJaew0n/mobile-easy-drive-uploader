@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.auth.NotSignedInException
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
+import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.upload.DriveUploadException
@@ -70,6 +71,8 @@ class UploadWorkerTest {
         queue = UploadQueueRepository(db.uploadTaskDao())
         ledger = UploadLedgerRepository(db.uploadedMediaDao())
         coEvery { uploader.resolveLength(any()) } answers { firstArg<UploadSource>().sizeBytes }
+        // 기본은 "한 번에 올리기를 지원하지 않음" — 각 테스트가 재개 경로를 그대로 검증한다
+        coEvery { uploader.uploadWhole(any(), any(), any()) } returns null
     }
 
     @After
@@ -286,4 +289,44 @@ class UploadWorkerTest {
     }
 
     private suspend fun rows() = db.uploadTaskDao().observeAll().first()
+
+    @Test
+    fun `작은 파일은 세션 없이 한 번에 올린다`() = runTest {
+        insert(mediaId = 1)
+        coEvery { uploader.uploadWhole(any(), "f", 1_000) } returns "drive-whole"
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        // 세션을 만들지 않았어야 한다 — 그것이 이 경로의 값어치다
+        coVerify(exactly = 0) { uploader.startSession(any(), any(), any()) }
+        assertEquals(UploadState.COMPLETED, rows().single().state)
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L)))
+    }
+
+    @Test
+    fun `한 번에 올리기를 지원하지 않으면 세션 경로로 간다`() = runTest {
+        insert(mediaId = 1)
+        coEvery { uploader.uploadWhole(any(), any(), any()) } returns null
+        coEvery { uploader.startSession(any(), "f", 1_000) } returns "https://session/1"
+        every { uploader.upload(any(), "https://session/1", 0, 1_000) } returns flowOf(
+            UploadEvent.Completed("drive-1"),
+        )
+
+        assertEquals(ListenableWorker.Result.success(), buildWorker().doWork())
+        coVerify { uploader.startSession(any(), "f", 1_000) }
+    }
+
+    @Test
+    fun `한도 초과는 영구 실패가 아니라 재시도다`() = runTest {
+        insert(mediaId = 1)
+        coEvery { uploader.uploadWhole(any(), any(), any()) } throws
+            RemoteStorageException("업로드 실패 (403): User rate limit exceeded.", 403)
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.retry(), result)
+        // FAILED 로 떨어지면 사용자가 손으로 다시 걸어야 한다
+        assertEquals(UploadState.PENDING, rows().single().state)
+    }
 }

@@ -10,7 +10,22 @@ import kotlin.coroutines.resumeWithException
 
 /** 제공자 공통 HTTP 오류. [httpCode] 4xx 는 영구 실패, 그 외는 재시도 대상(워커 규칙) */
 open class RemoteStorageException(message: String, val httpCode: Int? = null, cause: Throwable? = null) :
-    IOException(message, cause)
+    IOException(message, cause) {
+
+    /**
+     * 요청 한도에 걸린 것인가. 4xx 지만 **다시 하면 되는** 오류라 영구 실패로 버리면 안 된다.
+     * Drive 는 한도 초과를 403(`userRateLimitExceeded`)으로도, 429 로도 돌려준다.
+     */
+    val isRateLimited: Boolean
+        get() = httpCode == TOO_MANY_REQUESTS ||
+            (httpCode == FORBIDDEN && RATE_LIMIT_HINTS.any { message.orEmpty().contains(it, ignoreCase = true) })
+
+    private companion object {
+        const val FORBIDDEN = 403
+        const val TOO_MANY_REQUESTS = 429
+        val RATE_LIMIT_HINTS = listOf("rateLimitExceeded", "userRateLimitExceeded", "rate limit")
+    }
+}
 
 /** 제공자가 지원하지 않는 동작(폴더 이름 변경 등). UI 는 능력 집합으로 미리 숨기므로 방어용 */
 class UnsupportedOperationException(message: String) : RemoteStorageException(message)

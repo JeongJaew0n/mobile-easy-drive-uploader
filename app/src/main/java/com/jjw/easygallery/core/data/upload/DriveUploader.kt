@@ -22,6 +22,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -146,6 +147,50 @@ class DriveUploader @Inject constructor(
         }
     }
 
+    /**
+     * 메타데이터와 본문을 한 번의 POST 로 보낸다(`uploadType=multipart`).
+     * 세션 생성 왕복이 빠져 작은 파일에서 장당 1초 넘게 줄어든다 — `docs/UPLOAD_PERFORMANCE.md` §2-1.
+     *
+     * 끊기면 이어올릴 수 없으므로 호출자가 크기로 걸러서 부른다.
+     */
+    override suspend fun uploadWhole(source: UploadSource, folderId: String, length: Long): String? {
+        val mimeType = source.mimeType.ifBlank { DEFAULT_MIME_TYPE }
+        val metadata = json.encodeToString(
+            DriveFileMetadata.serializer(),
+            DriveFileMetadata(
+                name = source.displayName,
+                parents = listOf(folderId),
+                appProperties = uploadProperties(source, folderId),
+            ),
+        )
+        val body = MultipartBody.Builder()
+            .setType(MULTIPART_RELATED)
+            .addPart(metadata.toRequestBody(JSON_MEDIA_TYPE))
+            .addPart(
+                ContentUriRequestBody(
+                    context = context,
+                    uri = source.uri,
+                    mediaType = mimeType.toMediaTypeOrNull() ?: DEFAULT_MEDIA_TYPE,
+                    offset = 0,
+                    totalLength = length,
+                ) { },
+            )
+            .build()
+        val request = Request.Builder()
+            .url(MULTIPART_UPLOAD_URL)
+            .post(body)
+            .build()
+        return client.newCall(request).await().use { response ->
+            when (response.code) {
+                HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response).id
+                else -> throw DriveUploadException(
+                    "업로드 실패 (${response.code})${detailOf(response)}",
+                    response.code,
+                )
+            }
+        }
+    }
+
     /** [offset] 부터 끝까지 스트리밍 PUT. 진행률은 절대 바이트로 보고한다. */
     override fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent> =
         channelFlow {
@@ -193,6 +238,10 @@ class DriveUploader @Inject constructor(
         const val DEFAULT_MIME_TYPE = "application/octet-stream"
         val DEFAULT_MEDIA_TYPE = DEFAULT_MIME_TYPE.toMediaTypeOrNull()!!
         const val ERROR_BODY_LIMIT = 300L
+        const val MULTIPART_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" +
+            "&fields=id,name,mimeType,parents"
+        val MULTIPART_RELATED = "multipart/related".toMediaTypeOrNull()!!
+        val JSON_MEDIA_TYPE = "application/json; charset=UTF-8".toMediaTypeOrNull()!!
         const val PROP_MEDIA_STORE_ID = "mediaStoreId"
 
         /** 이 앱이 올렸다는 고정 표식 — 값이 고정이라야 Drive 쿼리로 찾을 수 있다 */

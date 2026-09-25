@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.upload.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -14,6 +15,28 @@ interface UploadTaskDao {
     /** RUNNING 도 포함 — 프로세스가 죽어 남은 항목을 이어서 처리한다. */
     @Query("SELECT * FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING') ORDER BY createdAt, id LIMIT 1")
     suspend fun nextUnfinished(): UploadTaskEntity?
+
+    @Query("SELECT * FROM upload_tasks WHERE state = 'PENDING' AND id NOT IN (:skip) ORDER BY createdAt, id LIMIT 1")
+    suspend fun nextPendingExcluding(skip: List<Long>): UploadTaskEntity?
+
+    /**
+     * 다음 항목을 **가져오면서 RUNNING 으로 표시**한다. 병렬 업로드에서 두 코루틴이 같은 항목을
+     * 집는 것을 막는다 — 트랜잭션이라 조회와 표시 사이에 끼어들 수 없다.
+     */
+    @Transaction
+    suspend fun claimNext(now: Long, skip: List<Long>): UploadTaskEntity? {
+        // NOT IN () 는 SQL 오류라 비어 있으면 있을 수 없는 id 를 넣는다
+        val task = nextPendingExcluding(skip.ifEmpty { listOf(-1L) }) ?: return null
+        updateState(task.id, "RUNNING", task.attemptCount, now)
+        return task
+    }
+
+    /**
+     * 워커가 시작할 때 RUNNING 을 PENDING 으로 되돌린다. 앱이 죽어 RUNNING 인 채 남은 항목은
+     * [claimNext] 가 PENDING 만 보므로 그대로 두면 영원히 집히지 않는다.
+     */
+    @Query("UPDATE upload_tasks SET state = 'PENDING', updatedAt = :now WHERE state = 'RUNNING'")
+    suspend fun releaseRunning(now: Long)
 
     @Query("SELECT COUNT(*) FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")
     suspend fun countUnfinished(): Int

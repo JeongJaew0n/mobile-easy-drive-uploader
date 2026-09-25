@@ -14,6 +14,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+// TooManyFunctions: 큐 한 줄에 대한 상태 전이가 각각 하나씩이라 항목이 늘면 함수도 는다
+@Suppress("TooManyFunctions")
 class UploadQueueRepository @Inject constructor(
     private val dao: UploadTaskDao,
 ) {
@@ -57,6 +59,15 @@ class UploadQueueRepository @Inject constructor(
     }
 
     suspend fun nextUnfinished(): UploadTask? = dao.nextUnfinished()?.toDomain()
+
+    /**
+     * 다음 항목을 집으면서 RUNNING 으로 표시. 병렬에서 중복 처리를 막는다.
+     * [skip] 은 이번 실행에서 미뤄둔 항목 — 바로 다시 집으면 제자리걸음이 된다.
+     */
+    suspend fun claimNext(skip: List<Long> = emptyList()): UploadTask? = dao.claimNext(clock(), skip)?.toDomain()
+
+    /** 워커 시작 시 죽은 RUNNING 을 되살린다 */
+    suspend fun releaseRunning() = dao.releaseRunning(clock())
 
     /** 상태 무관하게 큐에 있는 ID */
     suspend fun queuedAmong(mediaIds: Collection<Long>): Set<Long> =

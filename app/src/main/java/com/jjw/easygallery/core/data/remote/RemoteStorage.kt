@@ -81,6 +81,14 @@ interface RemoteUploader {
 
     fun upload(source: UploadSource, sessionUri: String, offset: Long, length: Long): Flow<UploadEvent>
 
+    /**
+     * 작은 파일을 **왕복 한 번**으로 올린다. 세션 생성이 통째로 빠져 장당 1초 넘게 줄어든다
+     * (`docs/UPLOAD_PERFORMANCE.md` §2-1). 대신 끊기면 처음부터이므로 호출자가 크기로 거른다.
+     *
+     * @return 올라간 파일 ID. 이 방식을 지원하지 않는 제공자는 null 을 돌려 기존 경로로 보낸다.
+     */
+    suspend fun uploadWhole(source: UploadSource, folderId: String, length: Long): String? = null
+
     /** 영구 실패로 버리는 세션의 서버 쪽 잔재 정리(S3 미완료 멀티파트 등). 기본은 할 일 없음 */
     suspend fun abort(sessionUri: String) = Unit
 }
