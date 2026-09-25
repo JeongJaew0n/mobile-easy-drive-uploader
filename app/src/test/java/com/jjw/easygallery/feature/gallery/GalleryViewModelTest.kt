@@ -11,6 +11,8 @@ import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
+import com.jjw.easygallery.core.data.upload.DeviceConditions
+import com.jjw.easygallery.core.data.upload.DeviceConditionsMonitor
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Category
@@ -70,6 +72,11 @@ class GalleryViewModelTest {
         every { observeHiddenIds() } returns hiddenIds
         coEvery { hide(any()) } answers { hiddenIds.value = hiddenIds.value + firstArg<Collection<Long>>() }
     }
+
+    // 기본은 "무제한 회선 + 충전 중" — 대기 이유가 생기지 않아 기존 기대값이 그대로 유지된다
+    private val conditions: DeviceConditionsMonitor = mockk {
+        every { observe() } returns flowOf(DeviceConditions(isUnmetered = true, isCharging = true))
+    }
     private val prefs: UserPreferencesRepository = mockk {
         every { preferences } returns kotlinx.coroutines.flow.MutableStateFlow(UserPreferences())
     }
@@ -100,6 +107,7 @@ class GalleryViewModelTest {
             OrphanAssignmentCleaner(repository, categoryRepository),
             prefs,
             hiddenMedia,
+            conditions,
             remoteAccounts,
         )
 

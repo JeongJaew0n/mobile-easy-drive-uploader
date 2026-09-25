@@ -138,7 +138,10 @@ class DriveUploader @Inject constructor(
                 HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED ->
                     SessionStatus.Complete(parseFile(response).id)
                 HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> SessionStatus.Expired
-                else -> throw DriveUploadException("세션 상태 조회 실패 (${response.code})", response.code)
+                else -> throw DriveUploadException(
+                    "세션 상태 조회 실패 (${response.code})${detailOf(response)}",
+                    response.code,
+                )
             }
         }
     }
@@ -164,12 +167,24 @@ class DriveUploader @Inject constructor(
                 when (response.code) {
                     HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response)
                     HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> throw SessionExpiredException(response.code)
-                    else -> throw DriveUploadException("업로드 실패 (${response.code})", response.code)
+                    else -> throw DriveUploadException(
+                        "업로드 실패 (${response.code})${detailOf(response)}",
+                        response.code,
+                    )
                 }
             }
             Timber.d("uploaded %s -> %s", source.displayName, file.id)
             send(UploadEvent.Completed(file.id))
         }.flowOn(ioDispatcher)
+
+    /**
+     * 서버가 준 설명을 오류에 붙인다. 코드만 있으면 "502" 가 우리 잘못인지 중간 경로의 문제인지
+     * 알 길이 없다. [Response.peekBody] 라 본문을 소비하지 않는다.
+     */
+    private fun detailOf(response: Response): String {
+        val body = runCatching { response.peekBody(ERROR_BODY_LIMIT).string() }.getOrNull()
+        return body?.trim()?.take(ERROR_BODY_LIMIT.toInt())?.takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
+    }
 
     private fun parseFile(response: Response): DriveFileDto =
         json.decodeFromString(DriveFileDto.serializer(), response.body.string())
@@ -177,6 +192,7 @@ class DriveUploader @Inject constructor(
     private companion object {
         const val DEFAULT_MIME_TYPE = "application/octet-stream"
         val DEFAULT_MEDIA_TYPE = DEFAULT_MIME_TYPE.toMediaTypeOrNull()!!
+        const val ERROR_BODY_LIMIT = 300L
         const val PROP_MEDIA_STORE_ID = "mediaStoreId"
 
         /** 이 앱이 올렸다는 고정 표식 — 값이 고정이라야 Drive 쿼리로 찾을 수 있다 */

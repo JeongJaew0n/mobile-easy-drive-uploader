@@ -59,3 +59,8 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 | DRV-P10 | 지정 폴더 행의 ⋮ | 이름 변경·이동·삭제가 없다 | ✅ 2026-09-25 | 메뉴가 통째로 없다. 처음엔 빈 팝업이 떠서 `EntryMenu.hasAny` 로 ⋮ 자체를 내렸다 — `menu.delete` 가 화면에서 쓰이지 않던 것도 이때 드러났다 |
 | DRV-P11 | 지정 폴더로 업로드 | 올라가고, Drive 앱에서 그 폴더에 보인다 | ✅ 2026-09-25 | GamesFolder 를 업로드 폴더로 지정 → 사진 1장 업로드 → **Drive 앱의 Games 안에 원래 파일들과 나란히** 들어갔다. 우리 앱에서는 그 사진과 피커로 고른 Build.zip 만 보이고 kokoa_day10.css/html 은 안 보인다 — 설계대로 |
 | DRV-P12 | `setOptOutIncludingGrantedScopes(true)` 적용 후 로그인 | `grantedScopes=[drive.file]` 만 | ✅ 2026-09-25 | `grantedScopes=[drive.file]` 만. 이전 `drive` 가 딸려 오지 않는다 |
+| UPL-14 | Wi-Fi 전용인데 LTE 일 때 배너 | "Wi-Fi 를 기다리는 중 (0/N)" | ⬜ | 2026-09-25 수정 전에는 "업로드 중 (1/N)" 이라 멈춘 줄 모른다 |
+| UPL-15 | 충전 전용인데 충전 중이 아닐 때 | "충전을 기다리는 중 (0/N)" | ⬜ | |
+| UPL-16 | 전송 실패로 백오프 대기 중 | "다시 시도하는 중 (n/N)" | ⬜ | 502 처럼 일시 오류로 쉬는 동안 |
+| UPL-17 | 제약이 모두 맞을 때 | "업로드 중 (n/N) · 파일명" | ⬜ | 기존 문구 그대로여야 한다 |
+| UPL-18 | 업로드 실패 메시지 | 서버가 준 설명이 함께 보인다 | ⬜ | 코드만 있으면 우리 잘못인지 서버 문제인지 구분이 안 된다 |

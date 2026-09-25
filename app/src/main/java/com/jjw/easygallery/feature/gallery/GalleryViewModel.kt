@@ -13,6 +13,7 @@ import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
+import com.jjw.easygallery.core.data.upload.DeviceConditionsMonitor
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
@@ -21,9 +22,11 @@ import com.jjw.easygallery.core.domain.model.CategoryAssignments
 import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
+import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
+import com.jjw.easygallery.core.domain.model.uploadWaitReason
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
@@ -67,6 +70,7 @@ class GalleryViewModel @Inject constructor(
     orphanCleaner: OrphanAssignmentCleaner,
     private val prefs: UserPreferencesRepository,
     private val hiddenMedia: HiddenMediaRepository,
+    private val conditions: DeviceConditionsMonitor,
     remoteAccounts: RemoteAccountRepository,
 ) : ViewModel() {
 
@@ -107,7 +111,24 @@ class GalleryViewModel @Inject constructor(
     // -1 로 시작해 최초 목록은 애니메이션 없이 바로 그린다(시작 페이드 제거, ANIMATION_IMPROVEMENT.md §10)
     private var animatedVersion = -1
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val uploadSummary: Flow<UploadSummary> = uploadQueue.observeSummary()
+
+    /** 큐 요약에 "왜 멈췄는지" 를 얹는다 — WorkManager 가 보는 것과 같은 조건을 화면도 본다 */
+    private val uploadSummary: Flow<UploadSummary> = combine(
+        uploadQueue.observeSummary(),
+        conditions.observe(),
+        prefs.preferences,
+    ) { summary, device, p ->
+        summary.copy(
+            waitReason = uploadWaitReason(
+                isRunning = summary.current?.state == UploadState.RUNNING,
+                wifiOnly = p.uploadWifiOnly,
+                chargingOnly = p.uploadChargingOnly,
+                isUnmetered = device.isUnmetered,
+                isCharging = device.isCharging,
+                attemptCount = summary.current?.attemptCount ?: 0,
+            ),
+        )
+    }
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
     val eventFlow: Flow<GalleryEvent> = events.receiveAsFlow()
 

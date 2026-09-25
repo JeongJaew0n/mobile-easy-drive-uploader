@@ -38,9 +38,32 @@ import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.domain.model.UploadWaitReason
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.categories.CategoryDot
 import java.time.format.DateTimeFormatter
+
+/**
+ * 멈춰 있을 때는 **왜 멈췄는지** 를 말한다. 기다리는 동안 "업로드 중" 이라고 하면
+ * 사용자는 앱이 고장났다고 읽는다(`docs/manual-tests/02-google-drive.md` UPL-14).
+ * 기다리는 중에는 실제로 끝난 개수만 세고, 올라가는 중일 때만 현재 항목을 +1 해서 보인다.
+ */
+@Composable
+private fun uploadBannerText(
+    summary: UploadSummary,
+    doneCount: Int,
+    currentName: String,
+): String = when (summary.waitReason) {
+    UploadWaitReason.WIFI -> stringResource(R.string.gallery_upload_waiting_wifi, doneCount, summary.total)
+    UploadWaitReason.CHARGING -> stringResource(R.string.gallery_upload_waiting_charging, doneCount, summary.total)
+    UploadWaitReason.RETRY -> stringResource(R.string.gallery_upload_waiting_retry, doneCount, summary.total)
+    UploadWaitReason.NONE -> stringResource(
+        R.string.gallery_uploading,
+        (doneCount + 1).coerceAtMost(summary.total),
+        summary.total,
+        currentName,
+    )
+}
 
 @Composable
 internal fun UploadProgressBanner(
@@ -60,12 +83,7 @@ internal fun UploadProgressBanner(
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(
-                        R.string.gallery_uploading,
-                        (doneCount + 1).coerceAtMost(summary.total),
-                        summary.total,
-                        current?.displayName.orEmpty(),
-                    ),
+                    text = uploadBannerText(summary, doneCount, current?.displayName.orEmpty()),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

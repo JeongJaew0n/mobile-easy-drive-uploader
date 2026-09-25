@@ -38,6 +38,8 @@ data class UploadSummary(
     val failed: Int = 0,
     /** 진행 중(없으면 다음 대기) 항목 */
     val current: UploadTask? = null,
+    /** 큐가 멈춰 있다면 그 이유. 화면이 "업로드 중" 대신 기다리는 까닭을 말한다 */
+    val waitReason: UploadWaitReason = UploadWaitReason.NONE,
 ) {
     val hasActive: Boolean get() = active > 0
 }
