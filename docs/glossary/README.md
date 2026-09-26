@@ -30,7 +30,8 @@
 | 자동 태그 (auto tag) | **ML Kit 이 추정해** 붙인 영어 라벨. 사용자가 "카테고리로 만들기" 를 누를 때만 카테고리로 넘어간다 | 카테고리와 표가 분리돼 있다(`docs/AUTO_TAGGING.md` §2) |
 | 저장소 (RemoteStorage) | 사진을 올릴 원격 대상. Google Drive·S3 호환·WebDAV·SMB·SFTP 가 같은 인터페이스를 구현한다 | "업로드 폴더" 는 그 저장소 안의 대상 폴더다 |
 | 능력 (Capability) | 저장소가 지원하는 동작의 집합(TRASH·RENAME·MOVE·SEARCH·DOWNLOAD 등). 화면 메뉴가 이 값에 따라 달라진다 | 저장소마다 다르다 — Drive 만 SEARCH 가 있다 |
-| 원장 (UploadLedger) | 업로드 완료 기록(`uploaded_media`). "이미 백업됨" 판단의 근거 | 큐(`upload_tasks`)와 다름 — 큐는 새 배치마다 비운다 |
+| 원장 (UploadLedger) | 업로드 완료 기록(`uploaded_media`). "이미 백업됨" 판단의 근거. **올린 곳마다** 따로 남는다 — 키가 `(사진, 목적지)` | 큐(`upload_tasks`)와 다름 — 큐는 새 배치마다 비운다 |
+| 목적지 (destination) | 원장에서 "어디로 올렸나". Drive 는 `drive:<연결된 이메일>`, 다른 저장소는 `remote:<accountId>`. 같은 Drive 라도 Google 계정이 다르면 다른 목적지다 | `accountId` 와 다름 — 그쪽은 저장소 계정이라 Drive 는 모두 null 이다(`docs/plans/ledger-per-account/spec.md`) |
 | 업로드 대상 | 지금 기본으로 올릴 저장소 계정과 폴더. 갤러리에서 ⋮ 로 이번 배치만 다른 곳에 올릴 수도 있다 | `UserPreferences.uploadAccountId` (null = Google Drive) |
 | 출처 (MediaSource) | 사진이 **어디서 온 것인지**. `relativePath` 로만 판정한다 — `DCIM/` 아래는 카메라, 경로에 `Screenshots` 가 있으면 스크린샷, 나머지는 다른 앱 | 갤러리 상단 탭의 기준. 앨범(폴더)보다 거친 단위다 |
 | 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것 |

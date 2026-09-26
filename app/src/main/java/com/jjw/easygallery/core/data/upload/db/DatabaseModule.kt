@@ -18,7 +18,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providesDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME).build()
+        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
+            .addMigrations(MIGRATION_11_12)
+            .build()
 
     @Provides
     fun providesUploadTaskDao(db: AppDatabase): UploadTaskDao = db.uploadTaskDao()

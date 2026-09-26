@@ -62,14 +62,17 @@ class UploadWorkerTest {
         coEvery { compress(any(), any(), any()) } returns null
     }
     private val prefs: UserPreferencesRepository = mockk {
-        coEvery { current() } returns UserPreferences(videoCompression = VideoCompression.HD_720)
+        coEvery { current() } returns UserPreferences(
+            accountEmail = "me@example.com",
+            videoCompression = VideoCompression.HD_720,
+        )
     }
 
     @Before
     fun setUp() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         queue = UploadQueueRepository(db.uploadTaskDao())
-        ledger = UploadLedgerRepository(db.uploadedMediaDao())
+        ledger = UploadLedgerRepository(db.uploadedMediaDao(), prefs)
         coEvery { uploader.resolveLength(any()) } answers { firstArg<UploadSource>().sizeBytes }
         // 기본은 "한 번에 올리기를 지원하지 않음" — 각 테스트가 재개 경로를 그대로 검증한다
         coEvery { uploader.uploadWhole(any(), any(), any()) } returns null

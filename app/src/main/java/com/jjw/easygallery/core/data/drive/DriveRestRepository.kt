@@ -37,6 +37,14 @@ class DriveRestRepository @Inject constructor(
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
 
+    override suspend fun listSharedFolders(pageToken: String?): DrivePage {
+        val page = api.listFiles(
+            query = "sharedWithMe = true and mimeType = '${DriveApi.FOLDER_MIME_TYPE}' and trashed = false",
+            pageToken = pageToken,
+        )
+        return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
+    }
+
     /**
      * Retrofit 은 비2xx 를 [HttpException](RuntimeException)으로 던진다. 그대로 두면 워커의
      * `IOException` 분기를 비켜가 5xx·429 가 재시도 없이 영구 실패한다 → 상태 코드를 살려 감싼다.

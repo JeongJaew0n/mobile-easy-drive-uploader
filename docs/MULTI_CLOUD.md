@@ -90,6 +90,8 @@ data class RemoteAccountEntity(
 ## 6. 업로드 파이프라인 변경
 
 - `upload_tasks`·`uploaded_media` 에 `accountId TEXT`(null = Google Drive) 추가(v6, 기본값 null → 기존 행은 Drive).
+- **v12 (2026-09-26)**: `uploaded_media` 의 키가 `mediaId` 하나라 같은 사진을 다른 저장소에 올리면 앞 기록이
+  **덮어써지던** 결함을 고쳤다. 키를 `(mediaId, destination)` 으로 바꿨다 — `docs/plans/ledger-per-account/spec.md`.
 - `UploadWorker` 는 태스크의 `accountId` 로 `RemoteStorage.uploader()` 를 얻는다. 세션 URI·상태 조회·이어 올리기 흐름은 `RemoteUploader` 인터페이스로 동일. 큐는 계정 순서와 무관하게 순차.
 - `EnqueueUploadsUseCase`/`AutoBackupUseCase` 는 `uploadAccountId` 를 태스크에 기록.
 - 알림 문구의 "Drive" 는 계정 표시 이름으로.

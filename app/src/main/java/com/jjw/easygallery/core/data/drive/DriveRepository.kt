@@ -15,6 +15,12 @@ interface DriveRepository {
      */
     suspend fun listChildren(parentId: String, pageToken: String? = null, foldersOnly: Boolean = false): DrivePage
 
+    /**
+     * 남이 나에게 공유한 폴더들(Drive 의 "공유 문서함"). 내 루트 아래에 없어서 [listChildren] 으로는
+     * 보이지 않는다. `drive.readonly` 가 있어야 비어 있지 않다(`docs/DRIVE_FILE_SCOPE.md` §10).
+     */
+    suspend fun listSharedFolders(pageToken: String? = null): DrivePage
+
     suspend fun createFolder(name: String, parentId: String): DriveFolder
 
     /** 파일 내용 스트림(`alt=media`). 호출자가 닫는다 */

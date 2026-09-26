@@ -624,6 +624,7 @@
     <string name="drive_add_view_folder">볼 수 있는 폴더 추가</string>
     <string name="drive_add_view_folder_confirm">이 폴더 추가</string>
     <string name="drive_view_only">보기 전용</string>
+    <string name="drive_shared_with_me">공유 문서함</string>
     <string name="drive_remove_view_folder">목록에서 제거</string>
     <string name="drive_view_folder_added">%1$s 을(를) 목록에 더했습니다</string>
     <string name="drive_view_folder_removed">%1$s 을(를) 목록에서 뺐습니다</string>

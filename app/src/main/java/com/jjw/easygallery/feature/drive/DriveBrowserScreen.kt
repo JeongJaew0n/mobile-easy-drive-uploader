@@ -110,19 +110,15 @@ fun DriveBrowserRoute(
     ) { result -> viewModel.onViewScopeResult(result.data) }
     var pickingViewFolder by remember { mutableStateOf(false) }
     if (pickingViewFolder) {
-        DriveFolderPickerSheet(
-            start = DriveFolder(DriveEntry.ROOT_ID, driveRootName),
-            excludeFolderId = null,
-            // 내 드라이브 최상위 자체는 "폴더" 가 아니라 고를 수 없게 둔다
-            currentParentId = DriveEntry.ROOT_ID,
-            loadFolders = viewModel::listDriveFolders,
+        ViewFolderPicker(
+            rootName = driveRootName,
+            listFolders = viewModel::listDriveFolders,
+            listSharedFolders = viewModel::listSharedFolders,
             onDismiss = { pickingViewFolder = false },
             onPick = { folder ->
                 pickingViewFolder = false
                 viewModel.addViewFolder(folder)
             },
-            titleRes = R.string.drive_add_view_folder,
-            confirmRes = R.string.drive_add_view_folder_confirm,
         )
     }
 

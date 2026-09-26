@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         AutoTagScanEntity::class,
         HiddenMediaEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -30,6 +30,7 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 9, to = 10),
         // 11: upload_tasks.errorReason — 실패 사유를 코드로 남겨 화면이 문장을 고른다
         AutoMigration(from = 10, to = 11),
+        // 12 는 수동 — 기본 키가 바뀌고 새 칸을 기존 칸에서 계산해야 한다(Migrations.kt)
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

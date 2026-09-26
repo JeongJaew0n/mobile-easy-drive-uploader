@@ -524,6 +524,18 @@ class DriveBrowserViewModel @Inject constructor(
      * 루트 목록에 이미 있는 폴더(지정 폴더·기본 폴더)는 더하지 않는다. 더해봐야 같은 줄이
      * 두 개가 되고, 화면에는 올릴 수 있는 쪽만 남아 "더했다는데 안 보인다" 가 된다.
      */
+    /** 남이 나에게 공유한 폴더들. 보기 폴더 피커의 "공유 문서함" 에서 쓴다 */
+    suspend fun listSharedFolders(): List<DriveFolder> {
+        val result = ArrayList<DriveFolder>()
+        var token: String? = null
+        do {
+            val page = driveFolders.listSharedFolders(token)
+            result += page.entries.map { it.toFolder() }
+            token = page.nextPageToken
+        } while (token != null)
+        return result.sortedBy { it.name.lowercase() }
+    }
+
     fun addViewFolder(folder: DriveFolder) {
         viewModelScope.launch {
             if (_uiState.value.entries.any { it.id == folder.id }) {

@@ -62,6 +62,8 @@ internal fun DriveFolderPickerSheet(
     onPick: (DriveFolder) -> Unit,
     @StringRes titleRes: Int = R.string.drive_move_title,
     @StringRes confirmRes: Int = R.string.drive_move_here,
+    /** [currentParentId] 말고도 고를 수 없는 것 — "공유 문서함" 처럼 폴더가 아니라 목록인 자리 */
+    unpickableIds: Set<String> = emptySet(),
 ) {
     var path by remember { mutableStateOf(listOf(DriveFolder(ROOT_ID, ""), start).distinctBy { it.id }) }
     var folders by remember { mutableStateOf<List<DriveFolder>?>(null) }
@@ -157,8 +159,8 @@ internal fun DriveFolderPickerSheet(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 TextButton(
                     onClick = { onPick(if (here.id == ROOT_ID) DriveFolder(ROOT_ID, rootName) else here) },
-                    // 원래 있던 폴더로는 이동 불가
-                    enabled = here.id != currentParentId,
+                    // 원래 있던 폴더로는 이동 불가. 목록 자리(공유 문서함 등)도 고를 수 없다
+                    enabled = here.id != currentParentId && here.id !in unpickableIds,
                 ) {
                     Text(stringResource(confirmRes))
                 }
