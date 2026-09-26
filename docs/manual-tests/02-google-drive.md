@@ -147,3 +147,4 @@ OAuth 클라이언트 ID(Android): 패키지 **`com.jjw.easygallery.debug`**, SH
 | GST-17 | "새 폴더" → 이름 입력 → 만들기 | 만들어지고 곧장 그 안으로 들어간다 | ✅ 2026-09-27 | `guest-folder-test` |
 | GST-18 | 새 폴더에서 "여기에 올리기" | 그 폴더로 올라가고 A 에게 공유된다 | ✅ 2026-09-27 | `cal.png` → `guest-folder-test` COMPLETED, "폴더를 지금 계정에 공유했습니다" |
 | GST-19 | A 의 Drive 화면 | 새 폴더가 소유자와 함께 보이고 안에 사진이 있다 | ✅ 2026-09-27 | `guest-folder-test · nhnpopt0@gmail.com · 보기 전용` → `cal.png`, 부제 "nhnpopt0@gmail.com 의 폴더" |
+| GST-20 | 다른 계정 업로드 중 업로드 목록 | 줄마다 B 의 이메일이 붙는다 | ⬜ | **"연결 해제된 저장소" 로 나왔다** — 등록된 저장소에서만 이름을 찾았다. 고친 빌드는 Flip 4 가 업로드 중이라 아직 안 올렸다 |

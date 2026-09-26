@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.UploadTask
@@ -136,7 +137,8 @@ internal fun UploadQueueScreen(
                         UploadTaskRow(
                             task = task,
                             accountName = task.accountId?.let { id ->
-                                uiState.accountNames[id] ?: stringResource(R.string.upload_account_removed)
+                                queueAccountLabel(id, uiState.accountNames)
+                                    ?: stringResource(R.string.upload_account_removed)
                             },
                             onRemove = { onRemove(task.id) },
                             modifier = Modifier.animateItem(
@@ -343,6 +345,16 @@ private fun UploadQueueScreenPreview() {
         )
     }
 }
+
+/**
+ * 목록 한 줄에 붙일 "어디로 가는지". 모르면 null — 화면이 "연결 해제된 저장소" 로 쓴다.
+ *
+ * 다른 계정 업로드(`google:<이메일>`)는 등록된 저장소가 아니다 — 앱이 B 를 기억하지 않도록 일부러 등록하지
+ * 않았다(`docs/plans/guest-account-upload/spec.md` §5). 그래서 등록 목록에서만 찾으면 늘 못 찾아
+ * "연결 해제된 저장소" 로 떨어졌다. 올리는 중인데 끊겼다고 말하는 셈이었다(2026-09-27 Flip 4).
+ */
+internal fun queueAccountLabel(accountId: String, registeredNames: Map<String, String>): String? =
+    RemoteAccount.guestEmailOf(accountId) ?: registeredNames[accountId]
 
 /** 실패 사유가 잘리지 않도록 넉넉히. 우리 문장은 한 줄이지만 서버 원문은 길 수 있다 */
 private const val FAILURE_MAX_LINES = 4
