@@ -1,6 +1,5 @@
 package com.jjw.easygallery.feature.gallery
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,7 +33,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -106,14 +105,16 @@ internal fun DateRangeSheet(
     // 반만 펼친 상태면 달력이 잘리고 적용 버튼이 화면 밖으로 나간다 → 처음부터 전체 펼침
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
         // 바깥(스크림)을 눌러도 닫지 않는다. 시작일을 고르고 종료일을 찾아 달을 넘기는 동안
         // 가장자리를 스치기 쉬운데, 그때 닫혀 버리면 고르던 것이 통째로 날아간다.
-        // 아래로 끌어내리는 것은 의도한 동작이므로 그대로 둔다 — 그때만 targetValue 가 Hidden 이다.
-        onDismissRequest = { if (sheetState.targetValue == SheetValue.Hidden) onDismiss() },
-        sheetState = sheetState,
+        // 아래로 끌어내리기와 뒤로가기는 그대로 둔다 — 그쪽은 의도한 동작이다.
+        properties = ModalBottomSheetProperties(
+            shouldDismissOnBackPress = true,
+            shouldDismissOnClickOutside = false,
+        ),
     ) {
-        // 스크림을 막은 대신 뒤로가기로는 언제든 닫힌다
-        BackHandler { onDismiss() }
         Column(
             Modifier
                 .fillMaxWidth()
