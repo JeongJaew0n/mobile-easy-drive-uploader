@@ -127,7 +127,7 @@ internal fun DateRangeSheet(
                 onPick = { range ->
                     selection = DateRangeSelection.of(range)
                     scope.launch {
-                        calendarState.animateScrollToMonth(YearMonth.from(range.start).coerceIn(startMonth, thisMonth))
+                        calendarState.scrollToMonth(YearMonth.from(range.start).coerceIn(startMonth, thisMonth))
                     }
                 },
             )
@@ -149,9 +149,11 @@ internal fun DateRangeSheet(
                     initialYear = calendarState.firstVisibleMonth.yearMonth.year,
                     startMonth = startMonth,
                     endMonth = thisMonth,
+                    // 목적지가 분명한 이동이라 곧장 간다. 2026 → 2017 은 백 개월이 넘어,
+                    // 애니메이션으로 넘기면 그 사이 달들을 전부 구성하느라 몇 초씩 끊긴다(실기기 확인).
                     onPick = { target ->
                         jumpOpen = false
-                        scope.launch { calendarState.animateScrollToMonth(target) }
+                        scope.launch { calendarState.scrollToMonth(target) }
                     },
                     // 달력과 같은 이유로 남는 높이만 쓴다. 고정 높이로 두면 가로 화면에서
                     // 월 그리드 마지막 줄과 적용 버튼이 잘린다(실기기 확인).
