@@ -37,6 +37,13 @@ class EnqueueUploadsUseCase @Inject constructor(
         return enqueue(items, accountId, folder, p.isSignedIn)
     }
 
+    /**
+     * 정해진 [folder] 로 [accountId] 에 올린다. "다른 계정 업로드" 가 B 의 폴더를 먼저 찾아 공유한 뒤
+     * 그 폴더로 넣을 때 쓴다(`docs/plans/guest-account-upload/spec.md` §3 ⑤). 로그인 확인은 호출 쪽이 이미 했다.
+     */
+    suspend fun toFolder(items: List<MediaItem>, accountId: String, folder: DriveFolder): Int =
+        enqueue(items, accountId, folder, signedIn = true)
+
     private suspend fun enqueue(
         items: List<MediaItem>,
         accountId: String?,

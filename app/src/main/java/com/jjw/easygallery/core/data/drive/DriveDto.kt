@@ -62,3 +62,20 @@ data class StorageQuotaDto(
     val usage: String? = null,
     val usageInDrive: String? = null,
 )
+
+/**
+ * `permissions.create` 본문. 다른 계정 업로드에서 B 의 폴더를 A 에게 보여줄 때 쓴다
+ * (`docs/plans/guest-account-upload/spec.md` §4.4).
+ */
+@Serializable
+data class DrivePermissionRequest(
+    val type: String,
+    val role: String,
+    val emailAddress: String,
+)
+
+@Serializable
+data class DrivePermissionDto(
+    val id: String,
+    val role: String? = null,
+)

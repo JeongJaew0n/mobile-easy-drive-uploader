@@ -38,6 +38,12 @@ interface DriveRepository {
     /** Drive 휴지통으로 / 복원. 완전 삭제는 제공하지 않는다(`docs/DRIVE_FILE_CRUD.md` §1) */
     suspend fun setTrashed(fileId: String, trashed: Boolean)
 
+    /**
+     * [fileId] 를 [email] 에게 읽기로 공유한다. 이미 공유돼 있어도 같은 권한이 한 번 더 생기지 않는다.
+     * 다른 계정 업로드에서 B 의 폴더를 A 가 보게 할 때 쓴다(`docs/plans/guest-account-upload/spec.md` §4.4).
+     */
+    suspend fun shareForReading(fileId: String, email: String)
+
     /** 앱 전용 루트 폴더("Easy Gallery"). 없으면 만든다. */
     suspend fun ensureAppRootFolder(): DriveFolder
 

@@ -1,8 +1,13 @@
 package com.jjw.easygallery.feature.gallery
 
+import android.app.PendingIntent
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
+import com.jjw.easygallery.core.data.auth.AuthRepository
+import com.jjw.easygallery.core.data.auth.GuestPick
+import com.jjw.easygallery.core.data.auth.SignInCancelledException
 import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
@@ -29,7 +34,10 @@ import com.jjw.easygallery.core.domain.model.filterByDate
 import com.jjw.easygallery.core.domain.model.uploadWaitReason
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.core.domain.usecase.GuestIsPrimaryException
+import com.jjw.easygallery.core.domain.usecase.GuestUploadStarted
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
+import com.jjw.easygallery.core.domain.usecase.StartGuestUploadUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -72,7 +80,20 @@ class GalleryViewModel @Inject constructor(
     private val hiddenMedia: HiddenMediaRepository,
     private val conditions: DeviceConditionsMonitor,
     remoteAccounts: RemoteAccountRepository,
+    private val auth: AuthRepository,
+    private val startGuestUpload: StartGuestUploadUseCase,
 ) : ViewModel() {
+
+    /** "다른 Google 계정으로 업로드" 를 보일지 — 주 계정이 연결돼 있을 때만(공유할 상대가 있어야 한다) */
+    val guestUploadAvailable: StateFlow<Boolean> = prefs.preferences.map { it.isSignedIn }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    /** 끝났는데 아직 "기기에서 지우라" 를 닫지 않은 B. 갤러리 배너로 보인다 */
+    val guestCleanupEmail: StateFlow<String?> = prefs.preferences.map { it.guestCleanupEmail }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** 계정 선택 창을 다녀오는 동안 선택을 붙들어 둔다 */
+    private var guestItems: List<MediaItem> = emptyList()
 
     /** 선택 상단바 "다른 저장소로 업로드" 메뉴 — 로그인된 Drive + 연결된 저장소. 하나뿐이면 메뉴를 숨긴다 */
     val uploadTargets: StateFlow<List<UploadTargetOption>> = combine(
@@ -302,6 +323,54 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch { manageQueue.cancelAll() }
     }
 
+    // ---------- 다른 계정 업로드(docs/plans/guest-account-upload) ----------
+
+    /** 계정 선택 창부터. 주 계정은 건드리지 않는다 */
+    fun startGuestUpload() {
+        guestItems = selectedItems()
+        if (guestItems.isEmpty()) return
+        viewModelScope.launch {
+            guestStep {
+                when (val pick = auth.beginGuestPick()) {
+                    is GuestPick.NeedsChooser -> events.send(GalleryEvent.GuestChooser(pick.pendingIntent))
+                    is GuestPick.Picked -> runGuestUpload(pick.accessToken)
+                }
+            }
+        }
+    }
+
+    fun onGuestPickResult(data: Intent?) {
+        viewModelScope.launch { guestStep { runGuestUpload(auth.completeGuestPick(data)) } }
+    }
+
+    fun dismissGuestCleanup() {
+        viewModelScope.launch { prefs.setGuestCleanupEmail(null) }
+    }
+
+    private suspend fun runGuestUpload(accessToken: String) {
+        val started = startGuestUpload(guestItems, accessToken)
+        guestItems = emptyList()
+        clearSelection()
+        events.send(GalleryEvent.GuestStarted(started))
+    }
+
+    /** 다른 계정 업로드의 실패를 한 곳에서 문구로 바꾼다. 선택 창을 닫은 것은 실패가 아니다 */
+    private suspend fun guestStep(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: SignInCancelledException) {
+            Timber.i(e, "guest pick cancelled")
+        } catch (e: GuestIsPrimaryException) {
+            Timber.i(e, "guest is primary")
+            events.send(GalleryEvent.GuestIsPrimary)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "guest upload failed")
+            events.send(GalleryEvent.Error(e.message ?: e.toString()))
+        }
+    }
+
     // ---------- 편집 ----------
 
     fun deleteSelected() = perform(MediaAction.Delete(selectedItems()))
@@ -524,6 +593,11 @@ private const val GOOGLE_DRIVE_LABEL = "Google Drive"
 
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
+
+    /** 다른 계정 업로드 — 계정 선택 창을 띄워야 한다 */
+    data class GuestChooser(val pendingIntent: PendingIntent) : GalleryEvent
+    data class GuestStarted(val result: GuestUploadStarted) : GalleryEvent
+    data object GuestIsPrimary : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
 
     /** 지울 것이 없을 때. 버튼이 아무 일도 안 하면 고장으로 보인다 */

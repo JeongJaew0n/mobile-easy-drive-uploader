@@ -109,6 +109,8 @@ class GalleryViewModelTest {
             hiddenMedia,
             conditions,
             remoteAccounts,
+            auth = mockk(relaxed = true),
+            startGuestUpload = mockk(relaxed = true),
         )
 
     @Test

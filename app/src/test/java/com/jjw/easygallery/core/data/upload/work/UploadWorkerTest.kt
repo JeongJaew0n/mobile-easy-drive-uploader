@@ -7,6 +7,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
+import com.jjw.easygallery.core.data.auth.AuthFailedException
 import com.jjw.easygallery.core.data.auth.NotSignedInException
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
@@ -24,6 +25,7 @@ import com.jjw.easygallery.core.data.upload.VideoCompressor
 import com.jjw.easygallery.core.data.upload.db.AppDatabase
 import com.jjw.easygallery.core.data.upload.db.UploadTaskEntity
 import com.jjw.easygallery.core.domain.model.DriveFolder
+import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.domain.usecase.GetUploadFolderUseCase
@@ -66,6 +68,7 @@ class UploadWorkerTest {
             accountEmail = "me@example.com",
             videoCompression = VideoCompression.HD_720,
         )
+        coEvery { setGuestCleanupEmail(any()) } returns Unit
     }
 
     @Before
@@ -272,6 +275,7 @@ class UploadWorkerTest {
         sessionUri: String? = null,
         attemptCount: Int = 0,
         folderId: String? = "f",
+        accountId: String? = null,
     ) {
         db.uploadTaskDao().insertAll(
             listOf(
@@ -287,9 +291,65 @@ class UploadWorkerTest {
                     attemptCount = attemptCount,
                     createdAt = mediaId,
                     updatedAt = mediaId,
+                    accountId = accountId,
                 ),
             ),
         )
+    }
+
+    // ---- 다른 계정 업로드(docs/plans/guest-account-upload) ----
+
+    private val guestId = RemoteAccount.guestDriveId("b@example.com")
+    private val guestUploader: RemoteUploader = mockk {
+        coEvery { resolveLength(any()) } answers { firstArg<UploadSource>().sizeBytes }
+        coEvery { findUploaded(any(), any()) } returns null
+    }
+    private val guestStorage: RemoteStorage = mockk {
+        every { uploader() } returns guestUploader
+        every { rootId } returns "root"
+    }
+
+    @Test
+    fun `B leaving the device fails only B's items and A keeps uploading`() = runTest {
+        coEvery { storages.storage(guestId) } returns guestStorage
+        coEvery { guestUploader.uploadWhole(any(), any(), any()) } throws AuthFailedException(4, "account gone")
+        coEvery { uploader.uploadWhole(any(), "f", 1_000) } returns "a-file"
+        insert(mediaId = 1, folderId = "b-folder", accountId = guestId)
+        insert(mediaId = 2)
+
+        val result = buildWorker().doWork()
+
+        // "A 로 다시 로그인하라" 로 전체를 세우면 안 된다
+        assertEquals(ListenableWorker.Result.success(), result)
+        val byMedia = rows().associateBy { it.mediaId }
+        assertEquals(UploadState.FAILED, byMedia.getValue(1).state)
+        assertEquals(UploadWorker.REASON_GUEST_UNAVAILABLE, byMedia.getValue(1).errorReason)
+        assertEquals(UploadState.COMPLETED, byMedia.getValue(2).state)
+    }
+
+    @Test
+    fun `when B's items are all done the app asks to remove B from the device`() = runTest {
+        coEvery { storages.storage(guestId) } returns guestStorage
+        coEvery { guestUploader.uploadWhole(any(), "b-folder", 1_000) } returns "b-file"
+        insert(mediaId = 1, folderId = "b-folder", accountId = guestId)
+
+        buildWorker().doWork()
+
+        coVerify { prefs.setGuestCleanupEmail("b@example.com") }
+        // B 로 올린 것은 B 의 이름으로 적힌다
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L), guestId))
+        assertEquals(emptySet<Long>(), ledger.uploadedAmong(listOf(1L), null))
+    }
+
+    @Test
+    fun `B is not announced while B still has work left`() = runTest {
+        coEvery { storages.storage(guestId) } returns guestStorage
+        coEvery { guestUploader.uploadWhole(any(), "b-folder", 1_000) } throws IOException("timeout")
+        insert(mediaId = 1, folderId = "b-folder", accountId = guestId)
+
+        buildWorker().doWork()
+
+        coVerify(exactly = 0) { prefs.setGuestCleanupEmail(any()) }
     }
 
     private suspend fun rows() = db.uploadTaskDao().observeAll().first()

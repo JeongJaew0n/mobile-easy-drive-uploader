@@ -76,6 +76,7 @@ internal fun GalleryScreen(
     onHideSelected: () -> Unit = {},
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
+    guest: GuestUploadUi = GuestUploadUi(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val content = uiState as? GalleryUiState.Content
@@ -107,6 +108,8 @@ internal fun GalleryScreen(
                         onUpload = onUploadSelected,
                         uploadTargets = uploadTargets,
                         onUploadTo = onUploadSelectedTo,
+                        guestAvailable = guest.available,
+                        onUploadToGuest = guest.onStart,
                     )
                 } else {
                     // 탭은 상단바와 한 덩어리다 — 선택 모드로 바뀌면 함께 사라진다.
@@ -190,6 +193,7 @@ internal fun GalleryScreen(
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
+                    guest = guest,
                 )
             }
             if (content?.isMutating == true) {
@@ -330,10 +334,23 @@ private fun GalleryContent(
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
+    guest: GuestUploadUi = GuestUploadUi(),
 ) {
     val motion = LocalMotion.current
     // 배너는 펴지며 등장해 그리드를 밀어내고, 접히며 사라진다 (그리드 점프 방지). 짧게(150ms) 유지
     Column(Modifier.fillMaxSize()) {
+        // 다른 계정 업로드가 끝났다 — 기기에서 그 계정을 지우라고(앱은 직접 못 지운다)
+        AnimatedVisibility(
+            visible = guest.cleanupEmail != null,
+            enter = motion.enterExpand(),
+            exit = motion.exitShrink(),
+        ) {
+            GuestCleanupBanner(
+                email = guest.cleanupEmail.orEmpty(),
+                onOpenSettings = guest.onOpenAccountSettings,
+                onDismiss = guest.onDismissCleanup,
+            )
+        }
         AnimatedVisibility(
             visible = uiState.upload.hasActive,
             enter = motion.enterExpand(),

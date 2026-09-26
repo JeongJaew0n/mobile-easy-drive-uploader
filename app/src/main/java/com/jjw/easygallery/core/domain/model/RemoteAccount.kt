@@ -41,6 +41,18 @@ data class RemoteAccount(
     companion object {
         /** Google Drive 는 Play 서비스가 토큰을 관리하므로 계정 행이 없다. null accountId 가 이 값을 뜻한다 */
         const val GOOGLE_DRIVE_ID = "google-drive"
+
+        /**
+         * "다른 계정 업로드" 의 대상(`docs/plans/guest-account-upload/spec.md`). 주 계정이 아닌 Google 계정 B 로
+         * 이번만 올릴 때 큐에 적는 `accountId` 다. 계정 행은 없다 — 앱은 B 를 기억하지 않는다.
+         */
+        fun guestDriveId(email: String): String = "$GUEST_DRIVE_PREFIX$email"
+
+        /** [guestDriveId] 로 만든 값이면 그 이메일, 아니면 null */
+        fun guestEmailOf(accountId: String?): String? =
+            accountId?.takeIf { it.startsWith(GUEST_DRIVE_PREFIX) }?.removePrefix(GUEST_DRIVE_PREFIX)
+
+        private const val GUEST_DRIVE_PREFIX = "google:"
     }
 }
 

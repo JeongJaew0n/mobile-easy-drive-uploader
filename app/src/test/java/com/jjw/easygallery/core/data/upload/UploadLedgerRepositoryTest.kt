@@ -143,6 +143,32 @@ class UploadLedgerRepositoryTest {
         }
     }
 
+    @Test
+    fun `a guest upload is recorded as that Google account`() = runTest {
+        // "다른 계정 업로드" 로 B 에 올린 것 — 주 계정 A 의 기록에 섞이면 안 된다
+        ledger.record(1, "b-file", "b-folder", accountId = RemoteAccount.guestDriveId(B))
+
+        assertEquals(emptySet<Long>(), ledger.uploadedAmong(listOf(1L), accountId = null))
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L), accountId = RemoteAccount.guestDriveId(B)))
+    }
+
+    @Test
+    fun `what B received as a guest counts once B becomes the primary`() = runTest {
+        ledger.record(1, "b-file", "b-folder", accountId = RemoteAccount.guestDriveId(B))
+        signInAs(B)
+
+        // 잠깐 올렸든 주 계정으로 올렸든 같은 Google 계정이면 같은 목적지다
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L), accountId = null))
+    }
+
+    @Test
+    fun `guest upload does not depend on who is connected`() = runTest {
+        ledger.record(1, "b-file", "b-folder", accountId = RemoteAccount.guestDriveId(B))
+        signInAs(null)
+
+        assertEquals(setOf(1L), ledger.uploadedAmong(listOf(1L), accountId = RemoteAccount.guestDriveId(B)))
+    }
+
     private companion object {
         const val A = "a@example.com"
         const val B = "b@example.com"

@@ -620,6 +620,17 @@
     <string name="upload_error_no_permission">이 폴더에 올릴 권한이 없습니다</string>
     <string name="upload_error_folder_missing">업로드 폴더를 찾을 수 없습니다</string>
     <string name="upload_error_sign_in">다시 로그인해야 합니다</string>
+    <!-- 다른 계정 업로드 (docs/plans/guest-account-upload) -->
+    <string name="gallery_upload_to_guest">다른 Google 계정으로 업로드…</string>
+    <string name="guest_upload_started">%1$s 로 %2$d개를 올립니다</string>
+    <string name="guest_upload_started_shared">%1$s 로 %2$d개를 올립니다. 폴더를 지금 계정에 공유했습니다</string>
+    <string name="guest_upload_nothing">%1$s 에 이미 모두 올라가 있습니다</string>
+    <string name="guest_is_primary">이미 연결된 계정입니다. 다른 계정을 고르세요</string>
+    <string name="notification_guest_done_title">%1$s 로 올리기가 끝났습니다</string>
+    <string name="notification_guest_done_text">%1$d개를 올렸습니다. 이 계정을 기기에 남기지 않으려면 탭해서 계정 목록에서 지우세요</string>
+    <string name="guest_cleanup_banner">%1$s 로 올리기가 끝났습니다. 기기에 남기지 않으려면 계정을 지우세요</string>
+    <string name="guest_cleanup_open_settings">계정 설정</string>
+    <string name="upload_error_guest_unavailable">그 계정이 기기에 없거나 권한이 없습니다</string>
     <!-- 보기 전용 폴더 (docs/DRIVE_FILE_SCOPE.md §10) -->
     <string name="drive_add_view_folder">볼 수 있는 폴더 추가</string>
     <string name="drive_add_view_folder_confirm">이 폴더 추가</string>

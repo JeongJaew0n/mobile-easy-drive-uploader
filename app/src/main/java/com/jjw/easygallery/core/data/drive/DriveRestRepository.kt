@@ -78,6 +78,10 @@ class DriveRestRepository @Inject constructor(
             DriveFileMetadata(name = name, mimeType = DriveApi.FOLDER_MIME_TYPE, parents = listOf(parentId)),
         ).toFolder()
 
+    override suspend fun shareForReading(fileId: String, email: String) {
+        api.createPermission(fileId, DrivePermissionRequest(type = "user", role = "reader", emailAddress = email))
+    }
+
     override suspend fun ensureAppRootFolder(): DriveFolder {
         val query = "mimeType = '${DriveApi.FOLDER_MIME_TYPE}' and trashed = false " +
             "and appProperties has { key = '$APP_ROOT_PROPERTY' and value = 'true' }"

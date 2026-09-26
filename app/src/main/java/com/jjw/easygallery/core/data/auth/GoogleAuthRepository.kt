@@ -10,6 +10,7 @@ import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.ClearTokenRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -141,6 +142,38 @@ class GoogleAuthRepository @Inject constructor(
 
     private fun AuthorizationResult.hasReadonly(): Boolean =
         grantedScopes.any { it == DRIVE_READONLY_SCOPE }
+
+    override suspend fun beginGuestPick(): GuestPick {
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
+            .setOptOutIncludingGrantedScopes(true)
+            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+            .build()
+        val result = try {
+            client.authorize(request).await()
+        } catch (e: ApiException) {
+            Timber.w(e, "guest pick failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        result.pendingIntent?.let { return GuestPick.NeedsChooser(it) }
+        // 주 계정 캐시(cached)에 넣지 않는다 — B 의 토큰이 A 의 자리를 차지하면 A 의 업로드가 B 로 간다
+        return GuestPick.Picked(result.accessToken ?: throw AuthorizationRequiredException())
+    }
+
+    override suspend fun completeGuestPick(data: Intent?): String {
+        if (data == null) throw SignInCancelledException()
+        val result = try {
+            client.getAuthorizationResultFromIntent(data)
+        } catch (e: ApiException) {
+            // 선택 창을 닫으면 결과 인텐트가 null 이 아니라 status 16 을 담아 온다(기기에서 확인).
+            // 취소는 실패가 아니다 — "Google 인증 실패 (16)" 을 띄우면 사용자는 뭔가 고장 난 줄 안다
+            if (e.statusCode == CommonStatusCodes.CANCELED) throw SignInCancelledException()
+            Timber.w(e, "guest pick result parse failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        // 여기서도 cache() 를 부르지 않는다. 위와 같은 이유
+        return result.accessToken ?: throw AuthorizationRequiredException(result.pendingIntent)
+    }
 
     override suspend fun getAccessToken(): String {
         cached?.takeIf { it.isFresh() }?.let { return it.token }

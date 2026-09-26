@@ -1,16 +1,17 @@
 package com.jjw.easygallery.feature.gallery
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +24,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
@@ -69,6 +69,16 @@ fun GalleryRoute(
     val startUpload = { startUploadTo(null) }
     val uploadTargets by viewModel.uploadTargets.collectAsStateWithLifecycle()
 
+    // 다른 계정 업로드 — 계정 선택 창(docs/plans/guest-account-upload)
+    val guestAvailable by viewModel.guestUploadAvailable.collectAsStateWithLifecycle()
+    val guestCleanupEmail by viewModel.guestCleanupEmail.collectAsStateWithLifecycle()
+    val guestChooserLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        // 닫았으면 아무것도 하지 않는다. Play 서비스가 취소 인텐트를 돌려줘도 저장소가 한 번 더 거른다
+        if (result.resultCode == Activity.RESULT_OK) viewModel.onGuestPickResult(result.data)
+    }
+
     // 편집 동의 다이얼로그 + 결과 스낵바 (공용)
     MediaActionEffect(
         events = viewModel.actionEvents,
@@ -85,35 +95,15 @@ fun GalleryRoute(
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
-            when (event) {
-                GalleryEvent.SignInRequired -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = resources.getString(R.string.gallery_sign_in_required),
-                        actionLabel = resources.getString(R.string.action_settings),
-                    )
-                    if (result == SnackbarResult.ActionPerformed) onSettingsClick()
-                }
-                // 하나도 안 들어갔으면 "0개 추가" 라고 말하지 않는다 — 왜 아무 일도 없는지를 알려준다
-                is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(
-                    when {
-                        event.added == 0 ->
-                            resources.getString(R.string.gallery_upload_all_skipped, event.skipped)
-                        event.skipped == 0 ->
-                            resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
-                        else ->
-                            resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
-                    },
-                )
-                GalleryEvent.NoUploadedToTrash ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.gallery_no_uploaded_to_trash))
-                is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
-                    resources.getQuantityString(R.plurals.category_assigned, event.count, event.count),
-                )
-                is GalleryEvent.Hidden -> snackbarHostState.showSnackbar(
-                    resources.getQuantityString(R.plurals.gallery_hidden_done, event.count, event.count),
-                )
-                is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
-            }
+            showGalleryEvent(
+                event = event,
+                snackbarHostState = snackbarHostState,
+                resources = resources,
+                onSettingsClick = onSettingsClick,
+                onGuestChooser = { pendingIntent ->
+                    guestChooserLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                },
+            )
         }
     }
 
@@ -153,6 +143,17 @@ fun GalleryRoute(
         onHiddenClick = onHiddenClick,
         onHideSelected = viewModel::hideSelected,
         onOpenItem = onOpenItem,
+        guest = GuestUploadUi(
+            available = guestAvailable,
+            cleanupEmail = guestCleanupEmail,
+            onStart = viewModel::startGuestUpload,
+            onOpenAccountSettings = {
+                // 앱은 기기 계정을 지울 수 없다 — 기기의 계정 목록을 연다
+                context.startActivity(Intent(Settings.ACTION_SYNC_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                viewModel.dismissGuestCleanup()
+            },
+            onDismissCleanup = viewModel::dismissGuestCleanup,
+        ),
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,
             onDelete = viewModel::deleteSelected,

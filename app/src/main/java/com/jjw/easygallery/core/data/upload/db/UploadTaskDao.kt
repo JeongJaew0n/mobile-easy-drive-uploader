@@ -97,6 +97,13 @@ interface UploadTaskDao {
     @Query("SELECT COUNT(*) FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")
     suspend fun countUnfinishedNow(): Int
 
+    /** [accountId] 로 가는 것 중 끝나지 않은 개수. "다른 계정 업로드" 가 끝났는지 볼 때 쓴다 */
+    @Query("SELECT COUNT(*) FROM upload_tasks WHERE accountId = :accountId AND state IN ('PENDING', 'RUNNING')")
+    suspend fun countUnfinishedFor(accountId: String): Int
+
+    @Query("SELECT COUNT(*) FROM upload_tasks WHERE accountId = :accountId AND state = 'COMPLETED'")
+    suspend fun countCompletedFor(accountId: String): Int
+
     @Query(
         "UPDATE upload_tasks SET state = 'PENDING', errorMessage = NULL, errorReason = NULL, " +
             "attemptCount = 0, updatedAt = :now " +

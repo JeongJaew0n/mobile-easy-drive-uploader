@@ -19,6 +19,7 @@ import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.data.upload.UploadSource
 import com.jjw.easygallery.core.data.upload.VideoCompressor
+import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.UploadTask
 import com.jjw.easygallery.core.domain.usecase.GetUploadFolderUseCase
 import dagger.assisted.Assisted
@@ -66,6 +67,9 @@ class UploadWorker @AssistedInject constructor(
     @Volatile
     private var hopelessError: RemoteStorageException? = null
 
+    /** 이번 실행에서 손댄 "다른 계정 업로드" 계정들. 끝에 그 계정의 것이 다 끝났으면 알린다 */
+    private val guestAccounts = Collections.synchronizedSet(mutableSetOf<String>())
+
     /**
      * 큐를 [PARALLELISM] 개 코루틴이 나눠 비운다. 장당 시간의 대부분이 서버를 기다리는 시간이라
      * 동시에 보내면 그대로 처리량이 는다 — `docs/UPLOAD_PERFORMANCE.md` §2-2.
@@ -87,7 +91,25 @@ class UploadWorker @AssistedInject constructor(
 
         // 모든 코루틴이 끝난 뒤에 접는다 — 도는 중에 접으면 다른 코루틴이 올리고 있는 것까지 접는다
         hopelessError?.let { error -> stopHopeless(error) }
+        announceFinishedGuests()
         return finishResult(stopResult.get())
+    }
+
+    /**
+     * "다른 계정 업로드" 가 끝난 계정을 알린다(`docs/plans/guest-account-upload/spec.md` §4.5).
+     *
+     * 앱은 기기 계정을 지울 수 없다. 끝나는 순간 "지우려면 여기" 를 보여주는 것이 앱이 할 수 있는 전부라,
+     * 알림에 더해 설정에도 남겨 갤러리 배너로 보인다 — 알림을 꺼 둔 사용자도 놓치지 않게.
+     */
+    private suspend fun announceFinishedGuests() {
+        val finished = guestAccounts.toList().filter { queue.countUnfinishedFor(it) == 0 }
+        for (accountId in finished) {
+            val email = RemoteAccount.guestEmailOf(accountId) ?: continue
+            val uploaded = queue.countCompletedFor(accountId)
+            Timber.i("guest upload finished: uploaded=%d", uploaded)
+            notifications.showGuestUploadDone(email, uploaded)
+            prefs.setGuestCleanupEmail(email)
+        }
     }
 
     /** 멈출 이유 > 미뤄둔 것 > 정상 종료 순으로 결과를 정한다 */
@@ -155,6 +177,7 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private suspend fun process(task: UploadTask): Outcome {
+        task.accountId?.takeIf { RemoteAccount.guestEmailOf(it) != null }?.let { guestAccounts += it }
         queue.markRunning(task.id, task.attemptCount)
         updateForeground(task, task.fraction)
         return try {
@@ -274,6 +297,13 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private suspend fun handleFailure(task: UploadTask, e: Exception): Outcome = when (e) {
+        // "다른 계정 업로드" 의 B 가 기기에서 빠졌거나 권한이 없다. 주 계정 A 의 업로드까지 세울 이유가
+        // 없다 — 그 항목만 접는다. 여기서 SignInRequired 를 내면 "A 로 다시 로그인하라" 는 엉뚱한 알림이 뜬다
+        is AuthException if RemoteAccount.guestEmailOf(task.accountId) != null -> {
+            Timber.w(e, "guest account unavailable")
+            queue.fail(task.id, e.message, REASON_GUEST_UNAVAILABLE)
+            Outcome.Failed
+        }
         is AuthException -> {
             Timber.w(e, "sign-in required")
             queue.markPending(task.id, task.attemptCount)
@@ -380,6 +410,9 @@ class UploadWorker @AssistedInject constructor(
     }
 
     companion object {
+        /** B 가 기기에 없거나 권한이 없다. 화면이 이 코드로 문장을 고른다 */
+        const val REASON_GUEST_UNAVAILABLE = "guestAccountUnavailable"
+
         /** 이 크기 이하만 왕복 한 번(multipart). 넘으면 끊겼을 때 다시 올리는 비용이 더 크다 */
         private const val WHOLE_UPLOAD_LIMIT = 4L * 1024 * 1024
 

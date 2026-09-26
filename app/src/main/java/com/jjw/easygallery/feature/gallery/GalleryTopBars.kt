@@ -109,6 +109,9 @@ internal fun SelectionTopBar(
     onUpload: () -> Unit,
     uploadTargets: List<UploadTargetOption> = emptyList(),
     onUploadTo: (UploadTargetOption) -> Unit = {},
+    /** 주 계정이 연결돼 있으면 "다른 Google 계정으로 업로드" 를 보인다(docs/plans/guest-account-upload) */
+    guestAvailable: Boolean = false,
+    onUploadToGuest: () -> Unit = {},
 ) {
     var targetMenuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
@@ -125,22 +128,34 @@ internal fun SelectionTopBar(
                     contentDescription = stringResource(R.string.action_upload_to_drive),
                 )
             }
-            // 저장소가 둘 이상이면 이번만 다른 곳으로 올릴 수 있다(설정은 그대로)
-            if (uploadTargets.size > 1) {
+            // 저장소가 둘 이상이거나 다른 계정 업로드가 되면 이번만 다른 곳으로 올릴 수 있다(설정은 그대로)
+            if (uploadTargets.size > 1 || guestAvailable) {
                 Box {
                     IconButton(onClick = { targetMenuExpanded = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gallery_upload_to))
                     }
                     DropdownMenu(expanded = targetMenuExpanded, onDismissRequest = { targetMenuExpanded = false }) {
-                        uploadTargets.forEach { target ->
+                        // 대상이 하나뿐이면 그건 위의 업로드 버튼과 같다 — 목록에 늘어놓지 않는다
+                        if (uploadTargets.size > 1) {
+                            uploadTargets.forEach { target ->
+                                DropdownMenuItem(
+                                    text = {
+                                        val label = stringResource(R.string.gallery_upload_to_item, target.name)
+                                        Text(if (target.isDefault) "$label ✓" else label)
+                                    },
+                                    onClick = {
+                                        targetMenuExpanded = false
+                                        onUploadTo(target)
+                                    },
+                                )
+                            }
+                        }
+                        if (guestAvailable) {
                             DropdownMenuItem(
-                                text = {
-                                    val label = stringResource(R.string.gallery_upload_to_item, target.name)
-                                    Text(if (target.isDefault) "$label ✓" else label)
-                                },
+                                text = { Text(stringResource(R.string.gallery_upload_to_guest)) },
                                 onClick = {
                                     targetMenuExpanded = false
-                                    onUploadTo(target)
+                                    onUploadToGuest()
                                 },
                             )
                         }

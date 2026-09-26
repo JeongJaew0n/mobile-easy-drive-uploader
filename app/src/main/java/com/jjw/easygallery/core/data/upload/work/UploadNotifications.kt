@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.ForegroundInfo
@@ -155,6 +156,32 @@ class UploadNotifications @Inject constructor(
         notify(SUMMARY_ID, text, context.getString(R.string.notification_upload_blocked_title))
     }
 
+    /**
+     * "다른 계정 업로드" 가 끝났다. 앱은 기기 계정을 지울 수 없으므로 탭하면 **기기의 계정 목록**을 연다
+     * (`docs/plans/guest-account-upload/spec.md` §2). B 가 원래 기기에 있던 계정이면 그냥 닫으면 된다.
+     */
+    fun showGuestUploadDone(email: String, uploaded: Int) {
+        if (!manager.areNotificationsEnabled()) return
+        val settings = PendingIntent.getActivity(
+            context,
+            GUEST_DONE_ID,
+            Intent(Settings.ACTION_SYNC_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle(context.getString(R.string.notification_guest_done_title, email))
+            .setContentText(context.getString(R.string.notification_guest_done_text, uploaded))
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(context.getString(R.string.notification_guest_done_text, uploaded)),
+            )
+            .setAutoCancel(true)
+            .setContentIntent(settings)
+            .build()
+        manager.notify(GUEST_DONE_ID, notification)
+    }
+
     private fun notify(id: Int, text: String, title: String) {
         // POST_NOTIFICATIONS 가 거부된 경우 notify 는 조용히 무시된다
         if (!manager.areNotificationsEnabled()) return
@@ -181,6 +208,7 @@ class UploadNotifications @Inject constructor(
         const val SUMMARY_ID = 1002
         const val SCAN_ID = 1003
         const val TAG_SCAN_ID = 1004
+        const val GUEST_DONE_ID = 1005
         const val DOWNLOAD_ID_BASE = 2000
         const val DOWNLOAD_RESULT_ID_BASE = 3000
         private const val DOWNLOAD_ID_SLOTS = 500

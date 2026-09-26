@@ -50,5 +50,23 @@ interface AuthRepository : TokenProvider {
      */
     suspend fun completeViewScopeConsent(data: Intent?): Boolean
 
+    /**
+     * "다른 계정 업로드" 의 계정 고르기(`docs/plans/guest-account-upload/spec.md` §4.1).
+     * 계정 선택 창을 **강제로** 띄운다 — 안 그러면 Play 서비스가 전에 쓴 계정(주 계정)을 조용히 고른다.
+     * 주 계정의 연결 정보와 토큰은 건드리지 않는다.
+     */
+    suspend fun beginGuestPick(): GuestPick
+
+    /** 선택 창 결과에서 고른 계정의 액세스 토큰. 누구인지는 호출 쪽이 Drive `about` 으로 확인한다 */
+    suspend fun completeGuestPick(data: Intent?): String
+
     suspend fun signOut()
+}
+
+/** [AuthRepository.beginGuestPick] 결과 */
+sealed interface GuestPick {
+    data class NeedsChooser(val pendingIntent: PendingIntent) : GuestPick
+
+    /** 선택 창 없이 바로 나왔다(드물다). 누구 것인지는 역시 `about` 으로 확인한다 */
+    data class Picked(val accessToken: String) : GuestPick
 }

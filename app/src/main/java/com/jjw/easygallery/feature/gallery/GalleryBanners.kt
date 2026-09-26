@@ -141,6 +141,7 @@ private fun uploadReasonTextOrNull(reason: String?): String? = when (reason) {
     "insufficientFilePermissions", "forbidden" -> stringResource(R.string.upload_error_no_permission)
     "notFound" -> stringResource(R.string.upload_error_folder_missing)
     "authError", "unauthorized" -> stringResource(R.string.upload_error_sign_in)
+    "guestAccountUnavailable" -> stringResource(R.string.upload_error_guest_unavailable)
     else -> null
 }
 

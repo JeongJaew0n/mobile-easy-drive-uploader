@@ -2,6 +2,7 @@ package com.jjw.easygallery.core.data.upload.db
 
 import androidx.room.Entity
 import androidx.room.Index
+import com.jjw.easygallery.core.domain.model.RemoteAccount
 
 /**
  * 올라간 항목의 영구 기록. 큐(`upload_tasks`)는 새 배치마다 완료 행을 지우므로
@@ -36,13 +37,15 @@ const val UNCLAIMED_DRIVE_DESTINATION = "drive:"
 /**
  * `destination` 을 만드는 유일한 자리.
  *
- * @param accountId 저장소 계정. null 또는 [driveAccountId] 면 Google Drive
+ * "다른 계정 업로드"(`google:<B>`)도 `drive:<B>` 로 적는다. 같은 Google 계정이면 주 계정으로 올렸든
+ * 잠깐 올렸든 **같은 목적지**다 — B 가 나중에 주 계정이 되어도 기록이 그대로 이어진다.
+ *
+ * @param accountId 저장소 계정. null 또는 [driveAccountId] 면 연결된 Google Drive
  * @param driveEmail 지금 연결된 Google 계정. Drive 인데 null 이면 목적지를 정할 수 없다
  * @return 정할 수 없으면 null — 그때 Drive 기록은 "없다" 로 본다
  */
-fun destinationFor(accountId: String?, driveEmail: String?, driveAccountId: String): String? =
-    if (accountId == null || accountId == driveAccountId) {
-        driveEmail?.let { "drive:$it" }
-    } else {
-        "remote:$accountId"
-    }
+fun destinationFor(accountId: String?, driveEmail: String?, driveAccountId: String): String? {
+    if (accountId == null || accountId == driveAccountId) return driveEmail?.let { "drive:$it" }
+    RemoteAccount.guestEmailOf(accountId)?.let { return "drive:$it" }
+    return "remote:$accountId"
+}

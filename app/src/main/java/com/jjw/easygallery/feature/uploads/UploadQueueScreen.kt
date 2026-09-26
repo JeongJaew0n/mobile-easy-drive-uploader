@@ -234,6 +234,7 @@ private fun failureText(task: UploadTask): String {
         "insufficientFilePermissions", "forbidden" -> R.string.upload_error_no_permission
         "notFound" -> R.string.upload_error_folder_missing
         "authError", "unauthorized" -> R.string.upload_error_sign_in
+        "guestAccountUnavailable" -> R.string.upload_error_guest_unavailable
         else -> null
     }
     if (known != null) return stringResource(known)

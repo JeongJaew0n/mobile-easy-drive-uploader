@@ -61,6 +61,17 @@ interface DriveApi {
         @Query("fields") fields: String = "id,name,mimeType,parents,trashed,modifiedTime,size,webViewLink",
     ): DriveFileDto
 
+    /**
+     * 권한 추가(공유). `drive.file` 로 허용된다 — 앱이 만든 파일·폴더라서.
+     * 폴더에 주면 안의 것은 모두 물려받는다. 알림 메일은 끈다: 앱이 대신 알리므로 메일은 소음이다.
+     */
+    @POST("drive/v3/files/{fileId}/permissions")
+    suspend fun createPermission(
+        @Path("fileId") fileId: String,
+        @Body permission: DrivePermissionRequest,
+        @Query("sendNotificationEmail") sendNotificationEmail: Boolean = false,
+    ): DrivePermissionDto
+
     /** 재개 가능 업로드 세션 시작. 응답 `Location` 헤더가 세션 URI. */
     @POST("upload/drive/v3/files?uploadType=resumable")
     suspend fun startResumableUpload(

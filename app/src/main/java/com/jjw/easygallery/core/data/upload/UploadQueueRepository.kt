@@ -87,6 +87,10 @@ class UploadQueueRepository @Inject constructor(
 
     suspend fun countUnfinished(): Int = dao.countUnfinished()
 
+    suspend fun countUnfinishedFor(accountId: String): Int = dao.countUnfinishedFor(accountId)
+
+    suspend fun countCompletedFor(accountId: String): Int = dao.countCompletedFor(accountId)
+
     suspend fun markRunning(id: Long, attemptCount: Int) =
         dao.updateState(id, UploadState.RUNNING.name, attemptCount, clock())
 

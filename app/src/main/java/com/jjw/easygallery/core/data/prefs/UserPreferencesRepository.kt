@@ -38,6 +38,12 @@ data class UserPreferences(
     val viewFolders: List<ViewFolder> = emptyList(),
     /** 사용자가 `drive.readonly` 를 허락했다. 토큰을 받을 때 이 scope 를 함께 요청한다 */
     val driveViewScopeGranted: Boolean = false,
+    /**
+     * "다른 계정 업로드" 가 끝났는데 아직 "기기에서 지우라" 는 말을 닫지 않은 계정.
+     * 앱은 기기 계정을 지울 수 없어서, 사용자가 지울 때까지 갤러리 배너로 남긴다
+     * (`docs/plans/guest-account-upload/spec.md` §4.5). 로그인 정보가 아니라 알림 문구용 이메일이다.
+     */
+    val guestCleanupEmail: String? = null,
     /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
     val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
@@ -98,6 +104,7 @@ class UserPreferencesRepository @Inject constructor(
             pickedFolders = decodeFolders(prefs[KEY_PICKED_FOLDERS]),
             viewFolders = decodeViewFolders(prefs[KEY_VIEW_FOLDERS]),
             driveViewScopeGranted = prefs[KEY_DRIVE_VIEW_SCOPE] ?: false,
+            guestCleanupEmail = prefs[KEY_GUEST_CLEANUP],
             uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
@@ -168,6 +175,10 @@ class UserPreferencesRepository @Inject constructor(
                 prefs.remove(KEY_VIEW_FOLDERS)
             }
         }
+    }
+
+    suspend fun setGuestCleanupEmail(email: String?) {
+        store.edit { if (email == null) it.remove(KEY_GUEST_CLEANUP) else it[KEY_GUEST_CLEANUP] = email }
     }
 
     private suspend fun editViewFolders(transform: (List<ViewFolder>) -> List<ViewFolder>) {
@@ -315,5 +326,6 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_PICKED_FOLDERS = stringPreferencesKey("picked_folders")
         val KEY_VIEW_FOLDERS = stringPreferencesKey("view_folders")
         val KEY_DRIVE_VIEW_SCOPE = booleanPreferencesKey("drive_view_scope")
+        val KEY_GUEST_CLEANUP = stringPreferencesKey("guest_cleanup_email")
     }
 }
