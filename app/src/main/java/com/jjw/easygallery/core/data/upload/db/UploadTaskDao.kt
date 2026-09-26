@@ -114,6 +114,13 @@ interface UploadTaskDao {
     @Query("DELETE FROM upload_tasks WHERE state = 'COMPLETED'")
     suspend fun deleteCompleted(): Int
 
+    /**
+     * 실패한 항목을 목록에서 지운다. 사진·업로드 기록(원장)은 건드리지 않는다 — 큐의 줄만 없어진다.
+     * 용량이 차서 1,500건이 한꺼번에 실패하면 하나씩 ✕ 로는 치울 수 없다.
+     */
+    @Query("DELETE FROM upload_tasks WHERE state = 'FAILED'")
+    suspend fun deleteFailed(): Int
+
     @Query("DELETE FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")
     suspend fun deleteUnfinished(): Int
 

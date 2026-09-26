@@ -124,6 +124,8 @@ class UploadQueueRepository @Inject constructor(
 
     suspend fun deleteCompleted(): Int = dao.deleteCompleted()
 
+    suspend fun deleteFailed(): Int = dao.deleteFailed()
+
     suspend fun deleteUnfinished(): Int = dao.deleteUnfinished()
 
     suspend fun delete(id: Long) = dao.deleteById(id)

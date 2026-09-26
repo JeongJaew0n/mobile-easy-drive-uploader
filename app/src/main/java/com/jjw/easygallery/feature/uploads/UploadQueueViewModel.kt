@@ -39,6 +39,8 @@ class UploadQueueViewModel @Inject constructor(
 
     fun clearCompleted() = viewModelScope.launch { manageQueue.clearCompleted() }
 
+    fun clearFailed() = viewModelScope.launch { manageQueue.clearFailed() }
+
     fun cancelAll() = viewModelScope.launch { manageQueue.cancelAll() }
 
     fun remove(taskId: Long) = viewModelScope.launch { manageQueue.remove(taskId) }

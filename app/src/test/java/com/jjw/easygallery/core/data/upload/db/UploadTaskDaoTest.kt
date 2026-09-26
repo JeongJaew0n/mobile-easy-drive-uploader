@@ -101,6 +101,31 @@ class UploadTaskDaoTest {
         assertEquals(listOf(1L), dao.observeAll().first().map { it.mediaId })
     }
 
+    @Test
+    fun `deleteFailed removes only failed rows`() = runTest {
+        dao.insertAll(
+            listOf(
+                entity(mediaId = 1, createdAt = 1, state = UploadState.FAILED),
+                entity(mediaId = 2, createdAt = 2, state = UploadState.FAILED),
+                entity(mediaId = 3, createdAt = 3, state = UploadState.COMPLETED),
+                entity(mediaId = 4, createdAt = 4, state = UploadState.RUNNING),
+                entity(mediaId = 5, createdAt = 5),
+            ),
+        )
+
+        assertEquals(2, dao.deleteFailed())
+        // 대기·진행·완료는 그대로 — 실패 정리가 올리는 중인 것을 건드리면 안 된다
+        assertEquals(listOf(3L, 4L, 5L), dao.observeAll().first().map { it.mediaId })
+    }
+
+    @Test
+    fun `deleteFailed on a queue without failures changes nothing`() = runTest {
+        dao.insertAll(listOf(entity(mediaId = 1, createdAt = 1)))
+
+        assertEquals(0, dao.deleteFailed())
+        assertEquals(1, dao.observeAll().first().size)
+    }
+
     private fun entity(mediaId: Long, createdAt: Long, state: UploadState = UploadState.PENDING) = UploadTaskEntity(
         mediaId = mediaId,
         uri = "content://test/$mediaId",

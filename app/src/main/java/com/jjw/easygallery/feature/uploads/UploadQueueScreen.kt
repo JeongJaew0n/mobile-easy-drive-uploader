@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,6 +35,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +67,7 @@ fun UploadQueueRoute(
         onClearCompleted = { viewModel.clearCompleted() },
         onCancelAll = { viewModel.cancelAll() },
         onRemove = { viewModel.remove(it) },
+        onClearFailed = { viewModel.clearFailed() },
     )
 }
 
@@ -74,8 +81,20 @@ internal fun UploadQueueScreen(
     onCancelAll: () -> Unit,
     onRemove: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    onClearFailed: () -> Unit = {},
 ) {
     val motion = LocalMotion.current
+    var confirmClearFailed by rememberSaveable { mutableStateOf(false) }
+    if (confirmClearFailed) {
+        ClearFailedDialog(
+            count = uiState.summary.failed,
+            onConfirm = {
+                confirmClearFailed = false
+                onClearFailed()
+            },
+            onDismiss = { confirmClearFailed = false },
+        )
+    }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -102,6 +121,7 @@ internal fun UploadQueueScreen(
                 onRetryFailed = onRetryFailed,
                 onClearCompleted = onClearCompleted,
                 onCancelAll = onCancelAll,
+                onClearFailed = { confirmClearFailed = true },
             )
             if (uiState.tasks.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -132,15 +152,21 @@ internal fun UploadQueueScreen(
     }
 }
 
+/**
+ * 목록 위 버튼들. 넷이 한꺼번에 나올 수 있어(실패 둘·완료·진행) 한 줄에 안 들어가면 다음 줄로 넘긴다 —
+ * Row 로 두면 좁은 화면에서 마지막 버튼이 잘린다.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QueueActions(
     summary: UploadSummary,
     onRetryFailed: () -> Unit,
     onClearCompleted: () -> Unit,
     onCancelAll: () -> Unit,
+    onClearFailed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    FlowRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
@@ -148,6 +174,7 @@ private fun QueueActions(
     ) {
         if (summary.failed > 0) {
             TextButton(onClick = onRetryFailed) { Text(stringResource(R.string.upload_queue_retry_failed)) }
+            TextButton(onClick = onClearFailed) { Text(stringResource(R.string.upload_queue_clear_failed)) }
         }
         if (summary.completed > 0) {
             TextButton(onClick = onClearCompleted) { Text(stringResource(R.string.upload_queue_clear_completed)) }
@@ -156,6 +183,20 @@ private fun QueueActions(
             TextButton(onClick = onCancelAll) { Text(stringResource(R.string.upload_queue_cancel_all)) }
         }
     }
+}
+
+/** 수천 건을 한 번에 지우므로 한 번 묻는다. 무엇이 남는지(사진·기록)를 같이 말해 겁주지 않는다 */
+@Composable
+private fun ClearFailedDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.upload_queue_clear_failed_title, count)) },
+        text = { Text(stringResource(R.string.upload_queue_clear_failed_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.upload_queue_clear_failed)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable
