@@ -113,8 +113,22 @@ class UserPreferencesRepository @Inject constructor(
         current.filterNot { it.id == folder.id } + folder
     }
 
-    suspend fun removePickedFolder(id: String) = editFolders { current ->
-        current.filterNot { it.id == id }
+    /**
+     * 지정을 풀면 업로드 대상도 함께 되돌린다.
+     *
+     * 풀어도 업로드 폴더가 그대로 남으면, 앱은 **볼 수 없는 곳으로 계속 올린다** —
+     * `drive.file` 에서 지정이 풀린 폴더는 화면에 나오지 않기 때문이다. 사용자에게는
+     * "올렸다는데 Drive 어디에도 없다" 로 보인다
+     * (`docs/troubleshootings/project-specific/uploaded-but-not-visible.md`).
+     */
+    suspend fun removePickedFolder(id: String) {
+        editFolders { current -> current.filterNot { it.id == id } }
+        store.edit {
+            if (it[KEY_UPLOAD_FOLDER_ID] == id) {
+                it.remove(KEY_UPLOAD_FOLDER_ID)
+                it.remove(KEY_UPLOAD_FOLDER_NAME)
+            }
+        }
     }
 
     private suspend fun editFolders(transform: (List<PickedFolder>) -> List<PickedFolder>) {
