@@ -149,10 +149,17 @@ internal fun DateRangeSheet(
                     initialYear = calendarState.firstVisibleMonth.yearMonth.year,
                     startMonth = startMonth,
                     endMonth = thisMonth,
+                    // 해만 골라도 "적용" 이 눌리게 — 날까지 찍어야만 되면 한 해를 통째로 보기가 번거롭다
+                    onPickYear = { year ->
+                        selection = DateRangeSelection.of(DateJump.wholeYear(year, startMonth, thisMonth))
+                    },
                     // 목적지가 분명한 이동이라 곧장 간다. 2026 → 2017 은 백 개월이 넘어,
                     // 애니메이션으로 넘기면 그 사이 달들을 전부 구성하느라 몇 초씩 끊긴다(실기기 확인).
                     onPick = { target ->
                         jumpOpen = false
+                        selection = DateRangeSelection.of(
+                            DateJump.wholeMonth(target.year, target.monthValue, startMonth, thisMonth),
+                        )
                         scope.launch { calendarState.scrollToMonth(target) }
                     },
                     // 달력과 같은 이유로 남는 높이만 쓴다. 고정 높이로 두면 가로 화면에서
@@ -436,6 +443,7 @@ private fun MonthJumpPanel(
     initialYear: Int,
     startMonth: YearMonth,
     endMonth: YearMonth,
+    onPickYear: (Int) -> Unit,
     onPick: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -467,7 +475,12 @@ private fun MonthJumpPanel(
             items(years, key = { it }) { year ->
                 FilterChip(
                     selected = year == selectedYear,
-                    onClick = { selectedYear = year },
+                    // 해를 고르면 그 해 전체가 기간이 된다. 월을 더 고르면 그 달로 좁혀지고,
+                    // 달력에서 날을 누르면 다시 날 단위가 된다 — 늘 마지막에 누른 것이 이긴다
+                    onClick = {
+                        selectedYear = year
+                        onPickYear(year)
+                    },
                     label = { Text(stringResource(R.string.gallery_date_year_label, year)) },
                 )
             }

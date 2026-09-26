@@ -1,5 +1,6 @@
 package com.jjw.easygallery.feature.gallery
 
+import com.jjw.easygallery.core.domain.model.DateRange
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -8,6 +9,9 @@ import java.time.YearMonth
  * ML Kit·MediaStore 와 무관한 UI 보조 로직이라 여기서 테스트로 굳힌다.
  */
 internal object DateJump {
+
+    private const val JANUARY = 1
+    private const val DECEMBER = 12
 
     /**
      * 달력이 다루는 [start]~[end] 안의 모든 연도. 내림차순(최신 먼저).
@@ -32,4 +36,20 @@ internal object DateJump {
      */
     fun target(year: Int, month: Int, start: YearMonth, end: YearMonth): YearMonth =
         YearMonth.of(year, month).coerceIn(start, end)
+
+    /**
+     * [year] 한 해 전체를 기간으로. 달력이 다루는 [start]~[end] 밖으로는 나가지 않는다 —
+     * 올해를 고르면 아직 오지 않은 달까지 잡히는 대신 달력 마지막 달의 말일에서 멈춘다.
+     */
+    fun wholeYear(year: Int, start: YearMonth, end: YearMonth): DateRange {
+        val first = YearMonth.of(year, JANUARY).coerceAtLeast(start)
+        val last = YearMonth.of(year, DECEMBER).coerceAtMost(end)
+        return DateRange(first.atDay(1), last.atEndOfMonth())
+    }
+
+    /** [year]·[month] 한 달 전체를 기간으로. 범위 밖이면 가장 가까운 끝으로 당긴다 */
+    fun wholeMonth(year: Int, month: Int, start: YearMonth, end: YearMonth): DateRange {
+        val target = target(year, month, start, end)
+        return DateRange(target.atDay(1), target.atEndOfMonth())
+    }
 }
