@@ -61,8 +61,14 @@ class GoogleDriveStorage @Inject constructor(
             .onFailure { Timber.w(it, "app root folder unavailable") }
             .getOrNull()
             ?.let { folderEntry(it.id, it.name) }
-        val viewOnly = current.viewFolders.map { folderEntry(it.id, it.name, readOnly = true) }
-        return RemotePage(picked + listOfNotNull(appRoot) + viewOnly, nextPageToken = null)
+        val uploadable = picked + listOfNotNull(appRoot)
+        // 같은 폴더를 보기 목록에도 넣었으면 올릴 수 있는 쪽을 남긴다. 그냥 이으면 같은 id 가
+        // 두 번 들어가 LazyColumn 이 "Key was already used" 로 죽는다 — 기기에서 겪었다
+        val taken = uploadable.map { it.id }.toSet()
+        val viewOnly = current.viewFolders
+            .filterNot { it.id in taken }
+            .map { folderEntry(it.id, it.name, readOnly = true) }
+        return RemotePage(uploadable + viewOnly, nextPageToken = null)
     }
 
     private fun folderEntry(id: String, name: String, readOnly: Boolean = false) = DriveEntry(

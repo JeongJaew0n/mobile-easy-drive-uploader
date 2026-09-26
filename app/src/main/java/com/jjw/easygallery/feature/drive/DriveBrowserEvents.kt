@@ -50,6 +50,7 @@ internal suspend fun showBrowserEvent(
         DriveBrowserEvent.ViewScopeDenied,
         is DriveBrowserEvent.ViewFolderAdded,
         is DriveBrowserEvent.ViewFolderRemoved,
+        is DriveBrowserEvent.ViewFolderAlreadyThere,
         -> Unit
     }
 }
@@ -75,6 +76,8 @@ private suspend fun showViewFolderEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_folder_added, event.name))
         is DriveBrowserEvent.ViewFolderRemoved ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_folder_removed, event.name))
+        is DriveBrowserEvent.ViewFolderAlreadyThere ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_folder_exists, event.name))
         else -> return false
     }
     return true

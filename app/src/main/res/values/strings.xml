@@ -611,6 +611,7 @@
     <string name="auto_tag_label_concert">공연</string>
     <string name="auto_tag_label_sports">운동</string>
     <string name="auto_tag_label_fireworks">불꽃놀이</string>
+    <string name="drive_video_failed">이 형식은 기기에서 재생할 수 없습니다. \"기기에 저장\" 후 다른 앱으로 열어 보세요</string>
     <!-- 보기 전용 폴더 (docs/DRIVE_FILE_SCOPE.md §10) -->
     <string name="drive_add_view_folder">볼 수 있는 폴더 추가</string>
     <string name="drive_add_view_folder_confirm">이 폴더 추가</string>
@@ -618,5 +619,6 @@
     <string name="drive_remove_view_folder">목록에서 제거</string>
     <string name="drive_view_folder_added">%1$s 을(를) 목록에 더했습니다</string>
     <string name="drive_view_folder_removed">%1$s 을(를) 목록에서 뺐습니다</string>
+    <string name="drive_view_folder_exists">%1$s 은(는) 이미 목록에 있습니다</string>
     <string name="drive_view_scope_denied">폴더를 보려면 Drive 읽기 권한이 필요합니다</string>
 </resources>

@@ -56,6 +56,31 @@ class GoogleDriveStorageRootTest {
     }
 
     @Test
+    fun `a folder that is both an upload target and a view folder appears once`() = runTest {
+        // 같은 id 가 두 번 들어가면 LazyColumn 이 죽는다(2026-09-26 기기에서 겪음)
+        val storage = storage(
+            UserPreferences(
+                pickedFolders = listOf(PickedFolder("p1", "여행 사진")),
+                viewFolders = listOf(ViewFolder("p1", "여행 사진"), ViewFolder("app", "Easy Gallery")),
+            ),
+        )
+        val ids = storage.listChildren("root").entries.map { it.id }
+        assertEquals(listOf("p1", "app"), ids)
+        assertEquals(ids.size, ids.toSet().size)
+    }
+
+    @Test
+    fun `the upload target wins when a folder is in both lists`() = runTest {
+        val storage = storage(
+            UserPreferences(
+                pickedFolders = listOf(PickedFolder("p1", "여행 사진")),
+                viewFolders = listOf(ViewFolder("p1", "여행 사진")),
+            ),
+        )
+        assertFalse(storage.listChildren("root").entries.first { it.id == "p1" }.readOnly)
+    }
+
+    @Test
     fun `the app folder still shows when nothing was added`() = runTest {
         val names = storage(UserPreferences()).listChildren("root").entries.map { it.name }
         assertEquals(listOf("Easy Gallery"), names)

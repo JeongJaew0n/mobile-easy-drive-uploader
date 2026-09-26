@@ -4,12 +4,14 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.datasource.DataSource
 import coil3.ImageLoader
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.auth.SignInStep
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.drive.DriveImages
+import com.jjw.easygallery.core.data.drive.DriveMedia
 import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.MutationProgress
@@ -54,6 +56,8 @@ class DriveBrowserViewModel @Inject constructor(
     private val driveFolders: DriveRepository,
     /** Drive 이미지를 앱 안에서 그릴 때 쓴다 — 인증이 붙어 있어 계정을 다시 묻지 않는다 */
     @param:DriveImages val driveImageLoader: ImageLoader,
+    /** Drive 영상을 앱 안에서 재생할 때 쓴다. 같은 이유로 인증이 붙어 있다 */
+    @param:DriveMedia val driveDataSourceFactory: DataSource.Factory,
 ) : ViewModel() {
 
     private lateinit var drive: RemoteStorage
@@ -95,6 +99,7 @@ class DriveBrowserViewModel @Inject constructor(
                         error = null,
                         capabilities = effectiveCapabilities(readOnly),
                         isReadOnly = readOnly,
+                        viewScopeGranted = prefs.current().driveViewScopeGranted,
                         isPickedRoot = folder.id == drive.rootId &&
                             drive.account.kind == RemoteAccountKind.GOOGLE_DRIVE,
                         accountName = drive.account.displayName,
@@ -515,8 +520,16 @@ class DriveBrowserViewModel @Inject constructor(
         return result
     }
 
+    /**
+     * 루트 목록에 이미 있는 폴더(지정 폴더·기본 폴더)는 더하지 않는다. 더해봐야 같은 줄이
+     * 두 개가 되고, 화면에는 올릴 수 있는 쪽만 남아 "더했다는데 안 보인다" 가 된다.
+     */
     fun addViewFolder(folder: DriveFolder) {
         viewModelScope.launch {
+            if (_uiState.value.entries.any { it.id == folder.id }) {
+                events.send(DriveBrowserEvent.ViewFolderAlreadyThere(folder.name))
+                return@launch
+            }
             prefs.addViewFolder(ViewFolder(folder.id, folder.name))
             events.send(DriveBrowserEvent.ViewFolderAdded(folder.name))
             refresh()
@@ -614,6 +627,8 @@ data class DriveBrowserUiState(
     val isPickedRoot: Boolean = false,
     /** 보기 전용 폴더의 안이다 — 올리기·만들기·고치기·지우기가 없다(`docs/DRIVE_FILE_SCOPE.md` §10) */
     val isReadOnly: Boolean = false,
+    /** 사용자가 `drive.readonly` 를 옵트인했다. 검색 범위가 Drive 전체로 넓어진다(§10.7) */
+    val viewScopeGranted: Boolean = false,
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
     val accountName: String? = null,
 
@@ -625,6 +640,17 @@ data class DriveBrowserUiState(
 
     /** 원격 검색 결과(부모 미상)에서만 이동을 막는다. 로컬 필터는 같은 폴더라 이동 가능 */
     val isRemoteSearchResult: Boolean get() = isSearching && Capability.SEARCH in capabilities
+
+    /**
+     * **지금 이 목록**을 고칠 수 있는가. 보기 전용 폴더 안이거나, 읽기 권한으로 넓어진
+     * 검색 결과이면 고칠 수 없다.
+     *
+     * 검색을 함께 묶는 이유: `drive.readonly` 를 받으면 검색이 Drive 전체를 훑어서
+     * **앱이 쓸 수 없는 남의 파일이 결과에 섞인다.** 어느 것이 쓸 수 있는지 앱은 알 길이
+     * 없으므로(Drive 의 `capabilities` 는 사용자 기준이지 우리 토큰 기준이 아니다),
+     * 통째로 읽기 전용으로 둔다. 메뉴에 있는데 누르면 403 이 나는 것보다 낫다 — §10.7
+     */
+    val isReadOnlyHere: Boolean get() = isReadOnly || (isRemoteSearchResult && viewScopeGranted)
 }
 
 /** 보기 전용 폴더에서 빼는 동작들 — 읽기 권한으로는 할 수 없다 */
@@ -675,6 +701,7 @@ sealed interface DriveBrowserEvent {
     /** 사용자가 읽기 권한을 주지 않았다 */
     data object ViewScopeDenied : DriveBrowserEvent
     data class ViewFolderAdded(val name: String) : DriveBrowserEvent
+    data class ViewFolderAlreadyThere(val name: String) : DriveBrowserEvent
     data class ViewFolderRemoved(val name: String) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent
 }

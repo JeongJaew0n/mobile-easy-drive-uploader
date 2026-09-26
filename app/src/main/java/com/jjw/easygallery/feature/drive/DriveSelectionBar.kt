@@ -28,6 +28,8 @@ internal fun DriveSelectionTopBar(
     onDelete: () -> Unit,
     canDownload: Boolean = false,
     onDownload: () -> Unit = {},
+    /** 읽기만 되는 목록에서는 삭제를 내린다 — 눌러도 403 이다 */
+    canDelete: Boolean = true,
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.gallery_selected_count, count)) },
@@ -59,8 +61,10 @@ internal fun DriveSelectionTopBar(
                     )
                 }
             }
-            IconButton(onClick = onDelete, enabled = enabled) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_remove))
+            if (canDelete) {
+                IconButton(onClick = onDelete, enabled = enabled) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_remove))
+                }
             }
         },
     )

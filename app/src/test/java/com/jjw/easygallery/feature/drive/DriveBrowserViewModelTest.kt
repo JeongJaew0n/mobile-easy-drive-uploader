@@ -75,6 +75,7 @@ class DriveBrowserViewModelTest {
             auth,
             driveFolders = mockk(relaxed = true),
             driveImageLoader = mockk(relaxed = true),
+            driveDataSourceFactory = mockk(relaxed = true),
         )
         viewModel.load(
             accountId = null,
@@ -85,6 +86,31 @@ class DriveBrowserViewModelTest {
         )
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
+    }
+
+    @Test
+    fun `search results are read-only once the view scope is granted`() = runTest(testDispatcher) {
+        // 원격 검색(Capability.SEARCH)일 때만 성립한다 — 로컬 필터는 같은 폴더 안이라 해당 없음
+        every { drive.capabilities } returns setOf(Capability.TRASH, Capability.RENAME, Capability.SEARCH)
+        coEvery { prefs.current() } returns UserPreferences(driveViewScopeGranted = true)
+        coEvery { drive.search("kokoa", null) } returns DrivePage(listOf(fileA), null)
+        val viewModel = loadedViewModel()
+        viewModel.startSearch()
+        viewModel.search("kokoa")
+        advanceUntilIdle()
+        // 읽기 권한이 붙으면 검색이 Drive 전체를 훑어 쓸 수 없는 파일이 섞인다
+        assertTrue(viewModel.uiState.value.isReadOnlyHere)
+    }
+
+    @Test
+    fun `search stays editable without the view scope`() = runTest(testDispatcher) {
+        every { drive.capabilities } returns setOf(Capability.TRASH, Capability.RENAME, Capability.SEARCH)
+        coEvery { drive.search("a", null) } returns DrivePage(listOf(fileA), null)
+        val viewModel = loadedViewModel()
+        viewModel.startSearch()
+        viewModel.search("a")
+        advanceUntilIdle()
+        assertTrue(!viewModel.uiState.value.isReadOnlyHere)
     }
 
     @Test

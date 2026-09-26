@@ -1,6 +1,10 @@
 package com.jjw.easygallery.core.data.drive
 
 import android.content.Context
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.jjw.easygallery.BuildConfig
@@ -29,6 +33,11 @@ annotation class DriveHttpClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class DriveImages
+
+/** Drive 인증이 붙은 ExoPlayer 데이터 소스 — 기기 영상용 기본 소스와 섞이면 안 된다 */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DriveMedia
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -86,6 +95,23 @@ abstract class DriveModule {
         ): ImageLoader = ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }
             .build()
+
+        /**
+         * Drive 영상을 **앱 안에서** 재생할 때 쓴다.
+         *
+         * 이미지와 같은 이유다(위 [providesDriveImageLoader]) — 링크를 외부로 넘기면 계정을
+         * 고르라고 묻는다. 다만 영상은 통째로 받아두지 않고 스트리밍한다: ExoPlayer 가
+         * Range 요청으로 필요한 만큼만 당겨 간다.
+         *
+         * Drive 는 `alt=media` 로 **원본을 그대로** 준다. 트랜스코딩이 없으므로 기기가 못 여는
+         * 코덱이면 재생이 실패한다 — 화면이 그때 "기기에 저장해서 보라" 고 안내한다.
+         */
+        @Provides
+        @Singleton
+        @DriveMedia
+        @OptIn(UnstableApi::class)
+        fun providesDriveDataSourceFactory(@DriveHttpClient client: OkHttpClient): DataSource.Factory =
+            OkHttpDataSource.Factory(client)
 
         @Provides
         @Singleton

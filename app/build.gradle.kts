@@ -141,6 +141,8 @@ dependencies {
     // Media
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui.compose)
+    // Drive 영상을 앱 안에서 재생 — 인증이 붙은 OkHttpClient 를 ExoPlayer 의 데이터 소스로 쓴다
+    implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.exifinterface)

@@ -89,10 +89,15 @@ fun DriveBrowserRoute(
     val storageRootName = stringResource(R.string.storage_root_name)
     val rootName = if (key.accountId == null) driveRootName else storageRootName
 
-    // 이미지는 앱 안에서 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
+    // 사진·영상은 앱 안에서 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
     var preview by remember { mutableStateOf<DriveEntry?>(null) }
     preview?.let { entry ->
-        DriveImagePreview(entry = entry, imageLoader = viewModel.driveImageLoader, onDismiss = { preview = null })
+        DrivePreview(
+            entry = entry,
+            imageLoader = viewModel.driveImageLoader,
+            dataSourceFactory = viewModel.driveDataSourceFactory,
+            onDismiss = { preview = null },
+        )
     }
 
     val authRecoveryLauncher = rememberLauncherForActivityResult(
@@ -149,8 +154,8 @@ fun DriveBrowserRoute(
                 // 보기 전용은 안으로 들어가도 계속 보기 전용이다
                 onOpenFolder(entry.toFolder(), uiState.isReadOnly || entry.readOnly)
             } else {
-                // 사진은 앱 안에서, 그 밖의 형식은 Drive 앱·브라우저에 맡긴다
-                if (entry.isImage) {
+                // 사진·영상은 앱 안에서, 그 밖의 형식은 Drive 앱·브라우저에 맡긴다
+                if (entry.isImage || entry.isVideo) {
                     preview = entry
                 } else {
                     entry.webViewLink?.let { link -> context.openDriveLink(link, uiState.accountEmail) }
@@ -167,7 +172,7 @@ fun DriveBrowserRoute(
         onAddViewFolder = viewModel::startAddViewFolder,
         entryActions = DriveEntryActions(
             onOpen = { entry ->
-                if (entry.isImage) {
+                if (entry.isImage || entry.isVideo) {
                     preview = entry
                 } else {
                     entry.webViewLink?.let { link -> context.openDriveLink(link, uiState.accountEmail) }
@@ -322,7 +327,7 @@ internal fun DriveBrowserScreen(
                                     uiState.capabilities,
                                     allowMove = !uiState.isRemoteSearchResult,
                                     isPickedRoot = uiState.isPickedRoot,
-                                    isReadOnly = uiState.isReadOnly,
+                                    isReadOnly = uiState.isReadOnlyHere,
                                 ),
                                 uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
                                 onOpen = { entryActions.onOpen(entry) },
@@ -454,6 +459,8 @@ private fun emptyMessageRes(uiState: DriveBrowserUiState): Int = when {
     uiState.searchQuery?.isBlank() == true && Capability.SEARCH in uiState.capabilities -> R.string.drive_search_prompt
     uiState.isSearching -> R.string.drive_search_empty
     uiState.isPickedRoot -> R.string.drive_root_empty
+    // 보기 전용 폴더는 읽기 권한이라 안이 전부 보인다 — "앱으로 올린 것만 보인다" 는 거짓말이 된다
+    uiState.isReadOnly -> R.string.drive_folder_empty
     // drive.file 에서는 남이 넣은 파일이 보이지 않는다 — 고장이 아니라는 것을 화면이 말해야 한다
     Capability.SEARCH in uiState.capabilities -> R.string.drive_folder_empty_scoped
     else -> R.string.drive_folder_empty
@@ -475,6 +482,7 @@ private fun BrowserTopBar(
         DriveSelectionTopBar(
             count = uiState.selectedIds.size,
             canMove = Capability.MOVE in uiState.capabilities && !uiState.isRemoteSearchResult,
+            canDelete = !uiState.isReadOnlyHere,
             canDownload = Capability.DOWNLOAD in uiState.capabilities,
             onDownload = entryActions.onDownloadSelected,
             enabled = !uiState.isMutating,
@@ -511,8 +519,9 @@ private fun BrowserTopBar(
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
             }
-            // 루트 자리는 실제 폴더가 아니라 목록이라 거기에 폴더를 만들 수 없다
-            if (!uiState.isPickedRoot) {
+            // 루트 자리는 실제 폴더가 아니라 목록이라 거기에 폴더를 만들 수 없다.
+            // 보기 전용 폴더는 읽기 권한뿐이라 만들어도 403 이다
+            if (!uiState.isPickedRoot && !uiState.isReadOnly) {
                 IconButton(
                     onClick = onCreateFolder,
                     enabled = uiState.current != null && !uiState.isMutating,
