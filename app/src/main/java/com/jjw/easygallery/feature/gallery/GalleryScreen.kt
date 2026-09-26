@@ -61,6 +61,8 @@ internal fun GalleryScreen(
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
+    onSelectAllVisible: () -> Unit = {},
+    onTrashUploaded: () -> Unit = {},
     onCategoryFilterChange: (CategoryFilter?) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
@@ -121,6 +123,7 @@ internal fun GalleryScreen(
                             onHiddenClick = onHiddenClick,
                             onPickDateRange = { showDateRange = true },
                             onPickCategory = { showCategoryFilter = true },
+                            onTrashUploaded = onTrashUploaded,
                         )
                         GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
                     }
@@ -182,6 +185,7 @@ internal fun GalleryScreen(
                         onOpenItem(item, uiState.viewerFilters(), bounds?.toHeroOrigin(item))
                     },
                     onClearDateRange = { onDateRangeChange(null) },
+                    onSelectAllVisible = onSelectAllVisible,
                     onClearCategoryFilter = { onCategoryFilterChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
@@ -321,6 +325,7 @@ private fun GalleryContent(
     onSelectionChange: (Set<Long>) -> Unit,
     onOpenItem: (MediaItem, Rect?) -> Unit,
     onClearDateRange: () -> Unit,
+    onSelectAllVisible: () -> Unit,
     onClearCategoryFilter: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
@@ -358,7 +363,14 @@ private fun GalleryContent(
             enter = motion.enterExpand(),
             exit = motion.exitShrink(),
         ) {
-            lastRange.value?.let { range -> DateRangeBar(range = range, onClear = onClearDateRange) }
+            lastRange.value?.let { range ->
+                DateRangeBar(
+                    range = range,
+                    onClear = onClearDateRange,
+                    onSelectAll = onSelectAllVisible,
+                    allSelected = uiState.itemCount > 0 && uiState.selectedIds.size >= uiState.itemCount,
+                )
+            }
         }
         val lastCategory = remember { mutableStateOf(uiState.categoryFilter) }
         if (uiState.categoryFilter != null) lastCategory.value = uiState.categoryFilter

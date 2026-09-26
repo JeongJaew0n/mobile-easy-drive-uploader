@@ -41,6 +41,7 @@ internal fun GalleryTopBar(
     onHiddenClick: () -> Unit,
     onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit = {},
+    onTrashUploaded: () -> Unit = {},
 ) {
     val itemCount = content?.itemCount
     val uploadedCount = content?.uploadedCount ?: 0
@@ -94,6 +95,7 @@ internal fun GalleryTopBar(
                 onOpenDuplicates = onDuplicatesClick,
                 onOpenHidden = onHiddenClick,
                 onPickCategory = onPickCategory,
+                onTrashUploaded = onTrashUploaded,
             )
         },
     )

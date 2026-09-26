@@ -104,6 +104,8 @@ fun GalleryRoute(
                             resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
                     },
                 )
+                GalleryEvent.NoUploadedToTrash ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.gallery_no_uploaded_to_trash))
                 is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
                     resources.getQuantityString(R.plurals.category_assigned, event.count, event.count),
                 )
@@ -139,6 +141,8 @@ fun GalleryRoute(
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,
+        onSelectAllVisible = viewModel::toggleSelectAllVisible,
+        onTrashUploaded = viewModel::trashUploadedVisible,
         onCategoryFilterChange = viewModel::setCategoryFilter,
         onManageCategories = onManageCategories,
         onCreateCategory = viewModel::createCategory,

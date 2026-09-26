@@ -137,6 +137,9 @@ class GalleryViewModel @Inject constructor(
 
     private var latestItems: List<MediaItem> = emptyList()
 
+    /** 원장 기준 "이미 올린" 미디어. 올린 것만 골라 지울 때 쓴다 */
+    private var latestUploadedIds: Set<Long> = emptySet()
+
     val uiState: StateFlow<GalleryUiState> = combine(permissionStatus, filter) { status, f -> status to f }
         .flatMapLatest { (status, f) -> stateFor(status, f) }
         .stateIn(
@@ -247,6 +250,19 @@ class GalleryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 지금 화면에 보이는 것을 전부 고른다(필터가 걸려 있으면 그 결과 전체).
+     * 이미 전부 골라져 있으면 해제한다 — 같은 버튼으로 되돌릴 수 있어야 한다.
+     */
+    fun toggleSelectAllVisible() {
+        val visible = latestItems.map { it.id }.toSet()
+        selectedIds.value = if (selectedIds.value.containsAll(visible) && visible.isNotEmpty()) {
+            emptySet()
+        } else {
+            visible
+        }
+    }
+
     /** 드래그 범위 선택 결과를 통째로 반영 */
     fun setSelection(ids: Set<Long>) {
         selectedIds.value = ids
@@ -289,6 +305,22 @@ class GalleryViewModel @Inject constructor(
     // ---------- 편집 ----------
 
     fun deleteSelected() = perform(MediaAction.Delete(selectedItems()))
+
+    /**
+     * 지금 보이는 것 중 **이미 올린 것만** 휴지통으로 보낸다(필터가 걸려 있으면 그 범위).
+     *
+     * 전체가 아니라 보이는 범위인 이유는, 기간이나 앨범으로 좁혀 놓고 "여기 올린 건 정리하자" 가
+     * 실제 쓰임이기 때문이다. 기기 휴지통으로 가므로 30일 안에는 되돌릴 수 있고,
+     * 최종 확인은 시스템 동의 창이 받는다.
+     */
+    fun trashUploadedVisible() {
+        val targets = latestItems.filter { it.id in latestUploadedIds }
+        if (targets.isEmpty()) {
+            viewModelScope.launch { events.send(GalleryEvent.NoUploadedToTrash) }
+            return
+        }
+        perform(MediaAction.Trash(targets, trashed = true))
+    }
 
     fun trashSelected() = perform(MediaAction.Trash(selectedItems(), trashed = true))
 
@@ -378,6 +410,7 @@ class GalleryViewModel @Inject constructor(
             val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
             val items = categorized.filterByDate(f.range)
             latestItems = items
+            latestUploadedIds = uploaded
             Catalog(
                 items = items,
                 // '다른 앱' 탭은 날짜 대신 앱으로 묶는다 — 카카오톡 사진 1000여 장이
@@ -492,6 +525,9 @@ private const val GOOGLE_DRIVE_LABEL = "Google Drive"
 sealed interface GalleryEvent {
     data object SignInRequired : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
+
+    /** 지울 것이 없을 때. 버튼이 아무 일도 안 하면 고장으로 보인다 */
+    data object NoUploadedToTrash : GalleryEvent
     data class CategoriesAssigned(val count: Int) : GalleryEvent
     data class Hidden(val count: Int) : GalleryEvent
     data class Error(val message: String) : GalleryEvent

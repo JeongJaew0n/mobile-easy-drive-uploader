@@ -116,6 +116,7 @@ internal fun GalleryOverflowMenu(
     onOpenDuplicates: () -> Unit,
     onOpenHidden: () -> Unit,
     onPickCategory: () -> Unit,
+    onTrashUploaded: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
@@ -186,6 +187,15 @@ internal fun GalleryOverflowMenu(
                 onClick = {
                     expanded = false
                     onFavoritesOnlyChange(!favoritesOnly)
+                },
+            )
+            // Drive 에 올린 것을 기기에서 정리하는 흐름. 기기 휴지통으로 가고 시스템이 한 번 더 묻는다
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.gallery_menu_trash_uploaded)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_cloud_done), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onTrashUploaded()
                 },
             )
             DropdownMenuItem(

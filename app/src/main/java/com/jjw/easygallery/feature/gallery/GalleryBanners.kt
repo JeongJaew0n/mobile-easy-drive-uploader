@@ -165,6 +165,8 @@ internal fun PermissionRequiredContent(
 internal fun DateRangeBar(
     range: DateRange,
     onClear: () -> Unit,
+    onSelectAll: () -> Unit,
+    allSelected: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy.MM.dd") }
@@ -186,6 +188,14 @@ internal fun DateRangeBar(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f),
             )
+            // 기간을 좁혀 놓고 그 결과를 통째로 다루는 일이 잦다 — 한 장씩 누르지 않아도 되게
+            TextButton(onClick = onSelectAll) {
+                Text(
+                    stringResource(
+                        if (allSelected) R.string.gallery_select_none else R.string.gallery_select_all_visible,
+                    ),
+                )
+            }
             IconButton(onClick = onClear) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.gallery_date_clear))
             }
