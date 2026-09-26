@@ -72,6 +72,8 @@ fun GalleryRoute(
     // 다른 계정 업로드 — 계정 선택 창(docs/plans/guest-account-upload)
     val guestAvailable by viewModel.guestUploadAvailable.collectAsStateWithLifecycle()
     val guestCleanupEmail by viewModel.guestCleanupEmail.collectAsStateWithLifecycle()
+    val guestFolderChoice by viewModel.guestFolderChoice.collectAsStateWithLifecycle()
+    guestFolderChoice?.let { session -> GuestFolderPicker(session, viewModel) }
     val guestChooserLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->

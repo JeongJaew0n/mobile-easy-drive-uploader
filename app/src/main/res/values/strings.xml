@@ -625,6 +625,9 @@
     <string name="upload_queue_clear_failed_message">목록에서만 지웁니다. 사진은 그대로 있고, 다시 올리려면 갤러리에서 고르면 됩니다.</string>
     <!-- 다른 계정 업로드 (docs/plans/guest-account-upload) -->
     <string name="gallery_upload_to_guest">다른 Google 계정으로 업로드…</string>
+    <string name="guest_pick_folder_title">어느 폴더에 올릴까요?</string>
+    <string name="guest_pick_folder_confirm">여기에 올리기</string>
+    <string name="guest_pick_folder_root">%1$s 의 드라이브</string>
     <string name="guest_upload_started">%1$s 로 %2$d개를 올립니다</string>
     <string name="guest_upload_started_shared">%1$s 로 %2$d개를 올립니다. 폴더를 지금 계정에 공유했습니다</string>
     <string name="guest_upload_nothing">%1$s 에 이미 모두 올라가 있습니다</string>

@@ -26,6 +26,7 @@ import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.CategoryAssignments
 import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
+import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
@@ -35,6 +36,7 @@ import com.jjw.easygallery.core.domain.model.uploadWaitReason
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.GuestIsPrimaryException
+import com.jjw.easygallery.core.domain.usecase.GuestSession
 import com.jjw.easygallery.core.domain.usecase.GuestUploadStarted
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.StartGuestUploadUseCase
@@ -45,6 +47,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -92,8 +95,13 @@ class GalleryViewModel @Inject constructor(
     val guestCleanupEmail: StateFlow<String?> = prefs.preferences.map { it.guestCleanupEmail }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
-    /** 계정 선택 창을 다녀오는 동안 선택을 붙들어 둔다 */
+    /** 계정 선택 창·폴더 고르기를 다녀오는 동안 선택을 붙들어 둔다 */
     private var guestItems: List<MediaItem> = emptyList()
+
+    private val _guestFolderChoice = MutableStateFlow<GuestSession?>(null)
+
+    /** B 가 정해져 폴더를 고를 차례면 그 계정. 화면이 폴더 고르기 시트를 띄운다(guest spec §7) */
+    val guestFolderChoice: StateFlow<GuestSession?> = _guestFolderChoice.asStateFlow()
 
     /** 선택 상단바 "다른 저장소로 업로드" 메뉴 — 로그인된 Drive + 연결된 저장소. 하나뿐이면 메뉴를 숨긴다 */
     val uploadTargets: StateFlow<List<UploadTargetOption>> = combine(
@@ -347,11 +355,37 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch { prefs.setGuestCleanupEmail(null) }
     }
 
+    suspend fun listGuestFolders(parentId: String): List<DriveFolder> {
+        val email = _guestFolderChoice.value?.email ?: return emptyList()
+        return startGuestUpload.listFolders(email, parentId)
+    }
+
+    suspend fun createGuestFolder(name: String, parentId: String): DriveFolder {
+        val email = checkNotNull(_guestFolderChoice.value?.email) { "no guest session" }
+        return startGuestUpload.createFolder(email, name, parentId)
+    }
+
+    /** 폴더를 골랐다 — 공유하고 큐에 넣는다 */
+    fun onGuestFolderPicked(folder: DriveFolder) {
+        val session = _guestFolderChoice.value ?: return
+        _guestFolderChoice.value = null
+        viewModelScope.launch {
+            guestStep {
+                val started = startGuestUpload.start(guestItems, session.email, folder)
+                guestItems = emptyList()
+                clearSelection()
+                events.send(GalleryEvent.GuestStarted(started))
+            }
+        }
+    }
+
+    /** 폴더 고르기를 닫았다. 선택은 그대로 둔다 — 다시 시작할 수 있게 */
+    fun dismissGuestFolderChoice() {
+        _guestFolderChoice.value = null
+    }
+
     private suspend fun runGuestUpload(accessToken: String) {
-        val started = startGuestUpload(guestItems, accessToken)
-        guestItems = emptyList()
-        clearSelection()
-        events.send(GalleryEvent.GuestStarted(started))
+        _guestFolderChoice.value = startGuestUpload.prepare(accessToken)
     }
 
     /** 다른 계정 업로드의 실패를 한 곳에서 문구로 바꾼다. 선택 창을 닫은 것은 실패가 아니다 */

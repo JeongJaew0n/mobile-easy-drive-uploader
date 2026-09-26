@@ -14,6 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.domain.model.DriveEntry
+import com.jjw.easygallery.core.domain.usecase.GuestSession
+import com.jjw.easygallery.feature.drive.DriveFolderPickerSheet
 
 /**
  * "다른 계정 업로드" 에 필요한 것을 한 묶음으로 화면에 넘긴다(`docs/plans/guest-account-upload/spec.md`).
@@ -54,6 +57,29 @@ internal fun GuestCleanupBanner(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         }
     }
+}
+
+/**
+ * B 의 어느 폴더에 올릴지(`docs/plans/guest-account-upload/spec.md` §7).
+ *
+ * B 의 "Easy Gallery" 안에서 열린다 — 기본값이면 바로 "여기에 올리기" 한 번. 경로에서 위로 올라가 다른 폴더를
+ * 고르거나 새로 만들 수 있다. B 에게는 `drive.file` 만 있어 **앱이 만든 폴더만** 보이는데, 그게 곧 고를 수 있는
+ * 범위다 — 기존 폴더는 A 에게 공유할 수 없다(§7.1). 최상위 자체는 공유할 수 없어 고를 수 없게 둔다.
+ */
+@Composable
+internal fun GuestFolderPicker(session: GuestSession, viewModel: GalleryViewModel) {
+    DriveFolderPickerSheet(
+        start = session.defaultFolder,
+        excludeFolderId = null,
+        currentParentId = DriveEntry.ROOT_ID,
+        loadFolders = viewModel::listGuestFolders,
+        onDismiss = viewModel::dismissGuestFolderChoice,
+        onPick = viewModel::onGuestFolderPicked,
+        titleRes = R.string.guest_pick_folder_title,
+        confirmRes = R.string.guest_pick_folder_confirm,
+        onCreateFolder = viewModel::createGuestFolder,
+        rootLabel = stringResource(R.string.guest_pick_folder_root, session.email),
+    )
 }
 
 /** 다른 계정 업로드 이벤트의 한 줄. 선택 창을 띄우는 것은 스낵바가 아니라 호출 쪽이 한다 */

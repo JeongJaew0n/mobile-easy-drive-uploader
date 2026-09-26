@@ -51,8 +51,38 @@ class StartGuestUploadUseCaseTest {
         StartGuestUploadUseCase(repo, guests, registry, enqueue)
 
     @Test
+    fun `prepare finds out who B is and makes sure B's default folder exists`() = runTest {
+        val session = useCase(UserPreferences(accountEmail = A)).prepare(TOKEN)
+
+        assertEquals(B, session.email)
+        assertEquals(folder, session.defaultFolder)
+        // 준비만으로는 아무것도 공유하거나 큐에 넣지 않는다 — 폴더를 아직 안 골랐다
+        coVerify(exactly = 0) { guestDrive.shareForReading(any(), any()) }
+        coVerify(exactly = 0) { enqueue.toFolder(any(), any(), any()) }
+    }
+
+    @Test
+    fun `start uploads into the folder the user picked`() = runTest {
+        val picked = DriveFolder("trip", "2026 여행")
+
+        useCase(UserPreferences(accountEmail = A)).start(items, B, picked)
+
+        coVerify { guestDrive.shareForReading("trip", A) }
+        coVerify { enqueue.toFolder(items, RemoteAccount.guestDriveId(B), picked) }
+    }
+
+    @Test
+    fun `a new folder is made in B's drive`() = runTest {
+        coEvery { guestDrive.createFolder("2026 여행", "root") } returns DriveFolder("new", "2026 여행")
+
+        val made = useCase(UserPreferences(accountEmail = A)).createFolder(B, "2026 여행", "root")
+
+        assertEquals("new", made.id)
+    }
+
+    @Test
     fun `uploads to B's folder under B's account id`() = runTest {
-        val result = useCase(UserPreferences(accountEmail = A))(items, TOKEN)
+        val result = useCase(UserPreferences(accountEmail = A)).start(items, B, folder)
 
         coVerify { enqueue.toFolder(items, RemoteAccount.guestDriveId(B), folder) }
         assertEquals(B, result.email)
@@ -62,7 +92,7 @@ class StartGuestUploadUseCaseTest {
 
     @Test
     fun `shares with A before anything is queued`() = runTest {
-        useCase(UserPreferences(accountEmail = A))(items, TOKEN)
+        useCase(UserPreferences(accountEmail = A)).start(items, B, folder)
 
         // 먼저 공유해야 올라가는 대로 A 쪽에서 보인다
         coVerifyOrder {
@@ -74,13 +104,13 @@ class StartGuestUploadUseCaseTest {
     @Test(expected = GuestIsPrimaryException::class)
     fun `picking A itself is refused`() = runTest {
         coEvery { guests.emailOf(TOKEN) } returns "A@Example.com"
-        useCase(UserPreferences(accountEmail = A))(items, TOKEN)
+        useCase(UserPreferences(accountEmail = A)).prepare(TOKEN)
     }
 
     @Test
     fun `refusing A queues nothing and shares nothing`() = runTest {
         coEvery { guests.emailOf(TOKEN) } returns A
-        runCatching { useCase(UserPreferences(accountEmail = A))(items, TOKEN) }
+        runCatching { useCase(UserPreferences(accountEmail = A)).prepare(TOKEN) }
 
         coVerify(exactly = 0) { guestDrive.shareForReading(any(), any()) }
         coVerify(exactly = 0) { enqueue.toFolder(any(), any(), any()) }
@@ -91,7 +121,7 @@ class StartGuestUploadUseCaseTest {
         val p = UserPreferences(accountEmail = A, driveViewScopeGranted = true)
         val repo = prefs(p)
 
-        val result = useCase(p, repo)(items, TOKEN)
+        val result = useCase(p, repo).start(items, B, folder)
 
         assertTrue(result.addedToViewFolders)
         // 이름은 그대로 두고 소유자를 따로 적는다 — 화면이 부제로 A 의 "Easy Gallery" 와 가른다
@@ -103,7 +133,7 @@ class StartGuestUploadUseCaseTest {
         val p = UserPreferences(accountEmail = A, driveViewScopeGranted = false)
         val repo = prefs(p)
 
-        val result = useCase(p, repo)(items, TOKEN)
+        val result = useCase(p, repo).start(items, B, folder)
 
         assertFalse(result.addedToViewFolders)
         coVerify(exactly = 0) { repo.addViewFolder(any()) }
@@ -114,7 +144,8 @@ class StartGuestUploadUseCaseTest {
         val p = UserPreferences(accountEmail = A, driveViewScopeGranted = true, uploadFolderId = "a-folder")
         val repo = prefs(p)
 
-        useCase(p, repo)(items, TOKEN)
+        val session = useCase(p, repo).prepare(TOKEN)
+        useCase(p, repo).start(items, session.email, session.defaultFolder)
 
         coVerify(exactly = 0) { repo.setAccount(any(), any()) }
         coVerify(exactly = 0) { repo.clearAccount() }
@@ -124,7 +155,7 @@ class StartGuestUploadUseCaseTest {
 
     @Test
     fun `without a primary there is no one to share with`() = runTest {
-        val result = useCase(UserPreferences(accountEmail = null))(items, TOKEN)
+        val result = useCase(UserPreferences(accountEmail = null)).start(items, B, folder)
 
         assertFalse(result.sharedWithPrimary)
         coVerify(exactly = 0) { guestDrive.shareForReading(any(), any()) }

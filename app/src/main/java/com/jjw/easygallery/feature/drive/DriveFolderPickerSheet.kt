@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * 폴더 선택 시트. 내 드라이브부터 폴더만 나열하고 탭하면 들어간다.
@@ -66,12 +69,21 @@ internal fun DriveFolderPickerSheet(
     unpickableIds: Set<String> = emptySet(),
     /** 한 줄 아래에 붙일 설명(소유자 등). 이름이 같은 폴더를 가른다 */
     supportingText: @Composable (DriveFolder) -> String? = { null },
+    /**
+     * 주면 "새 폴더" 가 생긴다. 지금 보고 있는 자리에 만들고 곧장 그 안으로 들어간다 — 만든 폴더에
+     * 올리려는 것이 대부분이라 한 번 더 찾아 누르게 하지 않는다. 다른 계정 업로드가 쓴다(guest spec §7).
+     */
+    onCreateFolder: (suspend (name: String, parentId: String) -> DriveFolder)? = null,
+    /** 경로 맨 앞 이름. 기본은 "내 드라이브" — 남의 드라이브를 훑을 때는 누구 것인지 적는다 */
+    rootLabel: String? = null,
 ) {
     var path by remember { mutableStateOf(listOf(DriveFolder(ROOT_ID, ""), start).distinctBy { it.id }) }
     var folders by remember { mutableStateOf<List<DriveFolder>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val here = path.last()
-    val rootName = stringResource(R.string.drive_root_name)
+    val rootName = rootLabel ?: stringResource(R.string.drive_root_name)
 
     LaunchedEffect(here.id) {
         folders = null
@@ -114,61 +126,114 @@ internal fun DriveFolderPickerSheet(
                     }
                 }
             }
-            Box(Modifier.height(LIST_HEIGHT_DP.dp)) {
-                val list = folders
-                when {
-                    list == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    error != null -> Text(
-                        text = error.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                    )
-                    list.isEmpty() -> Text(
-                        text = stringResource(R.string.drive_move_no_folders),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                    )
-                    else -> LazyColumn {
-                        items(list, key = { it.id }) { folder ->
-                            ListItem(
-                                headlineContent = { Text(folder.name) },
-                                supportingContent = supportingText(folder)?.let { text -> { Text(text) } },
-                                leadingContent = {
-                                    Icon(
-                                        painterResource(R.drawable.ic_folder),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                },
-                                trailingContent = {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                                },
-                                modifier = Modifier.clickable { path = path + folder },
-                            )
-                        }
+            FolderList(
+                folders = folders,
+                error = error,
+                supportingText = supportingText,
+                onOpen = { folder -> path = path + folder },
+            )
+            PickerActions(
+                canCreate = onCreateFolder != null,
+                canPick = here.id != currentParentId && here.id !in unpickableIds,
+                confirmRes = confirmRes,
+                onCreate = { creating = true },
+                onDismiss = onDismiss,
+                onPick = { onPick(if (here.id == ROOT_ID) DriveFolder(ROOT_ID, rootName) else here) },
+            )
+        }
+    }
+
+    if (creating && onCreateFolder != null) {
+        CreateFolderDialog(
+            onDismiss = { creating = false },
+            onConfirm = { name ->
+                creating = false
+                scope.launch {
+                    try {
+                        val made = onCreateFolder(name.trim(), here.id)
+                        path = path + made
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                        error = e.message ?: e.toString()
                     }
                 }
-            }
-            Row(
+            },
+        )
+    }
+}
+
+/** 폴더 목록 칸 — 읽는 중 / 오류 / 빈 폴더 / 목록 */
+@Composable
+private fun FolderList(
+    folders: List<DriveFolder>?,
+    error: String?,
+    supportingText: @Composable (DriveFolder) -> String?,
+    onOpen: (DriveFolder) -> Unit,
+) {
+    Box(Modifier.height(LIST_HEIGHT_DP.dp)) {
+        when {
+            folders == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+            error != null -> Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                TextButton(
-                    onClick = { onPick(if (here.id == ROOT_ID) DriveFolder(ROOT_ID, rootName) else here) },
-                    // 원래 있던 폴더로는 이동 불가. 목록 자리(공유 문서함 등)도 고를 수 없다
-                    enabled = here.id != currentParentId && here.id !in unpickableIds,
-                ) {
-                    Text(stringResource(confirmRes))
+                    .align(Alignment.Center)
+                    .padding(16.dp),
+            )
+            folders.isEmpty() -> Text(
+                text = stringResource(R.string.drive_move_no_folders),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp),
+            )
+            else -> LazyColumn {
+                items(folders, key = { it.id }) { folder ->
+                    ListItem(
+                        headlineContent = { Text(folder.name) },
+                        supportingContent = supportingText(folder)?.let { text -> { Text(text) } },
+                        leadingContent = {
+                            Icon(
+                                painterResource(R.drawable.ic_folder),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                        },
+                        modifier = Modifier.clickable { onOpen(folder) },
+                    )
                 }
             }
         }
+    }
+}
+
+/** 하단 버튼 줄. "새 폴더" 는 왼쪽 끝, 취소·확인은 오른쪽 */
+@Composable
+private fun PickerActions(
+    canCreate: Boolean,
+    canPick: Boolean,
+    @StringRes confirmRes: Int,
+    onCreate: () -> Unit,
+    onDismiss: () -> Unit,
+    onPick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        if (canCreate) {
+            TextButton(onClick = onCreate) { Text(stringResource(R.string.folder_picker_new_folder)) }
+            Spacer(Modifier.weight(1f))
+        }
+        TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        // 원래 있던 폴더로는 이동 불가. 목록 자리(공유 문서함 등)도 고를 수 없다
+        TextButton(onClick = onPick, enabled = canPick) { Text(stringResource(confirmRes)) }
     }
 }
 
