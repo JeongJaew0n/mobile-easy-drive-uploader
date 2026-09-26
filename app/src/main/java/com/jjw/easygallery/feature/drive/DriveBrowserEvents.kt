@@ -1,5 +1,6 @@
 package com.jjw.easygallery.feature.drive
 
+import android.app.PendingIntent
 import android.content.res.Resources
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -13,7 +14,10 @@ internal suspend fun showBrowserEvent(
     resources: Resources,
     viewModel: DriveBrowserViewModel,
     onUploadFolderSelected: (DriveFolder) -> Unit,
+    onViewScopeConsent: (PendingIntent) -> Unit,
+    onOpenViewFolderPicker: () -> Unit,
 ) {
+    if (showViewFolderEvent(event, snackbarHostState, resources, onViewScopeConsent, onOpenViewFolderPicker)) return
     when (event) {
         is DriveBrowserEvent.BatchTrashed, is DriveBrowserEvent.BatchMoved, is DriveBrowserEvent.BatchFailed ->
             showBatchEvent(event, snackbarHostState, resources, viewModel)
@@ -39,7 +43,41 @@ internal suspend fun showBrowserEvent(
         is DriveBrowserEvent.DownloadStarted ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_download_started, event.count))
         is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
+        // 위에서 이미 처리했다. else 로 뭉뚱그리지 않는 것은, 새 이벤트를 더했을 때
+        // 컴파일러가 "여기도 보라" 고 말해주게 하기 위해서다
+        is DriveBrowserEvent.NeedsViewScopeConsent,
+        DriveBrowserEvent.ViewFolderPickerReady,
+        DriveBrowserEvent.ViewScopeDenied,
+        is DriveBrowserEvent.ViewFolderAdded,
+        is DriveBrowserEvent.ViewFolderRemoved,
+        -> Unit
     }
+}
+
+/**
+ * 보기 전용 폴더(`docs/DRIVE_FILE_SCOPE.md` §10) 관련 이벤트. 처리했으면 true.
+ *
+ * 한 `when` 에 다 넣으면 분기가 detekt 한계를 넘는다 — 성격이 다른 묶음이라 떼어내는 편이 읽기도 낫다.
+ */
+private suspend fun showViewFolderEvent(
+    event: DriveBrowserEvent,
+    snackbarHostState: SnackbarHostState,
+    resources: Resources,
+    onViewScopeConsent: (PendingIntent) -> Unit,
+    onOpenViewFolderPicker: () -> Unit,
+): Boolean {
+    when (event) {
+        is DriveBrowserEvent.NeedsViewScopeConsent -> onViewScopeConsent(event.pendingIntent)
+        DriveBrowserEvent.ViewFolderPickerReady -> onOpenViewFolderPicker()
+        DriveBrowserEvent.ViewScopeDenied ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_scope_denied))
+        is DriveBrowserEvent.ViewFolderAdded ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_folder_added, event.name))
+        is DriveBrowserEvent.ViewFolderRemoved ->
+            snackbarHostState.showSnackbar(resources.getString(R.string.drive_view_folder_removed, event.name))
+        else -> return false
+    }
+    return true
 }
 
 /** 다중 선택 일괄 작업 결과 */

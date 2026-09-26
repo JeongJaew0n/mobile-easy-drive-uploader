@@ -35,5 +35,20 @@ interface AuthRepository : TokenProvider {
     /** 피커 결과 인텐트에서 고른 항목의 Drive 파일 ID 를 꺼낸다. 아무것도 고르지 않았으면 빈 목록. */
     suspend fun completeFolderPick(data: Intent?): List<String>
 
+    /**
+     * 보기 전용 폴더를 위해 `drive.readonly` 를 **추가로** 받는다(`docs/DRIVE_FILE_SCOPE.md` §10).
+     *
+     * 기본 설치는 `drive.file` 뿐이고, 사용자가 이 기능을 쓰겠다고 할 때만 한 번 더 묻는다.
+     * 이미 허락돼 있으면 [SignInStep.Completed] 가 온다.
+     */
+    suspend fun beginViewScopeConsent(): SignInStep
+
+    /**
+     * 동의 결과를 확인한다. 사용자가 읽기 권한 체크를 풀었을 수 있으므로 `grantedScopes` 를 본다.
+     *
+     * @return 실제로 `drive.readonly` 를 받았으면 true.
+     */
+    suspend fun completeViewScopeConsent(data: Intent?): Boolean
+
     suspend fun signOut()
 }

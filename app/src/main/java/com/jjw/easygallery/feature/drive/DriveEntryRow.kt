@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -55,6 +56,7 @@ internal fun DriveEntryRow(
     onRename: () -> Unit,
     onMove: () -> Unit,
     onTrash: () -> Unit,
+    onRemoveFromList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -77,6 +79,7 @@ internal fun DriveEntryRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val uploadedLabel = stringResource(R.string.drive_uploaded_from_device)
+            val readOnlyLabel = stringResource(R.string.drive_view_only)
             val details = buildList {
                 entry.sizeBytes?.let { add(Formatter.formatShortFileSize(context, it)) }
                 entry.modifiedTimeMillis?.let {
@@ -84,6 +87,8 @@ internal fun DriveEntryRow(
                     add(DateUtils.getRelativeTimeSpanString(it, now, DateUtils.DAY_IN_MILLIS).toString())
                 }
                 if (uploadedFromDevice) add(uploadedLabel)
+                // 왜 이 폴더에서는 올리기·고치기가 없는지 행에서 바로 읽히게 한다
+                if (entry.readOnly) add(readOnlyLabel)
             }
             if (details.isNotEmpty()) {
                 Text(
@@ -108,6 +113,7 @@ internal fun DriveEntryRow(
                 onRename = onRename,
                 onMove = onMove,
                 onTrash = onTrash,
+                onRemoveFromList = onRemoveFromList,
             )
         }
     }
@@ -124,6 +130,7 @@ private fun EntryDropdownMenu(
     onRename: () -> Unit,
     onMove: () -> Unit,
     onTrash: () -> Unit,
+    onRemoveFromList: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (menu.open) {
@@ -175,6 +182,16 @@ private fun EntryDropdownMenu(
                 onClick = {
                     onDismiss()
                     onTrash()
+                },
+            )
+        }
+        if (menu.removeFromList) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.drive_remove_view_folder)) },
+                leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onRemoveFromList()
                 },
             )
         }

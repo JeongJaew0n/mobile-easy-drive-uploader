@@ -75,7 +75,7 @@ import kotlinx.coroutines.flow.filter
 @Composable
 fun DriveBrowserRoute(
     key: DriveBrowserKey,
-    onOpenFolder: (DriveFolder) -> Unit,
+    onOpenFolder: (DriveFolder, readOnly: Boolean) -> Unit,
     onUploadFolderSelected: (DriveFolder) -> Unit,
     onBackClick: () -> Unit,
     viewModel: DriveBrowserViewModel = hiltViewModel(),
@@ -99,10 +99,44 @@ fun DriveBrowserRoute(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result -> viewModel.onAuthRecoveryResult(result.data) }
 
-    LaunchedEffect(key) { viewModel.load(key.accountId, key.folderId, key.folderName, rootName) }
+    // 보기 전용 폴더용 읽기 권한 동의(`docs/DRIVE_FILE_SCOPE.md` §10)
+    val viewScopeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> viewModel.onViewScopeResult(result.data) }
+    var pickingViewFolder by remember { mutableStateOf(false) }
+    if (pickingViewFolder) {
+        DriveFolderPickerSheet(
+            start = DriveFolder(DriveEntry.ROOT_ID, driveRootName),
+            excludeFolderId = null,
+            // 내 드라이브 최상위 자체는 "폴더" 가 아니라 고를 수 없게 둔다
+            currentParentId = DriveEntry.ROOT_ID,
+            loadFolders = viewModel::listDriveFolders,
+            onDismiss = { pickingViewFolder = false },
+            onPick = { folder ->
+                pickingViewFolder = false
+                viewModel.addViewFolder(folder)
+            },
+            titleRes = R.string.drive_add_view_folder,
+            confirmRes = R.string.drive_add_view_folder_confirm,
+        )
+    }
+
+    LaunchedEffect(key) {
+        viewModel.load(key.accountId, key.folderId, key.folderName, rootName, key.readOnly)
+    }
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
-            showBrowserEvent(event, snackbarHostState, resources, viewModel, onUploadFolderSelected)
+            showBrowserEvent(
+                event = event,
+                snackbarHostState = snackbarHostState,
+                resources = resources,
+                viewModel = viewModel,
+                onUploadFolderSelected = onUploadFolderSelected,
+                onViewScopeConsent = { pendingIntent ->
+                    viewScopeLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                },
+                onOpenViewFolderPicker = { pickingViewFolder = true },
+            )
         }
     }
 
@@ -112,7 +146,8 @@ fun DriveBrowserRoute(
         onBackClick = onBackClick,
         onEntryClick = { entry ->
             if (entry.isFolder) {
-                onOpenFolder(entry.toFolder())
+                // 보기 전용은 안으로 들어가도 계속 보기 전용이다
+                onOpenFolder(entry.toFolder(), uiState.isReadOnly || entry.readOnly)
             } else {
                 // 사진은 앱 안에서, 그 밖의 형식은 Drive 앱·브라우저에 맡긴다
                 if (entry.isImage) {
@@ -129,6 +164,7 @@ fun DriveBrowserRoute(
         },
         onCreateFolder = viewModel::createFolder,
         onSelectAsUploadFolder = viewModel::selectAsUploadFolder,
+        onAddViewFolder = viewModel::startAddViewFolder,
         entryActions = DriveEntryActions(
             onOpen = { entry ->
                 if (entry.isImage) {
@@ -140,6 +176,7 @@ fun DriveBrowserRoute(
             onRename = viewModel::rename,
             onMove = viewModel::move,
             onTrash = viewModel::trash,
+            onRemoveFromList = viewModel::removeViewFolder,
             loadFolders = viewModel::listFolders,
             onDownload = viewModel::download,
             onDownloadSelected = viewModel::downloadSelected,
@@ -161,6 +198,8 @@ internal data class DriveEntryActions(
     val onRename: (DriveEntry, String) -> Unit = { _, _ -> },
     val onMove: (DriveEntry, DriveFolder) -> Unit = { _, _ -> },
     val onTrash: (DriveEntry) -> Unit = {},
+    /** 보기 전용 폴더를 목록에서만 뺀다 */
+    val onRemoveFromList: (DriveEntry) -> Unit = {},
     val loadFolders: suspend (parentId: String) -> List<DriveFolder> = { emptyList() },
     // 다운로드
     val onDownload: (DriveEntry) -> Unit = {},
@@ -188,6 +227,7 @@ internal fun DriveBrowserScreen(
     onRecoverAuth: (PendingIntent) -> Unit,
     onCreateFolder: (String) -> Unit,
     onSelectAsUploadFolder: () -> Unit,
+    onAddViewFolder: () -> Unit = {},
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     entryActions: DriveEntryActions = DriveEntryActions(),
@@ -225,7 +265,7 @@ internal fun DriveBrowserScreen(
                 entryActions = entryActions,
             )
         },
-        bottomBar = { UploadFolderButton(uiState, onSelectAsUploadFolder) },
+        bottomBar = { BrowserBottomBar(uiState, onSelectAsUploadFolder, onAddViewFolder) },
     ) { innerPadding ->
         Box(
             Modifier
@@ -282,6 +322,7 @@ internal fun DriveBrowserScreen(
                                     uiState.capabilities,
                                     allowMove = !uiState.isRemoteSearchResult,
                                     isPickedRoot = uiState.isPickedRoot,
+                                    isReadOnly = uiState.isReadOnly,
                                 ),
                                 uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
                                 onOpen = { entryActions.onOpen(entry) },
@@ -289,6 +330,7 @@ internal fun DriveBrowserScreen(
                                 onRename = { renaming = entry },
                                 onMove = { moving = entry },
                                 onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
+                                onRemoveFromList = { entryActions.onRemoveFromList(entry) },
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = motion.quick(),
                                     placementSpec = motion.settle(),
@@ -363,18 +405,42 @@ private fun BrowserBackHandlers(uiState: DriveBrowserUiState, entryActions: Driv
 
 /** 하단 "이 폴더를 업로드 폴더로 지정" — 검색 결과에는 폴더 문맥이 없어 숨긴다 */
 @Composable
-private fun UploadFolderButton(uiState: DriveBrowserUiState, onClick: () -> Unit) {
+private fun BrowserBottomBar(
+    uiState: DriveBrowserUiState,
+    onSelectAsUploadFolder: () -> Unit,
+    onAddViewFolder: () -> Unit,
+) {
     if (uiState.isSearching) return
-    OutlinedButton(
-        onClick = onClick,
-        enabled = uiState.current != null && !uiState.isLoading,
-        modifier = Modifier
-            // 인셋이 없으면 버튼 아래 절반이 시스템 내비게이션 바에 가려 눌리지 않는다(실기기 확인)
+    Column(
+        // 인셋이 없으면 버튼 아래 절반이 시스템 내비게이션 바에 가려 눌리지 않는다(실기기 확인)
+        Modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(stringResource(R.string.drive_use_as_upload_folder))
+        // Drive 루트에서만. 보기 전용 폴더를 여기 목록에 더한다(`docs/DRIVE_FILE_SCOPE.md` §10)
+        if (uiState.isPickedRoot) {
+            OutlinedButton(
+                onClick = onAddViewFolder,
+                enabled = !uiState.isLoading && !uiState.isMutating,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+            ) {
+                Text(stringResource(R.string.drive_add_view_folder))
+            }
+        }
+        // 읽기 권한뿐인 폴더는 업로드 대상이 될 수 없다
+        if (!uiState.isReadOnly) {
+            OutlinedButton(
+                onClick = onSelectAsUploadFolder,
+                enabled = uiState.current != null && !uiState.isLoading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+            ) {
+                Text(stringResource(R.string.drive_use_as_upload_folder))
+            }
+        }
     }
 }
 

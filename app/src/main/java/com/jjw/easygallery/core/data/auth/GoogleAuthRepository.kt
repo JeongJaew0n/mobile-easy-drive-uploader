@@ -97,6 +97,51 @@ class GoogleAuthRepository @Inject constructor(
         return parsePicked(result.tokenResponseParams)
     }
 
+    override suspend fun beginViewScopeConsent(): SignInStep {
+        val email = prefs.current().accountEmail ?: throw NotSignedInException()
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_SCOPE), Scope(DRIVE_READONLY_SCOPE)))
+            .setAccount(Account(email, GOOGLE_ACCOUNT_TYPE))
+            .setOptOutIncludingGrantedScopes(true)
+            .build()
+        val result = try {
+            client.authorize(request).await()
+        } catch (e: ApiException) {
+            Timber.w(e, "view scope consent failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        val pending = result.pendingIntent
+        if (pending != null) return SignInStep.NeedsConsent(pending)
+        // 동의 UI 없이 돌아왔다면 이미 허락돼 있다는 뜻 — 그래도 실제로 들어왔는지 확인한다
+        if (!result.hasReadonly()) throw AuthorizationRequiredException()
+        grantViewScope(result)
+        return SignInStep.Completed
+    }
+
+    override suspend fun completeViewScopeConsent(data: Intent?): Boolean {
+        if (data == null) return false
+        val result = try {
+            client.getAuthorizationResultFromIntent(data)
+        } catch (e: ApiException) {
+            Timber.w(e, "view scope result parse failed: status=%d", e.statusCode)
+            throw AuthFailedException(e.statusCode, e.statusMessage, e)
+        }
+        Timber.i("view scope grantedScopes=%s", result.grantedScopes)
+        // 동의 화면에서 읽기 권한만 체크를 풀 수 있다. 그때는 켜면 안 된다
+        if (!result.hasReadonly()) return false
+        grantViewScope(result)
+        return true
+    }
+
+    private suspend fun grantViewScope(result: AuthorizationResult) {
+        prefs.setDriveViewScopeGranted(true)
+        // 예전 토큰에는 읽기 권한이 없다. 새로 받은 것이 있으면 그걸 쓰고, 없으면 캐시를 버린다
+        if (result.accessToken != null) cache(result) else cached = null
+    }
+
+    private fun AuthorizationResult.hasReadonly(): Boolean =
+        grantedScopes.any { it == DRIVE_READONLY_SCOPE }
+
     override suspend fun getAccessToken(): String {
         cached?.takeIf { it.isFresh() }?.let { return it.token }
         return mutex.withLock {
@@ -137,14 +182,29 @@ class GoogleAuthRepository @Inject constructor(
         }
     }
 
+    /**
+     * 요청할 scope. 기본은 `drive.file` 하나고, 보기 전용 폴더를 옵트인한 사용자만
+     * `drive.readonly` 가 붙는다(`docs/DRIVE_FILE_SCOPE.md` §10).
+     *
+     * `setOptOutIncludingGrantedScopes(true)` 를 쓰기 때문에 **여기 넣지 않은 scope 는
+     * 토큰에 실리지 않는다.** 읽기 권한을 허락받고도 빼먹으면 보기 폴더가 조용히 404 가 된다.
+     */
+    private suspend fun requestedScopes(): List<Scope> =
+        if (prefs.current().driveViewScopeGranted) {
+            listOf(Scope(DRIVE_SCOPE), Scope(DRIVE_READONLY_SCOPE))
+        } else {
+            listOf(Scope(DRIVE_SCOPE))
+        }
+
     private suspend fun authorize(account: Account?): AuthorizationResult {
+        val scopes = requestedScopes()
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
+            .setRequestedScopes(scopes)
             // 계정에 남은 이전 동의(`drive` 전체)가 토큰에 딸려 오는 것을 막는다 — SS-10
             .setOptOutIncludingGrantedScopes(true)
             .apply { if (account != null) setAccount(account) }
             .build()
-        Timber.i("authorize scope=%s account=%s", DRIVE_SCOPE, account?.name?.let { "set" } ?: "picker")
+        Timber.i("authorize scopes=%s account=%s", scopes, account?.name?.let { "set" } ?: "picker")
         return try {
             val result = client.authorize(request).await()
             Timber.i(
@@ -186,6 +246,15 @@ class GoogleAuthRepository @Inject constructor(
          * 대신 사용자의 기존 파일·폴더는 보이지 않는다 — 어디에 올릴지는 피커로 고르게 한다.
          */
         const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+
+        /**
+         * 보기 전용 폴더에만 쓰는 **옵트인** scope. 내 드라이브 전체를 읽을 수 있다.
+         *
+         * restricted scope 라 Play 프로덕션 공개 시 CASA 심사를 부른다. 그래서 기본으로
+         * 요청하지 않고, 사용자가 "볼 수 있는 폴더 추가" 를 누른 순간에만 받는다.
+         * 이 기능을 접으면 이 상수를 쓰는 자리만 지우면 된다 — `docs/DRIVE_FILE_SCOPE.md` §10.
+         */
+        const val DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
         private const val GOOGLE_ACCOUNT_TYPE = "com.google"
         private const val PICKED_IDS_KEY = "picked_file_ids"
 

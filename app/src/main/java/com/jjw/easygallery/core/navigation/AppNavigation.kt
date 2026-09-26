@@ -138,7 +138,9 @@ fun AppNavigation() {
             entry<DriveBrowserKey> { key ->
                 DriveBrowserRoute(
                     key = key,
-                    onOpenFolder = { folder -> backStack.add(DriveBrowserKey(folder.id, folder.name, key.accountId)) },
+                    onOpenFolder = { folder, readOnly ->
+                        backStack.add(DriveBrowserKey(folder.id, folder.name, key.accountId, readOnly))
+                    },
                     // 업로드 폴더를 지정하면 Drive 탐색 스택 전체를 걷어내고 이전 화면으로 복귀
                     onUploadFolderSelected = { backStack.removeAll { it is DriveBrowserKey } },
                     onBackClick = { backStack.removeLastOrNull() },

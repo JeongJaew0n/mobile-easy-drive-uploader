@@ -49,25 +49,30 @@ class GoogleDriveStorage @Inject constructor(
 
     /**
      * `drive.file` 에서 내 드라이브 루트는 빈 목록이다(SS-09). 그래서 루트 자리에
-     * **앱이 올릴 수 있는 폴더들** 을 대신 보여준다 — 지정 폴더와 기본 폴더.
-     * `docs/DRIVE_FILE_SCOPE.md` §2
+     * **앱이 다룰 수 있는 폴더들** 을 대신 보여준다.
+     *
+     * 순서에 뜻이 있다 — 올릴 수 있는 것(지정 폴더 → 기본 폴더)이 먼저 오고,
+     * 보기만 되는 것이 뒤에 온다. `docs/DRIVE_FILE_SCOPE.md` §2·§10
      */
     private suspend fun rootEntries(): RemotePage {
-        val picked = prefs.current().pickedFolders.map { folderEntry(it.id, it.alias) }
+        val current = prefs.current()
+        val picked = current.pickedFolders.map { folderEntry(it.id, it.alias) }
         val appRoot = runCatching { drive.ensureAppRootFolder() }
             .onFailure { Timber.w(it, "app root folder unavailable") }
             .getOrNull()
             ?.let { folderEntry(it.id, it.name) }
-        return RemotePage(picked + listOfNotNull(appRoot), nextPageToken = null)
+        val viewOnly = current.viewFolders.map { folderEntry(it.id, it.name, readOnly = true) }
+        return RemotePage(picked + listOfNotNull(appRoot) + viewOnly, nextPageToken = null)
     }
 
-    private fun folderEntry(id: String, name: String) = DriveEntry(
+    private fun folderEntry(id: String, name: String, readOnly: Boolean = false) = DriveEntry(
         id = id,
         name = name,
         mimeType = DriveEntry.FOLDER_MIME_TYPE,
         sizeBytes = null,
         modifiedTimeMillis = null,
         webViewLink = null,
+        readOnly = readOnly,
     )
 
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder = drive.createFolder(name, parentId)

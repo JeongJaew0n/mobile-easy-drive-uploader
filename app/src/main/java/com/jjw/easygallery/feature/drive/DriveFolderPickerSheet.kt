@@ -1,5 +1,6 @@
 package com.jjw.easygallery.feature.drive
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +42,14 @@ import com.jjw.easygallery.core.domain.model.DriveFolder
 import kotlinx.coroutines.CancellationException
 
 /**
- * 이동 대상 폴더 선택(`docs/DRIVE_FILE_CRUD.md` §4). 내 드라이브부터 폴더만 나열하고 탭하면 들어간다.
- * 상단 경로(breadcrumb)를 탭하면 그 단계로 돌아온다. 옮기는 항목이 폴더면 자기 자신은 목록에서 뺀다.
+ * 폴더 선택 시트. 내 드라이브부터 폴더만 나열하고 탭하면 들어간다.
+ * 상단 경로(breadcrumb)를 탭하면 그 단계로 돌아온다.
+ *
+ * 두 곳에서 쓴다 — 이동 대상 고르기(`docs/DRIVE_FILE_CRUD.md` §4)와 보기 전용 폴더
+ * 추가(`docs/DRIVE_FILE_SCOPE.md` §10). 문구만 [titleRes]·[confirmRes] 로 갈아끼운다.
+ *
+ * [currentParentId] 는 고를 수 없는 폴더다 — 이동에서는 "원래 있던 곳", 보기 폴더 추가에서는
+ * 내 드라이브 루트(그건 폴더가 아니라 최상위라 목록에 넣을 것이 못 된다).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +60,8 @@ internal fun DriveFolderPickerSheet(
     loadFolders: suspend (parentId: String) -> List<DriveFolder>,
     onDismiss: () -> Unit,
     onPick: (DriveFolder) -> Unit,
+    @StringRes titleRes: Int = R.string.drive_move_title,
+    @StringRes confirmRes: Int = R.string.drive_move_here,
 ) {
     var path by remember { mutableStateOf(listOf(DriveFolder(ROOT_ID, ""), start).distinctBy { it.id }) }
     var folders by remember { mutableStateOf<List<DriveFolder>?>(null) }
@@ -83,7 +92,7 @@ internal fun DriveFolderPickerSheet(
                 .navigationBarsPadding(),
         ) {
             Text(
-                text = stringResource(R.string.drive_move_title),
+                text = stringResource(titleRes),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
@@ -151,7 +160,7 @@ internal fun DriveFolderPickerSheet(
                     // 원래 있던 폴더로는 이동 불가
                     enabled = here.id != currentParentId,
                 ) {
-                    Text(stringResource(R.string.drive_move_here))
+                    Text(stringResource(confirmRes))
                 }
             }
         }

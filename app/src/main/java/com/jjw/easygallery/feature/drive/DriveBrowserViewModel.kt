@@ -7,8 +7,10 @@ import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
+import com.jjw.easygallery.core.data.auth.SignInStep
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.drive.DriveImages
+import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteStorage
@@ -19,6 +21,7 @@ import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
+import com.jjw.easygallery.core.domain.model.ViewFolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -43,6 +46,12 @@ class DriveBrowserViewModel @Inject constructor(
     private val downloads: DownloadScheduler,
     private val ledger: UploadLedgerRepository,
     private val auth: AuthRepository,
+    /**
+     * 보기 전용 폴더를 고를 때만 쓴다. [storages] 로 얻는 Drive 는 루트 자리에
+     * **지정 폴더 목록**을 돌려주므로(`GoogleDriveStorage.rootEntries`) 진짜 내 드라이브를
+     * 훑으려면 Drive 계층을 직접 봐야 한다.
+     */
+    private val driveFolders: DriveRepository,
     /** Drive 이미지를 앱 안에서 그릴 때 쓴다 — 인증이 붙어 있어 계정을 다시 묻지 않는다 */
     @param:DriveImages val driveImageLoader: ImageLoader,
 ) : ViewModel() {
@@ -71,7 +80,7 @@ class DriveBrowserViewModel @Inject constructor(
      * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
      * [folderId] null 이면 그 저장소의 루트, [rootName] 은 루트 표시 이름.
      */
-    fun load(accountId: String?, folderId: String?, folderName: String?, rootName: String) {
+    fun load(accountId: String?, folderId: String?, folderName: String?, rootName: String, readOnly: Boolean) {
         if (loaded) return
         loaded = true
         this.accountId = accountId
@@ -84,7 +93,8 @@ class DriveBrowserViewModel @Inject constructor(
                         current = folder,
                         isLoading = true,
                         error = null,
-                        capabilities = drive.capabilities,
+                        capabilities = effectiveCapabilities(readOnly),
+                        isReadOnly = readOnly,
                         isPickedRoot = folder.id == drive.rootId &&
                             drive.account.kind == RemoteAccountKind.GOOGLE_DRIVE,
                         accountName = drive.account.displayName,
@@ -446,6 +456,82 @@ class DriveBrowserViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 보기 전용 폴더 안에서는 바꾸는 동작을 모두 뺀다. 화면은 이미 [Capability] 로 메뉴를
+     * 구성하므로, 집합에서 빼는 것만으로 이름 변경·이동·삭제·새 폴더가 함께 사라진다.
+     *
+     * 다운로드는 남긴다 — 읽기 권한으로 되는 일이고, 남의 폴더 사진을 기기로 가져오는 것이
+     * 이 기능을 쓰는 이유이기도 하다.
+     */
+    private fun effectiveCapabilities(readOnly: Boolean): Set<Capability> =
+        if (readOnly) drive.capabilities - MUTATING_CAPABILITIES else drive.capabilities
+
+    /**
+     * "볼 수 있는 폴더 추가". 읽기 권한(`drive.readonly`)이 없으면 먼저 동의를 받는다 —
+     * 기본 설치에는 없는 권한이다(`docs/DRIVE_FILE_SCOPE.md` §10).
+     */
+    fun startAddViewFolder() {
+        viewModelScope.launch {
+            try {
+                if (prefs.current().driveViewScopeGranted) {
+                    events.send(DriveBrowserEvent.ViewFolderPickerReady)
+                    return@launch
+                }
+                val event = when (val step = auth.beginViewScopeConsent()) {
+                    is SignInStep.NeedsConsent -> DriveBrowserEvent.NeedsViewScopeConsent(step.pendingIntent)
+                    SignInStep.Completed -> DriveBrowserEvent.ViewFolderPickerReady
+                }
+                events.send(event)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "view scope consent failed")
+                events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+            }
+        }
+    }
+
+    /** 동의 화면 결과. 사용자가 읽기 권한 체크를 풀었으면 폴더 고르기로 넘어가지 않는다 */
+    fun onViewScopeResult(data: Intent?) {
+        viewModelScope.launch {
+            val granted = runCatching { auth.completeViewScopeConsent(data) }
+                .onFailure { Timber.w(it, "view scope result failed") }
+                .getOrDefault(false)
+            events.send(
+                if (granted) DriveBrowserEvent.ViewFolderPickerReady else DriveBrowserEvent.ViewScopeDenied,
+            )
+        }
+    }
+
+    /** 진짜 내 드라이브의 폴더들. 읽기 권한이 있어야 비어 있지 않다 */
+    suspend fun listDriveFolders(parentId: String): List<DriveFolder> {
+        val result = ArrayList<DriveFolder>()
+        var token: String? = null
+        do {
+            val page = driveFolders.listChildren(parentId, token, foldersOnly = true)
+            result += page.entries.map { it.toFolder() }
+            token = page.nextPageToken
+        } while (token != null)
+        return result
+    }
+
+    fun addViewFolder(folder: DriveFolder) {
+        viewModelScope.launch {
+            prefs.addViewFolder(ViewFolder(folder.id, folder.name))
+            events.send(DriveBrowserEvent.ViewFolderAdded(folder.name))
+            refresh()
+        }
+    }
+
+    /** 목록에서만 뺀다. Drive 의 폴더는 그대로 남는다 */
+    fun removeViewFolder(entry: DriveEntry) {
+        viewModelScope.launch {
+            prefs.removeViewFolder(entry.id)
+            events.send(DriveBrowserEvent.ViewFolderRemoved(entry.name))
+            refresh()
+        }
+    }
+
     fun selectAsUploadFolder() {
         val current = _uiState.value.current ?: return
         viewModelScope.launch {
@@ -526,6 +612,8 @@ data class DriveBrowserUiState(
      * 새 폴더 만들기·이름 변경·삭제가 모두 성립하지 않는다(`docs/DRIVE_FILE_SCOPE.md` §2).
      */
     val isPickedRoot: Boolean = false,
+    /** 보기 전용 폴더의 안이다 — 올리기·만들기·고치기·지우기가 없다(`docs/DRIVE_FILE_SCOPE.md` §10) */
+    val isReadOnly: Boolean = false,
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
     val accountName: String? = null,
 
@@ -538,6 +626,14 @@ data class DriveBrowserUiState(
     /** 원격 검색 결과(부모 미상)에서만 이동을 막는다. 로컬 필터는 같은 폴더라 이동 가능 */
     val isRemoteSearchResult: Boolean get() = isSearching && Capability.SEARCH in capabilities
 }
+
+/** 보기 전용 폴더에서 빼는 동작들 — 읽기 권한으로는 할 수 없다 */
+private val MUTATING_CAPABILITIES = setOf(
+    Capability.RENAME,
+    Capability.MOVE,
+    Capability.TRASH,
+    Capability.FOLDER_MUTATION,
+)
 
 /** 이미 있는 id 는 건너뛰고 붙인다 — 같은 키가 두 번 들어가면 LazyColumn 이 예외를 던진다 */
 internal fun List<DriveEntry>.plusMissing(more: List<DriveEntry>): List<DriveEntry> {
@@ -569,5 +665,16 @@ sealed interface DriveBrowserEvent {
     data class BatchFailed(val count: Int) : DriveBrowserEvent
     data class DownloadStarted(val count: Int) : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
+
+    /** 읽기 권한 동의 화면을 띄워야 한다 */
+    data class NeedsViewScopeConsent(val pendingIntent: PendingIntent) : DriveBrowserEvent
+
+    /** 권한이 준비됐으니 폴더 고르기를 연다 */
+    data object ViewFolderPickerReady : DriveBrowserEvent
+
+    /** 사용자가 읽기 권한을 주지 않았다 */
+    data object ViewScopeDenied : DriveBrowserEvent
+    data class ViewFolderAdded(val name: String) : DriveBrowserEvent
+    data class ViewFolderRemoved(val name: String) : DriveBrowserEvent
     data class Error(val message: String) : DriveBrowserEvent
 }

@@ -20,6 +20,11 @@ data class DriveEntry(
     val sizeBytes: Long?,
     val modifiedTimeMillis: Long?,
     val webViewLink: String?,
+    /**
+     * 보기 전용으로 추가한 폴더다(`docs/DRIVE_FILE_SCOPE.md` §10). 읽기 권한뿐이라
+     * 이 안에서는 올리기·만들기·고치기·지우기가 없다. 루트 목록에서만 true 가 된다.
+     */
+    val readOnly: Boolean = false,
 ) {
     val isFolder: Boolean get() = mimeType == FOLDER_MIME_TYPE
     val isImage: Boolean get() = mimeType.startsWith("image/")

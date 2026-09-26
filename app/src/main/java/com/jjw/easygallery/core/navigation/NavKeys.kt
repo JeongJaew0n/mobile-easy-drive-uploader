@@ -76,6 +76,11 @@ data class DriveBrowserKey(
     val folderId: String? = null,
     val folderName: String? = null,
     val accountId: String? = null,
+    /**
+     * 보기 전용 폴더의 하위다(`docs/DRIVE_FILE_SCOPE.md` §10). 한 번 true 가 되면
+     * 더 깊이 들어가도 계속 true — 읽기 권한은 안쪽으로 갈수록 넓어지지 않는다.
+     */
+    val readOnly: Boolean = false,
 ) : AppNavKey
 
 /** 저장소 계정 추가(S3 호환 / WebDAV / SMB). [accountId] 가 있으면 그 계정 수정 */

@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.jjw.easygallery.core.domain.model.PickedFolder
 import com.jjw.easygallery.core.domain.model.VideoCompression
+import com.jjw.easygallery.core.domain.model.ViewFolder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -33,6 +34,10 @@ data class UserPreferences(
     val uploadFolderName: String? = null,
     /** 피커로 지정한 남의 Drive 폴더들(`docs/DRIVE_FILE_SCOPE.md` §4) */
     val pickedFolders: List<PickedFolder> = emptyList(),
+    /** 보기 전용으로 추가한 폴더들. `drive.readonly` 를 옵트인해야 채워진다(§10) */
+    val viewFolders: List<ViewFolder> = emptyList(),
+    /** 사용자가 `drive.readonly` 를 허락했다. 토큰을 받을 때 이 scope 를 함께 요청한다 */
+    val driveViewScopeGranted: Boolean = false,
     /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
     val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
@@ -78,6 +83,12 @@ class UserPreferencesRepository @Inject constructor(
         return runCatching { json.decodeFromString<List<PickedFolder>>(raw) }.getOrElse { emptyList() }
     }
 
+    /** 같은 이유로 보기 폴더 목록도 깨지면 비운다. */
+    private fun decodeViewFolders(raw: String?): List<ViewFolder> {
+        if (raw.isNullOrEmpty()) return emptyList()
+        return runCatching { json.decodeFromString<List<ViewFolder>>(raw) }.getOrElse { emptyList() }
+    }
+
     val preferences: Flow<UserPreferences> = store.data.map { prefs ->
         UserPreferences(
             accountEmail = prefs[KEY_ACCOUNT_EMAIL],
@@ -85,6 +96,8 @@ class UserPreferencesRepository @Inject constructor(
             uploadFolderId = prefs[KEY_UPLOAD_FOLDER_ID],
             uploadFolderName = prefs[KEY_UPLOAD_FOLDER_NAME],
             pickedFolders = decodeFolders(prefs[KEY_PICKED_FOLDERS]),
+            viewFolders = decodeViewFolders(prefs[KEY_VIEW_FOLDERS]),
+            driveViewScopeGranted = prefs[KEY_DRIVE_VIEW_SCOPE] ?: false,
             uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
@@ -131,6 +144,39 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    /** 보기 폴더를 더한다. 같은 폴더를 또 고르면 이름만 새로 고친다(Drive 에서 이름이 바뀌었을 수 있다). */
+    suspend fun addViewFolder(folder: ViewFolder) = editViewFolders { current ->
+        current.filterNot { it.id == folder.id } + folder
+    }
+
+    /**
+     * 목록에서만 뺀다. Drive 의 폴더는 건드리지 않는다 —
+     * 읽기 권한뿐이라 지울 수도 없고, 사용자가 기대하는 것도 "내 목록에서 치우기" 다.
+     */
+    suspend fun removeViewFolder(id: String) = editViewFolders { current -> current.filterNot { it.id == id } }
+
+    /**
+     * `drive.readonly` 옵트인 상태. 끄면 보기 폴더 목록도 함께 비운다 —
+     * 권한 없이 남아 있으면 들어갈 때마다 실패하는 행이 된다.
+     */
+    suspend fun setDriveViewScopeGranted(granted: Boolean) {
+        store.edit { prefs ->
+            if (granted) {
+                prefs[KEY_DRIVE_VIEW_SCOPE] = true
+            } else {
+                prefs.remove(KEY_DRIVE_VIEW_SCOPE)
+                prefs.remove(KEY_VIEW_FOLDERS)
+            }
+        }
+    }
+
+    private suspend fun editViewFolders(transform: (List<ViewFolder>) -> List<ViewFolder>) {
+        store.edit { prefs ->
+            val next = transform(decodeViewFolders(prefs[KEY_VIEW_FOLDERS]))
+            if (next.isEmpty()) prefs.remove(KEY_VIEW_FOLDERS) else prefs[KEY_VIEW_FOLDERS] = json.encodeToString(next)
+        }
+    }
+
     private suspend fun editFolders(transform: (List<PickedFolder>) -> List<PickedFolder>) {
         store.edit { prefs ->
             val next = transform(decodeFolders(prefs[KEY_PICKED_FOLDERS]))
@@ -149,13 +195,15 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
-    /** 계정과 함께 업로드 폴더도 지운다 — 폴더 ID 는 계정에 종속된 값. */
+    /** 계정과 함께 업로드 폴더도 지운다 — 폴더 ID 는 계정에 종속된 값. 보기 폴더와 읽기 권한도 같다. */
     suspend fun clearAccount() {
         store.edit { prefs ->
             prefs.remove(KEY_ACCOUNT_EMAIL)
             prefs.remove(KEY_ACCOUNT_NAME)
             prefs.remove(KEY_UPLOAD_FOLDER_ID)
             prefs.remove(KEY_UPLOAD_FOLDER_NAME)
+            prefs.remove(KEY_VIEW_FOLDERS)
+            prefs.remove(KEY_DRIVE_VIEW_SCOPE)
         }
     }
 
@@ -265,5 +313,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_UPLOAD_FOLDER_ID = stringPreferencesKey("upload_folder_id")
         val KEY_UPLOAD_FOLDER_NAME = stringPreferencesKey("upload_folder_name")
         val KEY_PICKED_FOLDERS = stringPreferencesKey("picked_folders")
+        val KEY_VIEW_FOLDERS = stringPreferencesKey("view_folders")
+        val KEY_DRIVE_VIEW_SCOPE = booleanPreferencesKey("drive_view_scope")
     }
 }

@@ -66,11 +66,41 @@ class DriveBrowserViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger, auth, mockk(relaxed = true))
-        viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
+    private fun loadedViewModel(readOnly: Boolean = false): DriveBrowserViewModel {
+        val viewModel = DriveBrowserViewModel(
+            storages,
+            prefs,
+            downloads,
+            ledger,
+            auth,
+            driveFolders = mockk(relaxed = true),
+            driveImageLoader = mockk(relaxed = true),
+        )
+        viewModel.load(
+            accountId = null,
+            folderId = "root",
+            folderName = "내 드라이브",
+            rootName = "내 드라이브",
+            readOnly = readOnly,
+        )
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel
+    }
+
+    @Test
+    fun `a read-only folder drops every mutating capability`() = runTest(testDispatcher) {
+        val viewModel = loadedViewModel(readOnly = true)
+        val caps = viewModel.uiState.value.capabilities
+        assertTrue(viewModel.uiState.value.isReadOnly)
+        assertTrue(Capability.TRASH !in caps)
+        assertTrue(Capability.RENAME !in caps)
+        assertTrue(Capability.MOVE !in caps)
+    }
+
+    @Test
+    fun `an ordinary folder keeps them`() = runTest(testDispatcher) {
+        val viewModel = loadedViewModel()
+        assertEquals(setOf(Capability.TRASH, Capability.RENAME, Capability.MOVE), viewModel.uiState.value.capabilities)
     }
 
     @Test
