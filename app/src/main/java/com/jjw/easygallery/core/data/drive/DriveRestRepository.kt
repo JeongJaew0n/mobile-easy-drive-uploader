@@ -78,12 +78,26 @@ class DriveRestRepository @Inject constructor(
             DriveFileMetadata(name = name, mimeType = DriveApi.FOLDER_MIME_TYPE, parents = listOf(parentId)),
         ).toFolder()
 
+    override suspend fun ownerOf(fileId: String): String? =
+        runCatching { api.getFile(fileId).ownerEmail() }
+            .onFailure { Timber.w(it, "owner lookup failed") }
+            .getOrNull()
+
     override suspend fun shareForReading(fileId: String, email: String) {
         api.createPermission(fileId, DrivePermissionRequest(type = "user", role = "reader", emailAddress = email))
     }
 
+    /**
+     * 표식이 붙은 앱 폴더를 찾고 없으면 만든다.
+     *
+     * **`'me' in owners` 가 빠지면 안 된다.** 읽기 권한(`drive.readonly`)을 옵트인하면 남이 공유한 파일도
+     * 보이는데, 그 사람이 이 앱을 쓰고 있으면 **그 사람의 앱 폴더에도 같은 표식이 있다.** 2026-09-27 기기에서
+     * 다른 계정 업로드로 B 의 "Easy Gallery" 가 A 에게 공유된 뒤, A 의 앱 폴더 자리에 B 의 폴더가 잡혔다 —
+     * 화면에는 B 의 폴더가 "내 계정" 으로, A 의 진짜 폴더는 보기 전용으로 나왔다. 업로드 폴더가 지정돼 있지
+     * 않았다면 A 의 업로드가 B 의 폴더로 향했을 것이다.
+     */
     override suspend fun ensureAppRootFolder(): DriveFolder {
-        val query = "mimeType = '${DriveApi.FOLDER_MIME_TYPE}' and trashed = false " +
+        val query = "mimeType = '${DriveApi.FOLDER_MIME_TYPE}' and trashed = false and 'me' in owners " +
             "and appProperties has { key = '$APP_ROOT_PROPERTY' and value = 'true' }"
         listAll(query).firstOrNull()?.let { return it.toFolder() }
         return api.createFile(
@@ -107,7 +121,9 @@ class DriveRestRepository @Inject constructor(
         return result
     }
 
-    private fun DriveFileDto.toFolder() = DriveFolder(id = id, name = name)
+    private fun DriveFileDto.toFolder() = DriveFolder(id = id, name = name, ownerEmail = ownerEmail())
+
+    private fun DriveFileDto.ownerEmail(): String? = owners?.firstNotNullOfOrNull { it.emailAddress }
 
     private fun DriveFileDto.toEntry() = DriveEntry(
         id = id,
@@ -116,6 +132,7 @@ class DriveRestRepository @Inject constructor(
         sizeBytes = size?.toLongOrNull(),
         modifiedTimeMillis = modifiedTime?.let { parseRfc3339(it) },
         webViewLink = webViewLink,
+        ownerEmail = ownerEmail(),
     )
 
     private fun parseRfc3339(value: String): Long? = try {

@@ -210,6 +210,15 @@ appProperties = mapOf("egTarget" to alias)
 고른 뒤로는 다른 보기 폴더와 똑같다 — 안으로 들어가면 `'<id>' in parents` 로 읽히고, 메뉴는 열기·기기에
 저장뿐이다. `docs/MULTI_GOOGLE_ACCOUNT.md` §4 의 "B 로 올리고 A 에게 공유해 A 에서 본다" 가 이걸로 끝까지 된다.
 
+### 10.10 읽기 권한을 켜면 남의 "앱 폴더" 도 보인다 (2026-09-27)
+
+앱은 자기 폴더를 `appProperties` 표식(`easyGalleryRoot`)으로 찾는다. `drive.file` 만 있을 때는 앱이 만든 것만
+보이니 문제가 없었는데, 읽기 권한을 켜면 **남이 공유한 파일도 보인다.** 그 사람이 이 앱을 쓰면 그 사람의 앱
+폴더에도 같은 표식이 있다. 기기에서 다른 계정 업로드(B → A 공유) 뒤에 A 의 앱 폴더 자리에 B 의 폴더가 잡혔다.
+
+**표식으로 찾는 질의에는 `'me' in owners` 를 함께 건다.** 지금은 `ensureAppRootFolder` 하나다.
+§6 의 "표식으로 지정 폴더 되살리기" 를 만들 때도 같은 조건이 필요하다.
+
 ### 10.6 사람이 해야 하는 일
 
 **GCP OAuth 동의 화면에 `drive.readonly` 를 등록해야 한다.** 등록되지 않은 scope 를

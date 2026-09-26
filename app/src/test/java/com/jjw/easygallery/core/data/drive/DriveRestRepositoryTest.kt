@@ -134,6 +134,16 @@ class DriveRestRepositoryTest {
     }
 
     @Test
+    fun `ensureAppRootFolder looks only at folders I own`() = runTest {
+        // 남이 공유한 앱 폴더(같은 표식)를 내 것으로 잡으면 안 된다 — 2026-09-27 기기에서 겪었다
+        server.enqueue(json("""{"files":[{"id":"mine","name":"Easy Gallery"}]}"""))
+
+        repository.ensureAppRootFolder()
+
+        assertTrue(server.takeRequest().url.queryParameter("q")!!.contains("'me' in owners"))
+    }
+
+    @Test
     fun `ensureAppRootFolder creates folder with app property when missing`() = runTest {
         server.enqueue(json("""{"files":[]}"""))
         server.enqueue(json("""{"id":"new1","name":"Easy Gallery","mimeType":"${DriveApi.FOLDER_MIME_TYPE}"}"""))

@@ -47,9 +47,10 @@ class StartGuestUploadUseCase @Inject constructor(
         val primaryEmail = primary.accountEmail
         if (primaryEmail != null) guest.drive.shareForReading(folder.id, primaryEmail)
 
-        // A 의 루트에 이미 "Easy Gallery" 가 있다 — 누구 것인지 이름에 붙인다
+        // A 의 루트에 이미 A 의 "Easy Gallery" 가 있다. 이름을 바꾸지 않고 소유자를 따로 적어
+        // 화면이 부제로 가른다 — 이름에 붙이면 목록에서 잘린다(spec §6)
         val viewAdded = primaryEmail != null && primary.driveViewScopeGranted
-        if (viewAdded) prefs.addViewFolder(ViewFolder(folder.id, "${folder.name} · $email"))
+        if (viewAdded) prefs.addViewFolder(ViewFolder(folder.id, folder.name, ownerEmail = email))
 
         val added = enqueueUploads.toFolder(items, RemoteAccount.guestDriveId(email), folder)
         Timber.i("guest upload started: added=%d shared=%s view=%s", added, primaryEmail != null, viewAdded)

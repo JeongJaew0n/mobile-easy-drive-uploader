@@ -114,6 +114,7 @@ fun DriveBrowserRoute(
             rootName = driveRootName,
             listFolders = viewModel::listDriveFolders,
             listSharedFolders = viewModel::listSharedFolders,
+            myEmail = uiState.accountEmail,
             onDismiss = { pickingViewFolder = false },
             onPick = { folder ->
                 pickingViewFolder = false
@@ -123,7 +124,7 @@ fun DriveBrowserRoute(
     }
 
     LaunchedEffect(key) {
-        viewModel.load(key.accountId, key.folderId, key.folderName, rootName, key.readOnly)
+        viewModel.load(key.accountId, key.folderId, key.folderName, rootName, key.readOnly, key.ownerEmail)
     }
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -332,6 +333,12 @@ internal fun DriveBrowserScreen(
                                 onMove = { moving = entry },
                                 onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
                                 onRemoveFromList = { entryActions.onRemoveFromList(entry) },
+                                // 루트는 서로 다른 계정의 폴더가 섞이는 유일한 자리다
+                                ownerLabel = if (uiState.isPickedRoot) {
+                                    ownerLabelOf(entry.ownerEmail, uiState.accountEmail)
+                                } else {
+                                    null
+                                },
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = motion.quick(),
                                     placementSpec = motion.settle(),
@@ -499,7 +506,14 @@ private fun BrowserTopBar(
         return
     }
     TopAppBar(
-        title = { BrowserTitle(folderName = uiState.current?.name, accountName = uiState.accountName) },
+        title = {
+            BrowserTitle(
+                folderName = uiState.current?.name,
+                accountName = uiState.accountName,
+                // 남의 폴더 안이면 부제로 누구 것인지 보인다 — 제목만으로는 내 "Easy Gallery" 와 같다
+                foreignOwner = uiState.folderOwnerEmail?.takeIf { it != uiState.accountEmail },
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBackClick) {
                 Icon(
@@ -532,14 +546,14 @@ private fun BrowserTopBar(
     )
 }
 
-/** 제목: 현재 폴더 이름, 부제: 저장소(계정) 이름 */
+/** 제목: 현재 폴더 이름, 부제: 저장소(계정) 이름 — 남의 폴더면 그 소유자 */
 @Composable
-private fun BrowserTitle(folderName: String?, accountName: String?) {
+private fun BrowserTitle(folderName: String?, accountName: String?, foreignOwner: String? = null) {
     val storageName = accountName ?: stringResource(R.string.drive_title)
     Column {
         Text(folderName ?: storageName)
         Text(
-            text = storageName,
+            text = foreignOwner?.let { stringResource(R.string.drive_folder_of, it) } ?: storageName,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -547,6 +561,14 @@ private fun BrowserTitle(folderName: String?, accountName: String?) {
 }
 
 private const val LOAD_MORE_THRESHOLD = 5
+
+/** "내 계정" / 소유자 이메일 / 모르면 null (`docs/plans/guest-account-upload/spec.md` §6) */
+@Composable
+internal fun ownerLabelOf(ownerEmail: String?, myEmail: String?): String? = when {
+    ownerEmail == null -> null
+    ownerEmail.equals(myEmail, ignoreCase = true) -> stringResource(R.string.drive_owner_me)
+    else -> ownerEmail
+}
 
 @Preview(showBackground = true)
 @Composable

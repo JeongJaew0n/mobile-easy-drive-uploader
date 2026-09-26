@@ -58,6 +58,8 @@ internal fun DriveEntryRow(
     onTrash: () -> Unit,
     onRemoveFromList: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 누구의 폴더인지("내 계정" / 이메일). 이름이 같은 폴더를 가른다. 루트 목록에서만 넘긴다 */
+    ownerLabel: String? = null,
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -87,6 +89,8 @@ internal fun DriveEntryRow(
                     add(DateUtils.getRelativeTimeSpanString(it, now, DateUtils.DAY_IN_MILLIS).toString())
                 }
                 if (uploadedFromDevice) add(uploadedLabel)
+                // 이름이 같아도(A 의 Easy Gallery · B 의 Easy Gallery) 이 줄로 가른다
+                ownerLabel?.let { add(it) }
                 // 왜 이 폴더에서는 올리기·고치기가 없는지 행에서 바로 읽히게 한다
                 if (entry.readOnly) add(readOnlyLabel)
             }

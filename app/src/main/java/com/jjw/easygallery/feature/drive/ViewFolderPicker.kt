@@ -20,6 +20,7 @@ internal fun ViewFolderPicker(
     rootName: String,
     listFolders: suspend (parentId: String) -> List<DriveFolder>,
     listSharedFolders: suspend () -> List<DriveFolder>,
+    myEmail: String?,
     onDismiss: () -> Unit,
     onPick: (DriveFolder) -> Unit,
 ) {
@@ -40,6 +41,11 @@ internal fun ViewFolderPicker(
         onPick = onPick,
         titleRes = R.string.drive_add_view_folder,
         confirmRes = R.string.drive_add_view_folder_confirm,
+        // 공유 문서함의 폴더는 이름이 내 것과 같을 수 있다(내 Easy Gallery · 남의 Easy Gallery) — 소유자로 가른다.
+        // 내 드라이브의 폴더는 전부 내 것이라 붙이지 않는다
+        supportingText = { folder ->
+            folder.ownerEmail?.takeIf { !it.equals(myEmail, ignoreCase = true) }
+        },
     )
 }
 

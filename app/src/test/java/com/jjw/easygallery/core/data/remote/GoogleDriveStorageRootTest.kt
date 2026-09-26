@@ -7,10 +7,12 @@ import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.domain.model.PickedFolder
 import com.jjw.easygallery.core.domain.model.ViewFolder
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,8 +26,10 @@ class GoogleDriveStorageRootTest {
         coEvery { ensureAppRootFolder() } returns DriveFolder("app", "Easy Gallery")
     }
 
+    private val repo: UserPreferencesRepository = mockk(relaxed = true)
+
     private fun storage(prefs: UserPreferences): GoogleDriveStorage {
-        val repo: UserPreferencesRepository = mockk { coEvery { current() } returns prefs }
+        coEvery { repo.current() } returns prefs
         return GoogleDriveStorage(drive, mockk(relaxed = true), repo)
     }
 
@@ -84,6 +88,52 @@ class GoogleDriveStorageRootTest {
     fun `the app folder still shows when nothing was added`() = runTest {
         val names = storage(UserPreferences()).listChildren("root").entries.map { it.name }
         assertEquals(listOf("Easy Gallery"), names)
+    }
+
+    // ---- 누구의 폴더인가(docs/plans/guest-account-upload/spec.md §6) ----
+
+    @Test
+    fun `the app folder belongs to the connected account`() = runTest {
+        val root = storage(UserPreferences(accountEmail = "a@x.com")).listChildren("root").entries
+        assertEquals("a@x.com", root.single().ownerEmail)
+    }
+
+    @Test
+    fun `a stored owner is shown without asking Drive`() = runTest {
+        val storage = storage(
+            UserPreferences(viewFolders = listOf(ViewFolder("v1", "Easy Gallery", ownerEmail = "b@x.com"))),
+        )
+        val entry = storage.listChildren("root").entries.first { it.id == "v1" }
+        assertEquals("b@x.com", entry.ownerEmail)
+        coVerify(exactly = 0) { drive.ownerOf(any()) }
+    }
+
+    @Test
+    fun `an old view folder gets its owner once and loses the email tail`() = runTest {
+        coEvery { drive.ownerOf("v1") } returns "b@x.com"
+        val storage = storage(
+            UserPreferences(
+                driveViewScopeGranted = true,
+                viewFolders = listOf(ViewFolder("v1", "Easy Gallery · b@x.com")),
+            ),
+        )
+
+        val entry = storage.listChildren("root").entries.first { it.id == "v1" }
+
+        // 소유자를 따로 보이니 이름 뒤의 이메일은 겹친다
+        assertEquals("Easy Gallery", entry.name)
+        assertEquals("b@x.com", entry.ownerEmail)
+        coVerify { repo.setViewFolderOwner("v1", "b@x.com") }
+    }
+
+    @Test
+    fun `without read access the owner stays unknown`() = runTest {
+        val storage = storage(
+            UserPreferences(driveViewScopeGranted = false, viewFolders = listOf(ViewFolder("v1", "사진"))),
+        )
+        val entry = storage.listChildren("root").entries.first { it.id == "v1" }
+        assertNull(entry.ownerEmail)
+        coVerify(exactly = 0) { drive.ownerOf(any()) }
     }
 
     @Test

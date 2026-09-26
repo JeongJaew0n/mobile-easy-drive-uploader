@@ -64,6 +64,8 @@ internal fun DriveFolderPickerSheet(
     @StringRes confirmRes: Int = R.string.drive_move_here,
     /** [currentParentId] 말고도 고를 수 없는 것 — "공유 문서함" 처럼 폴더가 아니라 목록인 자리 */
     unpickableIds: Set<String> = emptySet(),
+    /** 한 줄 아래에 붙일 설명(소유자 등). 이름이 같은 폴더를 가른다 */
+    supportingText: @Composable (DriveFolder) -> String? = { null },
 ) {
     var path by remember { mutableStateOf(listOf(DriveFolder(ROOT_ID, ""), start).distinctBy { it.id }) }
     var folders by remember { mutableStateOf<List<DriveFolder>?>(null) }
@@ -134,6 +136,7 @@ internal fun DriveFolderPickerSheet(
                         items(list, key = { it.id }) { folder ->
                             ListItem(
                                 headlineContent = { Text(folder.name) },
+                                supportingContent = supportingText(folder)?.let { text -> { Text(text) } },
                                 leadingContent = {
                                     Icon(
                                         painterResource(R.drawable.ic_folder),

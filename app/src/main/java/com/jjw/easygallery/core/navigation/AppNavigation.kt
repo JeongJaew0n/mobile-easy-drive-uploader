@@ -139,7 +139,16 @@ fun AppNavigation() {
                 DriveBrowserRoute(
                     key = key,
                     onOpenFolder = { folder, readOnly ->
-                        backStack.add(DriveBrowserKey(folder.id, folder.name, key.accountId, readOnly))
+                        // 하위 폴더도 목록에서 소유자를 받아 오므로 따로 물려주지 않는다
+                        backStack.add(
+                            DriveBrowserKey(
+                                folderId = folder.id,
+                                folderName = folder.name,
+                                accountId = key.accountId,
+                                readOnly = readOnly,
+                                ownerEmail = folder.ownerEmail,
+                            ),
+                        )
                     },
                     // 업로드 폴더를 지정하면 Drive 탐색 스택 전체를 걷어내고 이전 화면으로 복귀
                     onUploadFolderSelected = { backStack.removeAll { it is DriveBrowserKey } },

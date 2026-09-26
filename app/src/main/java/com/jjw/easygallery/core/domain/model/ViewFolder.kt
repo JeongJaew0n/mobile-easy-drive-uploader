@@ -10,4 +10,9 @@ import kotlinx.serialization.Serializable
  * `drive.readonly` 를 옵트인한 사용자만 가질 수 있다. `docs/DRIVE_FILE_SCOPE.md` §10.
  */
 @Serializable
-data class ViewFolder(val id: String, val name: String)
+data class ViewFolder(
+    val id: String,
+    val name: String,
+    /** 누구의 폴더인지. 이름이 같은 폴더를 가른다. 옛 저장분은 null — 루트를 읽을 때 채운다 */
+    val ownerEmail: String? = null,
+)

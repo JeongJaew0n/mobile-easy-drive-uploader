@@ -56,22 +56,39 @@ class GoogleDriveStorage @Inject constructor(
      */
     private suspend fun rootEntries(): RemotePage {
         val current = prefs.current()
+        // 지정 폴더는 drive.file 에서 읽을 수 없어(404) 소유자를 모른다
         val picked = current.pickedFolders.map { folderEntry(it.id, it.alias) }
         val appRoot = runCatching { drive.ensureAppRootFolder() }
             .onFailure { Timber.w(it, "app root folder unavailable") }
             .getOrNull()
-            ?.let { folderEntry(it.id, it.name) }
+            // 내 것만 찾으므로(ensureAppRootFolder) 주인은 연결 계정이다. Drive 가 준 값이 있으면 그걸 믿는다
+            ?.let { folderEntry(it.id, it.name, owner = it.ownerEmail ?: current.accountEmail) }
         val uploadable = picked + listOfNotNull(appRoot)
         // 같은 폴더를 보기 목록에도 넣었으면 올릴 수 있는 쪽을 남긴다. 그냥 이으면 같은 id 가
         // 두 번 들어가 LazyColumn 이 "Key was already used" 로 죽는다 — 기기에서 겪었다
         val taken = uploadable.map { it.id }.toSet()
         val viewOnly = current.viewFolders
             .filterNot { it.id in taken }
-            .map { folderEntry(it.id, it.name, readOnly = true) }
+            .map { folder ->
+                val owner = folder.ownerEmail ?: backfillOwner(folder.id, current.driveViewScopeGranted)
+                val name = if (owner != null) folder.name.removeSuffix(" · $owner") else folder.name
+                folderEntry(folder.id, name, readOnly = true, owner = owner)
+            }
         return RemotePage(uploadable + viewOnly, nextPageToken = null)
     }
 
-    private fun folderEntry(id: String, name: String, readOnly: Boolean = false) = DriveEntry(
+    /**
+     * 소유자 없이 저장된 옛 보기 폴더 — 한 번 물어 저장한다. 다음부터는 묻지 않는다.
+     * 보기 폴더는 읽기 권한으로 연 것이라 `files.get` 이 된다(`docs/plans/guest-account-upload/spec.md` §6).
+     */
+    private suspend fun backfillOwner(id: String, canRead: Boolean): String? {
+        if (!canRead) return null
+        val owner = drive.ownerOf(id) ?: return null
+        prefs.setViewFolderOwner(id, owner)
+        return owner
+    }
+
+    private fun folderEntry(id: String, name: String, readOnly: Boolean = false, owner: String? = null) = DriveEntry(
         id = id,
         name = name,
         mimeType = DriveEntry.FOLDER_MIME_TYPE,
@@ -79,6 +96,7 @@ class GoogleDriveStorage @Inject constructor(
         modifiedTimeMillis = null,
         webViewLink = null,
         readOnly = readOnly,
+        ownerEmail = owner,
     )
 
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder = drive.createFolder(name, parentId)

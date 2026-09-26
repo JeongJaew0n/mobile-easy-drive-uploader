@@ -94,8 +94,8 @@ class StartGuestUploadUseCaseTest {
         val result = useCase(p, repo)(items, TOKEN)
 
         assertTrue(result.addedToViewFolders)
-        // A 의 루트에 A 자신의 "Easy Gallery" 가 이미 있다 — 누구 것인지 이름에 붙인다
-        coVerify { repo.addViewFolder(ViewFolder(folder.id, "Easy Gallery · $B")) }
+        // 이름은 그대로 두고 소유자를 따로 적는다 — 화면이 부제로 A 의 "Easy Gallery" 와 가른다
+        coVerify { repo.addViewFolder(ViewFolder(folder.id, "Easy Gallery", ownerEmail = B)) }
     }
 
     @Test

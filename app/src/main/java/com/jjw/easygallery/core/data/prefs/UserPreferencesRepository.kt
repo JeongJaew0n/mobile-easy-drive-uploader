@@ -157,6 +157,18 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     /**
+     * 옛 보기 폴더에 소유자를 채운다(`docs/plans/guest-account-upload/spec.md` §6).
+     *
+     * 소유자를 따로 보이게 되면서 이름 뒤에 붙여 두었던 `· <이메일>` 은 겹친다 — 그 꼬리를 뗀다.
+     */
+    suspend fun setViewFolderOwner(id: String, ownerEmail: String) = editViewFolders { current ->
+        current.map { folder ->
+            if (folder.id != id) return@map folder
+            folder.copy(name = folder.name.removeSuffix(" · $ownerEmail"), ownerEmail = ownerEmail)
+        }
+    }
+
+    /**
      * 목록에서만 뺀다. Drive 의 폴더는 건드리지 않는다 —
      * 읽기 권한뿐이라 지울 수도 없고, 사용자가 기대하는 것도 "내 목록에서 치우기" 다.
      */

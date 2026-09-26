@@ -28,7 +28,8 @@ interface DriveApi {
     @GET("drive/v3/files/{fileId}")
     suspend fun getFile(
         @Path("fileId") fileId: String,
-        @Query("fields") fields: String = "id,name,mimeType,parents,capabilities(canAddChildren,canEdit)",
+        @Query("fields") fields: String =
+            "id,name,mimeType,parents,capabilities(canAddChildren,canEdit),owners(emailAddress)",
     ): DriveFileDto
 
     @GET("drive/v3/files")
@@ -39,7 +40,7 @@ interface DriveApi {
         @Query("orderBy") orderBy: String = "folder,name_natural",
         @Query("spaces") spaces: String = "drive",
         @Query("fields") fields: String =
-            "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink)",
+            "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink,owners(emailAddress))",
     ): DriveFileListDto
 
     @POST("drive/v3/files")

@@ -3,6 +3,8 @@ package com.jjw.easygallery.core.domain.model
 data class DriveFolder(
     val id: String,
     val name: String,
+    /** 소유자 이메일(나일 수도 있다). null 은 모른다. 이름이 같은 폴더를 가르는 데 쓴다 */
+    val ownerEmail: String? = null,
 )
 
 data class DriveAccount(
@@ -25,12 +27,17 @@ data class DriveEntry(
      * 이 안에서는 올리기·만들기·고치기·지우기가 없다. 루트 목록에서만 true 가 된다.
      */
     val readOnly: Boolean = false,
+    /**
+     * 소유자 이메일(나일 수도 있다). null 은 모른다. "내 계정" 인지는 화면이 연결 이메일과 비교해 정한다
+     * (`docs/plans/guest-account-upload/spec.md` §6).
+     */
+    val ownerEmail: String? = null,
 ) {
     val isFolder: Boolean get() = mimeType == FOLDER_MIME_TYPE
     val isImage: Boolean get() = mimeType.startsWith("image/")
     val isVideo: Boolean get() = mimeType.startsWith("video/")
 
-    fun toFolder() = DriveFolder(id, name)
+    fun toFolder() = DriveFolder(id, name, ownerEmail)
 
     companion object {
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"

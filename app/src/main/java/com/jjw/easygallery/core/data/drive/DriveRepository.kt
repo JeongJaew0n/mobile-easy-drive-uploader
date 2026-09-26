@@ -44,6 +44,9 @@ interface DriveRepository {
      */
     suspend fun shareForReading(fileId: String, email: String)
 
+    /** [fileId] 의 소유자 이메일. 읽을 수 없으면(drive.file 의 남의 폴더 — 404) null */
+    suspend fun ownerOf(fileId: String): String?
+
     /** 앱 전용 루트 폴더("Easy Gallery"). 없으면 만든다. */
     suspend fun ensureAppRootFolder(): DriveFolder
 

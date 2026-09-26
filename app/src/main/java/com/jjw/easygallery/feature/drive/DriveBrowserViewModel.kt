@@ -84,7 +84,14 @@ class DriveBrowserViewModel @Inject constructor(
      * NavEntry 키의 계정·폴더로 초기화. 재구성마다 호출돼도 한 번만 로드한다.
      * [folderId] null 이면 그 저장소의 루트, [rootName] 은 루트 표시 이름.
      */
-    fun load(accountId: String?, folderId: String?, folderName: String?, rootName: String, readOnly: Boolean) {
+    fun load(
+        accountId: String?,
+        folderId: String?,
+        folderName: String?,
+        rootName: String,
+        readOnly: Boolean,
+        ownerEmail: String? = null,
+    ) {
         if (loaded) return
         loaded = true
         this.accountId = accountId
@@ -99,6 +106,7 @@ class DriveBrowserViewModel @Inject constructor(
                         error = null,
                         capabilities = effectiveCapabilities(readOnly),
                         isReadOnly = readOnly,
+                        folderOwnerEmail = ownerEmail,
                         viewScopeGranted = prefs.current().driveViewScopeGranted,
                         isPickedRoot = folder.id == drive.rootId &&
                             drive.account.kind == RemoteAccountKind.GOOGLE_DRIVE,
@@ -542,7 +550,7 @@ class DriveBrowserViewModel @Inject constructor(
                 events.send(DriveBrowserEvent.ViewFolderAlreadyThere(folder.name))
                 return@launch
             }
-            prefs.addViewFolder(ViewFolder(folder.id, folder.name))
+            prefs.addViewFolder(ViewFolder(folder.id, folder.name, ownerEmail = folder.ownerEmail))
             events.send(DriveBrowserEvent.ViewFolderAdded(folder.name))
             refresh()
         }
@@ -639,6 +647,8 @@ data class DriveBrowserUiState(
     val isPickedRoot: Boolean = false,
     /** 보기 전용 폴더의 안이다 — 올리기·만들기·고치기·지우기가 없다(`docs/DRIVE_FILE_SCOPE.md` §10) */
     val isReadOnly: Boolean = false,
+    /** 지금 폴더의 소유자(모르면 null). 연결 계정과 다르면 상단 부제로 보인다 */
+    val folderOwnerEmail: String? = null,
     /** 사용자가 `drive.readonly` 를 옵트인했다. 검색 범위가 Drive 전체로 넓어진다(§10.7) */
     val viewScopeGranted: Boolean = false,
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */

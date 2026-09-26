@@ -81,6 +81,8 @@ data class DriveBrowserKey(
      * 더 깊이 들어가도 계속 true — 읽기 권한은 안쪽으로 갈수록 넓어지지 않는다.
      */
     val readOnly: Boolean = false,
+    /** 폴더 소유자. 남의 폴더면 상단 부제로 보인다 — 제목만으로는 내 "Easy Gallery" 와 같다 */
+    val ownerEmail: String? = null,
 ) : AppNavKey
 
 /** 저장소 계정 추가(S3 호환 / WebDAV / SMB). [accountId] 가 있으면 그 계정 수정 */

@@ -13,6 +13,14 @@ data class DriveFileDto(
     val size: String? = null,
     val webViewLink: String? = null,
     val capabilities: DriveCapabilitiesDto? = null,
+    /** 소유자. 이름이 같은 폴더(A 의 Easy Gallery·B 의 Easy Gallery)를 가르는 데 쓴다 */
+    val owners: List<DriveOwnerDto>? = null,
+)
+
+@Serializable
+data class DriveOwnerDto(
+    val emailAddress: String? = null,
+    val displayName: String? = null,
 )
 
 /** 이 항목에 무엇을 할 수 있는지. `drive.file` 에서 접근권이 어디까지 미치는지 보는 데 쓴다. */
