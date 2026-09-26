@@ -1,6 +1,8 @@
 package com.jjw.easygallery.feature.gallery
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -47,12 +50,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import com.jjw.easygallery.R
@@ -172,6 +179,7 @@ internal fun DateRangeSheet(
                     state = calendarState,
                     dayCounts = dayCounts,
                     selection = selection,
+                    today = today,
                     onDayClick = { selection = selection.select(it) },
                     // 세로에서는 400dp, 가로처럼 낮은 화면에서는 남는 만큼만 쓴다.
                     // 고정 높이로 두면 적용·취소 행이 화면 밖으로 밀린다.
@@ -259,6 +267,7 @@ private fun RangeCalendar(
     state: CalendarState,
     dayCounts: Map<LocalDate, Int>,
     selection: DateRangeSelection,
+    today: LocalDate,
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -275,6 +284,7 @@ private fun RangeCalendar(
                 day = day,
                 count = dayCounts[day.date] ?: 0,
                 selection = selection,
+                today = today,
                 onClick = onDayClick,
             )
         },
@@ -299,6 +309,7 @@ private fun BoxScope.DayCell(
     day: CalendarDay,
     count: Int,
     selection: DateRangeSelection,
+    today: LocalDate,
     onClick: (LocalDate) -> Unit,
 ) {
     if (day.position != DayPosition.MonthDate) {
@@ -306,7 +317,7 @@ private fun BoxScope.DayCell(
         return
     }
     val date = day.date
-    val style = dayCellStyle(MaterialTheme.colorScheme, date, count, selection)
+    val style = dayCellStyle(MaterialTheme.colorScheme, date, count, selection, today)
     val description = if (count > 0) {
         stringResource(R.string.gallery_date_day_with_count, date.dayOfMonth, count)
     } else {
@@ -324,7 +335,8 @@ private fun BoxScope.DayCell(
         Box(
             modifier = Modifier
                 .size(ENDPOINT_SIZE_DP.dp)
-                .background(style.circle, CircleShape),
+                .background(style.circle, CircleShape)
+                .border(style.borderWidth, style.border, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -350,14 +362,23 @@ private class DayCellStyle(
     val circle: Color,
     val text: Color,
     val dot: Color,
+    /** 비어 있는 날에도 "누를 수 있다" 를 보여주는 윤곽. 채워진 날에는 없다 */
+    val border: Color,
+    val borderWidth: Dp,
 )
 
-/** 셀의 색·모양만 계산한다(컴포저블 밖) — 시작·끝은 원, 사이는 띠, 사진 있는 날은 점 */
+/**
+ * 셀의 색·모양만 계산한다(컴포저블 밖) — 시작·끝은 원, 사이는 띠, 사진 있는 날은 점.
+ *
+ * 고르지 않은 날에는 **윤곽선 원**을 둔다. 숫자만 떠 있으면 누를 수 있는 자리인지 알 수 없다는
+ * 지적이 있었다. 오늘은 조금 더 진하게 그려 기준점이 되게 한다.
+ */
 private fun dayCellStyle(
     colors: ColorScheme,
     date: LocalDate,
     count: Int,
     selection: DateRangeSelection,
+    today: LocalDate,
 ): DayCellStyle {
     val inRange = selection.contains(date)
     val isStart = date == selection.start
@@ -377,8 +398,18 @@ private fun dayCellStyle(
         circle = if (isEndpoint) colors.primary else Color.Transparent,
         text = dayTextColor(colors, isEndpoint, inRange, hasPhotos = count > 0),
         dot = dayDotColor(colors, count, isEndpoint),
+        border = dayBorderColor(colors, isEndpoint, filled = inRange && multiDay, isToday = date == today),
+        borderWidth = if (date == today) TODAY_BORDER_DP.dp else DAY_BORDER_DP.dp,
     )
 }
+
+/** 채워졌거나 띠 안이면 이미 눈에 띈다. 나머지에만 윤곽을 준다 */
+private fun dayBorderColor(colors: ColorScheme, isEndpoint: Boolean, filled: Boolean, isToday: Boolean): Color =
+    when {
+        isEndpoint || filled -> Color.Transparent
+        isToday -> colors.primary
+        else -> colors.outlineVariant
+    }
 
 /** 사진이 없는 날도 고를 수 있다. 흐리게만 해서 "여기엔 없다" 를 알린다 */
 private fun dayTextColor(colors: ColorScheme, isEndpoint: Boolean, inRange: Boolean, hasPhotos: Boolean): Color =
@@ -406,6 +437,10 @@ private const val CALENDAR_HEIGHT_DP = 400
 private const val CALENDAR_HORIZONTAL_PADDING_DP = 12
 private const val ENDPOINT_SIZE_DP = 40
 private const val DOT_SIZE_DP = 4
+
+/** 고르지 않은 날의 윤곽. "누를 수 있는 자리" 를 알리되 숫자를 가리지 않을 만큼만 */
+private const val DAY_BORDER_DP = 1
+private const val TODAY_BORDER_DP = 2
 private const val HALF_PERCENT = 50
 
 /** 사진이 없는 날·달을 흐리게 하는 정도. 고를 수는 있다 */
@@ -415,24 +450,54 @@ private const val EMPTY_ALPHA = 0.38f
 @Composable
 private fun MonthJumpHeader(state: CalendarState, expanded: Boolean, onToggle: () -> Unit) {
     val month = state.firstVisibleMonth.yearMonth
+    val label = stringResource(R.string.gallery_date_month_label, month.year, month.monthValue)
+    val action = stringResource(
+        if (expanded) R.string.gallery_date_jump_collapse else R.string.gallery_date_jump_expand,
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp + 8.dp, vertical = 8.dp),
+            .padding(horizontal = CALENDAR_HORIZONTAL_PADDING_DP.dp + 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(R.string.gallery_date_month_label, month.year, month.monthValue),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-            contentDescription = stringResource(
-                if (expanded) R.string.gallery_date_jump_collapse else R.string.gallery_date_jump_expand,
-            ),
-        )
+        // 전체 너비 글자였을 때는 그냥 제목으로 읽혀 누를 수 있는 줄 몰랐다.
+        // 내용 크기의 알약 모양으로 두르고 눌린 동안 색이 차오르게 해 버튼임을 드러낸다.
+        Surface(
+            shape = CircleShape,
+            color = if (expanded) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (expanded) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onToggle)
+                .semantics {
+                    role = Role.Button
+                    contentDescription = "$label, $action"
+                },
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+                Icon(
+                    imageVector = if (expanded) {
+                        Icons.Filled.KeyboardArrowUp
+                    } else {
+                        Icons.Filled.KeyboardArrowDown
+                    },
+                    contentDescription = null,
+                )
+            }
+        }
     }
 }
 

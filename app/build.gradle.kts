@@ -146,6 +146,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.kizitonwose.calendar.compose)
     implementation(libs.smbj)
     // sshj: bcpkix 는 PEM 개인키를 읽을 때만 필요한데 우리는 비밀번호 인증만 쓴다.

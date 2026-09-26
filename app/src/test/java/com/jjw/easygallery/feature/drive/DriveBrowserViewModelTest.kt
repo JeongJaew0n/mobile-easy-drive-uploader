@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.download.DownloadScheduler
+import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.StorageRegistry
@@ -49,7 +50,11 @@ class DriveBrowserViewModelTest {
             RemoteAccount(RemoteAccount.GOOGLE_DRIVE_ID, RemoteAccountKind.GOOGLE_DRIVE, "Google Drive")
     }
     private val storages: StorageRegistry = mockk { coEvery { storage(null) } returns drive }
-    private val prefs: UserPreferencesRepository = mockk()
+
+    // Drive 링크를 열 때 연결 계정을 싣느라 읽는다(계정을 매번 고르라고 묻지 않게)
+    private val prefs: UserPreferencesRepository = mockk {
+        coEvery { current() } returns UserPreferences()
+    }
     private val downloads: DownloadScheduler = mockk(relaxed = true)
     private val ledger: UploadLedgerRepository = mockk { every { observeRemoteIds(null) } returns flowOf(setOf("f2")) }
     private val auth: AuthRepository = mockk(relaxed = true)
@@ -62,7 +67,7 @@ class DriveBrowserViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun loadedViewModel(): DriveBrowserViewModel {
-        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger, auth)
+        val viewModel = DriveBrowserViewModel(storages, prefs, downloads, ledger, auth, mockk(relaxed = true))
         viewModel.load(accountId = null, folderId = "root", folderName = "내 드라이브", rootName = "내 드라이브")
         testDispatcher.scheduler.advanceUntilIdle()
         return viewModel

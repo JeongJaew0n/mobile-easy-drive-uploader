@@ -425,6 +425,8 @@
     <string name="action_settings">설정</string>
     <string name="action_back">뒤로</string>
     <string name="action_cancel">취소</string>
+    <string name="action_close">닫기</string>
+    <string name="drive_preview_failed">사진을 불러오지 못했습니다</string>
     <string name="action_create">만들기</string>
     <string name="action_retry">다시 시도</string>
     <string name="action_clear_selection">선택 해제</string>

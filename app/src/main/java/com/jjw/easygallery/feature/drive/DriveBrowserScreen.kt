@@ -1,6 +1,7 @@
 package com.jjw.easygallery.feature.drive
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -88,6 +89,12 @@ fun DriveBrowserRoute(
     val storageRootName = stringResource(R.string.storage_root_name)
     val rootName = if (key.accountId == null) driveRootName else storageRootName
 
+    // 이미지는 앱 안에서 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
+    var preview by remember { mutableStateOf<DriveEntry?>(null) }
+    preview?.let { entry ->
+        DriveImagePreview(entry = entry, imageLoader = viewModel.driveImageLoader, onDismiss = { preview = null })
+    }
+
     val authRecoveryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result -> viewModel.onAuthRecoveryResult(result.data) }
@@ -107,10 +114,11 @@ fun DriveBrowserRoute(
             if (entry.isFolder) {
                 onOpenFolder(entry.toFolder())
             } else {
-                // 파일은 Drive 앱(설치돼 있으면) 또는 브라우저에서 연다
-                entry.webViewLink?.let { link ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
+                // 사진은 앱 안에서, 그 밖의 형식은 Drive 앱·브라우저에 맡긴다
+                if (entry.isImage) {
+                    preview = entry
+                } else {
+                    entry.webViewLink?.let { link -> context.openDriveLink(link, uiState.accountEmail) }
                 }
             }
         },
@@ -123,9 +131,10 @@ fun DriveBrowserRoute(
         onSelectAsUploadFolder = viewModel::selectAsUploadFolder,
         entryActions = DriveEntryActions(
             onOpen = { entry ->
-                entry.webViewLink?.let { link ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
+                if (entry.isImage) {
+                    preview = entry
+                } else {
+                    entry.webViewLink?.let { link -> context.openDriveLink(link, uiState.accountEmail) }
                 }
             },
             onRename = viewModel::rename,
@@ -491,6 +500,13 @@ private fun DriveBrowserScreenPreview() {
             onSelectAsUploadFolder = {},
         )
     }
+}
+
+/** 연결된 계정으로 연다. 여러 계정이 로그인돼 있어도 파일마다 고르라고 묻지 않는다 */
+private fun Context.openDriveLink(link: String, accountEmail: String?) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(driveLinkForAccount(link, accountEmail)))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    startActivity(intent)
 }
 
 /** 변경 중 진행바 — 오브젝트 단위 진행을 아는 제공자(S3)는 "n / total", 아니면 불확정 */

@@ -4,9 +4,11 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.ImageLoader
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.download.DownloadScheduler
+import com.jjw.easygallery.core.data.drive.DriveImages
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteStorage
@@ -41,6 +43,8 @@ class DriveBrowserViewModel @Inject constructor(
     private val downloads: DownloadScheduler,
     private val ledger: UploadLedgerRepository,
     private val auth: AuthRepository,
+    /** Drive 이미지를 앱 안에서 그릴 때 쓴다 — 인증이 붙어 있어 계정을 다시 묻지 않는다 */
+    @param:DriveImages val driveImageLoader: ImageLoader,
 ) : ViewModel() {
 
     private lateinit var drive: RemoteStorage
@@ -84,6 +88,9 @@ class DriveBrowserViewModel @Inject constructor(
                         isPickedRoot = folder.id == drive.rootId &&
                             drive.account.kind == RemoteAccountKind.GOOGLE_DRIVE,
                         accountName = drive.account.displayName,
+                        // Drive 링크를 열 때 어느 계정으로 볼지 지정하는 데 쓴다.
+                        // 다른 저장소(S3·NAS)는 Google 계정과 무관하므로 Drive 일 때만 싣는다.
+                        accountEmail = if (accountId == null) prefs.current().accountEmail else null,
                     )
                 }
                 observeMutationProgress()
@@ -521,6 +528,9 @@ data class DriveBrowserUiState(
     val isPickedRoot: Boolean = false,
     /** 상단 부제에 보이는 저장소 이름(Google Drive / 사용자가 정한 이름) */
     val accountName: String? = null,
+
+    /** 연결된 Google 계정. 파일을 열 때 계정을 매번 고르라고 묻지 않게 링크에 싣는다 */
+    val accountEmail: String? = null,
 ) {
     val isSelecting: Boolean get() = selectedIds.isNotEmpty()
     val isSearching: Boolean get() = searchQuery != null

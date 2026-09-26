@@ -1,10 +1,14 @@
 package com.jjw.easygallery.core.data.drive
 
+import android.content.Context
+import coil3.ImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.jjw.easygallery.BuildConfig
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,6 +24,11 @@ import javax.inject.Singleton
 @Qualifier
 @Retention(AnnotationRetention.RUNTIME)
 annotation class DriveHttpClient
+
+/** Drive 인증이 붙은 이미지 로더 — 일반 이미지 로더와 섞이면 안 된다 */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DriveImages
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -59,6 +68,23 @@ abstract class DriveModule {
             .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             // 대용량 PUT 은 쓰기 시간이 길다
             .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+
+        /**
+         * Drive 파일을 **앱 안에서** 보여줄 때 쓰는 로더.
+         *
+         * 링크를 외부 Drive 앱으로 넘기면 기기에 여러 Google 계정이 있을 때 파일마다 계정을
+         * 고르라고 묻는다(`authuser` 를 실어도 Drive 앱은 무시한다). 우리가 직접 받아
+         * 그리면 그 물음 자체가 없어진다 — 인증은 이미 붙어 있는 [DriveHttpClient] 가 한다.
+         */
+        @Provides
+        @Singleton
+        @DriveImages
+        fun providesDriveImageLoader(
+            @ApplicationContext context: Context,
+            @DriveHttpClient client: OkHttpClient,
+        ): ImageLoader = ImageLoader.Builder(context)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }
             .build()
 
         @Provides
