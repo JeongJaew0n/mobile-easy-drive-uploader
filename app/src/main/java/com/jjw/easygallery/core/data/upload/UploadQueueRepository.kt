@@ -24,11 +24,14 @@ class UploadQueueRepository @Inject constructor(
     fun observeTasks(): Flow<List<UploadTask>> = dao.observeAll().map { list -> list.map { it.toDomain() } }
 
     fun observeSummary(): Flow<UploadSummary> = observeTasks().map { tasks ->
+        val failures = tasks.filter { it.state == UploadState.FAILED }
         UploadSummary(
             total = tasks.size,
             active = tasks.count { it.isActive },
             completed = tasks.count { it.state == UploadState.COMPLETED },
-            failed = tasks.count { it.state == UploadState.FAILED },
+            failed = failures.size,
+            // 하나라도 이유가 다르면 배너가 거짓말이 된다 — 전부 같을 때만 싣는다
+            failureReason = failures.mapTo(HashSet()) { it.errorReason }.singleOrNull(),
             current = tasks.firstOrNull { it.state == UploadState.RUNNING }
                 ?: tasks.firstOrNull { it.state == UploadState.PENDING },
         )
@@ -98,7 +101,20 @@ class UploadQueueRepository @Inject constructor(
 
     suspend fun complete(id: Long, driveFileId: String) = dao.markCompleted(id, driveFileId, clock())
 
-    suspend fun fail(id: Long, message: String?) = dao.markFailed(id, message, clock())
+    suspend fun fail(id: Long, message: String?, reason: String? = null) =
+        dao.markFailed(id, message, reason, clock())
+
+    /**
+     * 끝나지 않은 것을 모두 같은 이유로 실패 처리한다. @return 접힌 개수.
+     *
+     * Room 의 UPDATE 반환값은 이 경로에서 0 으로 오는 일이 있어(2026-09-26 기기에서 확인)
+     * 직접 세고 나서 갱신한다 — 로그가 거짓말을 하면 다음 사람이 "안 돌았다" 고 읽는다.
+     */
+    suspend fun failAllUnfinished(message: String?, reason: String?): Int {
+        val count = dao.countUnfinishedNow()
+        dao.failAllUnfinished(message, reason, clock())
+        return count
+    }
 
     suspend fun retryFailed(): Int = dao.retryFailed(clock())
 
@@ -126,6 +142,7 @@ class UploadQueueRepository @Inject constructor(
         bytesUploaded = bytesUploaded,
         driveFileId = driveFileId,
         errorMessage = errorMessage,
+        errorReason = errorReason,
         attemptCount = attemptCount,
         createdAt = createdAt,
         width = width,

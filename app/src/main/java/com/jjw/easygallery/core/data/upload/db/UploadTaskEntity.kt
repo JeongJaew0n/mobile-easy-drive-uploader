@@ -24,6 +24,11 @@ data class UploadTaskEntity(
     val bytesUploaded: Long = 0,
     val driveFileId: String? = null,
     val errorMessage: String? = null,
+    /**
+     * 서버가 준 기계용 실패 코드(`storageQuotaExceeded` 등). 화면이 이걸로 제대로 된 한국어
+     * 문장을 고른다 — [errorMessage] 는 코드가 없을 때의 대비책이다.
+     */
+    val errorReason: String? = null,
     val attemptCount: Int = 0,
     val createdAt: Long,
     val updatedAt: Long,

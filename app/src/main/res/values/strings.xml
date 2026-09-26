@@ -612,6 +612,14 @@
     <string name="auto_tag_label_sports">운동</string>
     <string name="auto_tag_label_fireworks">불꽃놀이</string>
     <string name="drive_video_failed">이 형식은 기기에서 재생할 수 없습니다. \"기기에 저장\" 후 다른 앱으로 열어 보세요</string>
+    <!-- 업로드 실패 사유 (Google API reason 코드 → 사람 말) -->
+    <string name="notification_upload_blocked_title">업로드를 멈췄습니다</string>
+    <string name="upload_blocked_storage_full">Google Drive 저장 공간이 가득 찼습니다. 공간을 비우고 다시 시도하세요</string>
+    <string name="upload_error_storage_full">Drive 저장 공간이 가득 찼습니다</string>
+    <string name="upload_error_rate_limited">요청이 많아 잠시 뒤 다시 시도합니다</string>
+    <string name="upload_error_no_permission">이 폴더에 올릴 권한이 없습니다</string>
+    <string name="upload_error_folder_missing">업로드 폴더를 찾을 수 없습니다</string>
+    <string name="upload_error_sign_in">다시 로그인해야 합니다</string>
     <!-- 보기 전용 폴더 (docs/DRIVE_FILE_SCOPE.md §10) -->
     <string name="drive_add_view_folder">볼 수 있는 폴더 추가</string>
     <string name="drive_add_view_folder_confirm">이 폴더 추가</string>

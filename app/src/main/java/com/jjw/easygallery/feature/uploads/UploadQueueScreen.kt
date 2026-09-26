@@ -189,7 +189,7 @@ private fun UploadTaskRow(
                     Formatter.formatShortFileSize(context, task.sizeBytes),
                 )
                 UploadState.COMPLETED -> stringResource(R.string.upload_state_completed, task.folderName.orEmpty())
-                UploadState.FAILED -> task.errorMessage ?: stringResource(R.string.upload_state_failed)
+                UploadState.FAILED -> failureText(task)
             }.let { text -> if (accountName != null) "$accountName · $text" else text }
             Text(
                 text = subtitle,
@@ -199,7 +199,8 @@ private fun UploadTaskRow(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                maxLines = 2,
+                // 실패 사유는 두 줄로 잘리면 무슨 일인지 알 수 없다. 서버 원문이 섞여도 읽히게 넉넉히 준다
+                maxLines = if (task.state == UploadState.FAILED) FAILURE_MAX_LINES else 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (task.state == UploadState.RUNNING) {
@@ -216,6 +217,27 @@ private fun UploadTaskRow(
             Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_remove))
         }
     }
+}
+
+/**
+ * 실패 한 줄. **서버가 준 원문을 그대로 쓰지 않는다** — 예전에는 Drive 의 오류 JSON 이
+ * 통째로 들어가 `업로드 실패 (403): {  "error": {…` 로 잘렸다(2026-09-26 기기에서 확인).
+ *
+ * 서버가 준 코드(`errorReason`)를 아는 것이면 우리 문장으로 바꾼다. 모르는 코드면
+ * 그때만 원문을 보여준다 — 영어라도 없는 것보다는 낫다.
+ */
+@Composable
+private fun failureText(task: UploadTask): String {
+    val known = when (task.errorReason) {
+        "storageQuotaExceeded" -> R.string.upload_error_storage_full
+        "rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded" -> R.string.upload_error_rate_limited
+        "insufficientFilePermissions", "forbidden" -> R.string.upload_error_no_permission
+        "notFound" -> R.string.upload_error_folder_missing
+        "authError", "unauthorized" -> R.string.upload_error_sign_in
+        else -> null
+    }
+    if (known != null) return stringResource(known)
+    return task.errorMessage ?: stringResource(R.string.upload_state_failed)
 }
 
 @Composable
@@ -279,3 +301,6 @@ private fun UploadQueueScreenPreview() {
         )
     }
 }
+
+/** 실패 사유가 잘리지 않도록 넉넉히. 우리 문장은 한 줄이지만 서버 원문은 길 수 있다 */
+private const val FAILURE_MAX_LINES = 4

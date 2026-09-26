@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         AutoTagScanEntity::class,
         HiddenMediaEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -28,6 +28,8 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
+        // 11: upload_tasks.errorReason — 실패 사유를 코드로 남겨 화면이 문장을 고른다
+        AutoMigration(from = 10, to = 11),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

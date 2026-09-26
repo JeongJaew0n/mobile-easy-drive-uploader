@@ -20,6 +20,8 @@ data class UploadTask(
     val bytesUploaded: Long,
     val driveFileId: String?,
     val errorMessage: String?,
+    /** 서버가 준 실패 코드. 화면이 이걸로 문장을 고른다 */
+    val errorReason: String? = null,
     val attemptCount: Int,
     val createdAt: Long,
     val width: Int = 0,
@@ -40,6 +42,11 @@ data class UploadSummary(
     val current: UploadTask? = null,
     /** 큐가 멈춰 있다면 그 이유. 화면이 "업로드 중" 대신 기다리는 까닭을 말한다 */
     val waitReason: UploadWaitReason = UploadWaitReason.NONE,
+    /**
+     * 실패한 것들이 **모두 같은 이유**면 그 코드. 배너가 개수만 말하지 않고 까닭을 말한다 —
+     * "1553개 실패" 만으로는 무엇을 해야 할지 알 수 없다. 이유가 섞였으면 null.
+     */
+    val failureReason: String? = null,
 ) {
     val hasActive: Boolean get() = active > 0
 }

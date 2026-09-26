@@ -147,6 +147,14 @@ class UploadNotifications @Inject constructor(
         )
     }
 
+    /**
+     * 더 해봐야 소용없어서 멈췄다(용량 초과 등). 남은 항목을 조용히 두고 이유를 알린다 —
+     * 알리지 않으면 사용자는 "업로드가 멈췄다" 만 겪는다.
+     */
+    fun showUploadBlocked(text: String) {
+        notify(SUMMARY_ID, text, context.getString(R.string.notification_upload_blocked_title))
+    }
+
     private fun notify(id: Int, text: String, title: String) {
         // POST_NOTIFICATIONS 가 거부된 경우 notify 는 조용히 무시된다
         if (!manager.areNotificationsEnabled()) return

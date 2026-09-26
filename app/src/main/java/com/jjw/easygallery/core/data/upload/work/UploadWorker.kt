@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
@@ -59,6 +60,13 @@ class UploadWorker @AssistedInject constructor(
     private val deferred = Collections.synchronizedSet(mutableSetOf<Long>())
 
     /**
+     * 더 해봐야 소용없다고 판정된 오류. 남은 항목을 같은 이유로 접을 때 쓴다.
+     * 큐에서 집어온 [UploadTask] 는 실패 **전**의 복사본이라 사유가 들어 있지 않다.
+     */
+    @Volatile
+    private var hopelessError: RemoteStorageException? = null
+
+    /**
      * 큐를 [PARALLELISM] 개 코루틴이 나눠 비운다. 장당 시간의 대부분이 서버를 기다리는 시간이라
      * 동시에 보내면 그대로 처리량이 는다 — `docs/UPLOAD_PERFORMANCE.md` §2-2.
      *
@@ -77,7 +85,14 @@ class UploadWorker @AssistedInject constructor(
             }
         }
 
-        stopResult.get()?.let { return it }
+        // 모든 코루틴이 끝난 뒤에 접는다 — 도는 중에 접으면 다른 코루틴이 올리고 있는 것까지 접는다
+        hopelessError?.let { error -> stopHopeless(error) }
+        return finishResult(stopResult.get())
+    }
+
+    /** 멈출 이유 > 미뤄둔 것 > 정상 종료 순으로 결과를 정한다 */
+    private fun finishResult(stop: Result?): Result {
+        if (stop != null) return stop
         // 일시 오류로 미뤄둔 것이 남았으면 백오프 후 이 워커가 다시 돈다
         if (deferred.isNotEmpty()) {
             Timber.i("upload deferred %d item(s) (succeeded=%d failed=%d)", deferred.size, succeeded, failed)
@@ -105,8 +120,28 @@ class UploadWorker @AssistedInject constructor(
                     notifications.showSignInRequired()
                     stopResult.compareAndSet(null, Result.failure())
                 }
+                // 용량 초과처럼 다시 해도 소용없는 이유다. 남은 것을 계속 시도하면 같은 실패가
+                // 수백 번 쌓이고, 사용자는 "N개 실패" 만 보게 된다 — 한 건에서 멈추고 이유를 알린다
+                // 접는 것은 여기서 하지 않는다 — 다른 코루틴이 아직 올리고 있는 항목까지
+                // 잘못 접는다. 모두 끝난 뒤 doWork 가 한 번에 정리한다
+                Outcome.Hopeless -> {
+                    countFailure()
+                    stopResult.compareAndSet(null, Result.failure())
+                }
             }
         }
+    }
+
+    /**
+     * 남은 것을 같은 이유로 접고 멈춘다.
+     *
+     * 대기로 두면 화면에는 "업로드 중" 으로 보이고, 하나씩 올려보면 같은 실패가 쌓인다 —
+     * 용량이 찬 채로 1553건이 그랬다. 사용자가 공간을 비운 뒤 "실패 재시도" 를 누르면 그대로 간다.
+     */
+    private suspend fun stopHopeless(error: RemoteStorageException) {
+        val folded = queue.failAllUnfinished(error.message, error.reason)
+        Timber.w("upload stopped: %s, folded %d unfinished item(s)", error.reason, folded)
+        notifications.showUploadBlocked(applicationContext.getString(R.string.upload_blocked_storage_full))
     }
 
     @Synchronized
@@ -273,9 +308,11 @@ class UploadWorker @AssistedInject constructor(
             runCatching { storages.storage(task.accountId).uploader().abort(session) }
                 .onFailure { Timber.w(it, "abort session failed") }
         }
-        queue.fail(task.id, e.message ?: e.toString())
+        queue.fail(task.id, e.message ?: e.toString(), (e as? RemoteStorageException)?.reason)
         compressor.cleanup(task.toSource())
-        return Outcome.Failed
+        if (e !is RemoteStorageException || !e.isHopeless) return Outcome.Failed
+        hopelessError = e
+        return Outcome.Hopeless
     }
 
     private suspend fun retryTransient(task: UploadTask, e: Exception): Outcome {
@@ -289,7 +326,7 @@ class UploadWorker @AssistedInject constructor(
         val attempts = task.attemptCount + 1
         if (attempts >= MAX_ATTEMPTS) {
             Timber.e(e, "upload gave up after %d attempts: %s", attempts, task.displayName)
-            queue.fail(task.id, e.message ?: e.toString())
+            queue.fail(task.id, e.message ?: e.toString(), (e as? RemoteStorageException)?.reason)
             return Outcome.Failed
         }
         Timber.w(e, "upload transient failure (%d/%d): %s", attempts, MAX_ATTEMPTS, task.displayName)
@@ -332,7 +369,15 @@ class UploadWorker @AssistedInject constructor(
         height = height,
     )
 
-    private enum class Outcome { Success, Failed, RetryLater, SignInRequired }
+    private enum class Outcome {
+        Success,
+        Failed,
+        RetryLater,
+        SignInRequired,
+
+        /** 다시 해도 소용없다(Drive 용량 초과). 남은 항목을 건드리지 않고 멈춘다 */
+        Hopeless,
+    }
 
     companion object {
         /** 이 크기 이하만 왕복 한 번(multipart). 넘으면 끊겼을 때 다시 올리는 비용이 더 크다 */

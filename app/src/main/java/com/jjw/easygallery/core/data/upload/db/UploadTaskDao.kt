@@ -7,6 +7,8 @@ import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
+// TooManyFunctions: 큐 한 표에 대한 질의 모음이라 쪼개면 "어느 DAO 였더라" 를 매번 찾게 된다
+@Suppress("TooManyFunctions")
 interface UploadTaskDao {
 
     @Query("SELECT * FROM upload_tasks ORDER BY createdAt, id")
@@ -68,15 +70,36 @@ interface UploadTaskDao {
 
     @Query(
         "UPDATE upload_tasks SET state = 'COMPLETED', driveFileId = :fileId, bytesUploaded = sizeBytes, " +
-            "errorMessage = NULL, updatedAt = :now WHERE id = :id",
+            "errorMessage = NULL, errorReason = NULL, updatedAt = :now WHERE id = :id",
     )
     suspend fun markCompleted(id: Long, fileId: String, now: Long)
 
-    @Query("UPDATE upload_tasks SET state = 'FAILED', errorMessage = :message, updatedAt = :now WHERE id = :id")
-    suspend fun markFailed(id: Long, message: String?, now: Long)
+    @Query(
+        "UPDATE upload_tasks SET state = 'FAILED', errorMessage = :message, errorReason = :reason, " +
+            "updatedAt = :now WHERE id = :id",
+    )
+    suspend fun markFailed(id: Long, message: String?, reason: String?, now: Long)
+
+    /**
+     * 끝나지 않은 항목을 모두 같은 이유로 접는다. 용량 초과처럼 **다시 해도 소용없는** 이유가
+     * 나왔을 때 쓴다 — 그대로 두면 화면에는 "대기 중"·"업로드 중" 으로 남아 진행 중인 것처럼
+     * 보이고, 하나씩 올려보면 같은 실패가 수백 번 쌓인다.
+     *
+     * `RUNNING` 까지 포함하는 이유: 멈추는 순간 코루틴이 집어 든 항목이 그 상태로 남는다.
+     * **모든 코루틴이 끝난 뒤**에 불러야 진행 중인 것을 잘못 접지 않는다.
+     */
+    @Query(
+        "UPDATE upload_tasks SET state = 'FAILED', errorMessage = :message, errorReason = :reason, " +
+            "updatedAt = :now WHERE state IN ('PENDING', 'RUNNING')",
+    )
+    suspend fun failAllUnfinished(message: String?, reason: String?, now: Long)
+
+    @Query("SELECT COUNT(*) FROM upload_tasks WHERE state IN ('PENDING', 'RUNNING')")
+    suspend fun countUnfinishedNow(): Int
 
     @Query(
-        "UPDATE upload_tasks SET state = 'PENDING', errorMessage = NULL, attemptCount = 0, updatedAt = :now " +
+        "UPDATE upload_tasks SET state = 'PENDING', errorMessage = NULL, errorReason = NULL, " +
+            "attemptCount = 0, updatedAt = :now " +
             "WHERE state = 'FAILED'",
     )
     suspend fun retryFailed(now: Long): Int

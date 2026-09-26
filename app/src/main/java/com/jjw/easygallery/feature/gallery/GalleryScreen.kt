@@ -346,7 +346,11 @@ private fun GalleryContent(
             enter = motion.enterExpand(),
             exit = motion.exitShrink(),
         ) {
-            UploadFailedBanner(failed = uiState.upload.failed, onClick = onUploadQueueClick)
+            UploadFailedBanner(
+                failed = uiState.upload.failed,
+                onClick = onUploadQueueClick,
+                reason = uiState.upload.failureReason,
+            )
         }
         AnimatedVisibility(
             visible = uiState.isPartialAccess,

@@ -107,6 +107,8 @@ internal fun UploadFailedBanner(
     failed: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 실패가 전부 같은 이유일 때 그 코드. 개수만 말하면 무엇을 해야 할지 알 수 없다 */
+    reason: String? = null,
 ) {
     Surface(
         modifier = modifier
@@ -118,14 +120,28 @@ internal fun UploadFailedBanner(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val count = pluralStringResource(R.plurals.gallery_upload_failed_banner, failed, failed)
+            val why = uploadReasonTextOrNull(reason)
             Text(
-                text = pluralStringResource(R.plurals.gallery_upload_failed_banner, failed, failed),
+                text = if (why != null) "$count — $why" else count,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onClick) { Text(stringResource(R.string.action_view)) }
         }
     }
+}
+
+/** 아는 실패 코드면 우리 문장, 모르면 null(개수만 보여준다) */
+@Composable
+private fun uploadReasonTextOrNull(reason: String?): String? = when (reason) {
+    "storageQuotaExceeded" -> stringResource(R.string.upload_error_storage_full)
+    "rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded" ->
+        stringResource(R.string.upload_error_rate_limited)
+    "insufficientFilePermissions", "forbidden" -> stringResource(R.string.upload_error_no_permission)
+    "notFound" -> stringResource(R.string.upload_error_folder_missing)
+    "authError", "unauthorized" -> stringResource(R.string.upload_error_sign_in)
+    else -> null
 }
 
 @Composable

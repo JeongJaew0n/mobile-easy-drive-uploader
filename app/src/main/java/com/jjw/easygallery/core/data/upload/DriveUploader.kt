@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.drive.DriveHttpClient
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
+import com.jjw.easygallery.core.data.remote.parseRemoteErrorBody
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -61,7 +62,8 @@ sealed interface SessionStatus {
     data object Expired : SessionStatus
 }
 
-open class DriveUploadException(message: String, httpCode: Int? = null) : RemoteStorageException(message, httpCode)
+open class DriveUploadException(message: String, httpCode: Int? = null, reason: String? = null) :
+    RemoteStorageException(message, httpCode, reason = reason)
 
 /** 세션 URI 가 만료/삭제됨(404·410). 새 세션을 만들어 처음부터 올려야 한다. */
 class SessionExpiredException(httpCode: Int) : DriveUploadException("업로드 세션이 만료되었습니다", httpCode)
@@ -100,7 +102,14 @@ class DriveUploader @Inject constructor(
             contentLength = length,
         )
         if (!response.isSuccessful) {
-            throw DriveUploadException("업로드 세션 생성 실패 (${response.code()})", response.code())
+            // 예전에는 코드만 던져서 294건이 "업로드 세션 생성 실패 (403)" 로만 남았다 — 이유를 알 길이 없었다
+            val parsed = parseRemoteErrorBody(runCatching { response.errorBody()?.string() }.getOrNull())
+            Timber.w("start session failed %d reason=%s", response.code(), parsed.reason)
+            throw DriveUploadException(
+                message = "업로드 세션 생성 실패 (${response.code()})${parsed.message?.let { ": $it" }.orEmpty()}",
+                httpCode = response.code(),
+                reason = parsed.reason,
+            )
         }
         return response.headers()["Location"] ?: throw DriveUploadException("업로드 세션 URI 가 없습니다")
     }
@@ -139,10 +148,7 @@ class DriveUploader @Inject constructor(
                 HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED ->
                     SessionStatus.Complete(parseFile(response).id)
                 HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> SessionStatus.Expired
-                else -> throw DriveUploadException(
-                    "세션 상태 조회 실패 (${response.code})${detailOf(response)}",
-                    response.code,
-                )
+                else -> throw failureOf("세션 상태 조회", response)
             }
         }
     }
@@ -183,10 +189,7 @@ class DriveUploader @Inject constructor(
         return client.newCall(request).await().use { response ->
             when (response.code) {
                 HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response).id
-                else -> throw DriveUploadException(
-                    "업로드 실패 (${response.code})${detailOf(response)}",
-                    response.code,
-                )
+                else -> throw failureOf("업로드", response)
             }
         }
     }
@@ -222,10 +225,7 @@ class DriveUploader @Inject constructor(
                 when (response.code) {
                     HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response)
                     HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> throw SessionExpiredException(response.code)
-                    else -> throw DriveUploadException(
-                        "업로드 실패 (${response.code})${detailOf(response)}",
-                        response.code,
-                    )
+                    else -> throw failureOf("업로드", response)
                 }
             }
             Timber.d("uploaded %s -> %s", source.displayName, file.id)
@@ -233,12 +233,22 @@ class DriveUploader @Inject constructor(
         }.flowOn(ioDispatcher)
 
     /**
-     * 서버가 준 설명을 오류에 붙인다. 코드만 있으면 "502" 가 우리 잘못인지 중간 경로의 문제인지
+     * 서버가 준 설명을 오류로 바꾼다. 코드만 있으면 "502" 가 우리 잘못인지 중간 경로의 문제인지
      * 알 길이 없다. [Response.peekBody] 라 본문을 소비하지 않는다.
+     *
+     * 본문을 **그대로 붙이지 않는다.** 예전에는 JSON 통째로 붙여서 업로드 목록의 두 줄짜리
+     * 자리에 `업로드 실패 (403): {  "error": {…` 로 잘렸다. 기계용 코드는 [RemoteStorageException.reason]
+     * 으로 넘겨 화면이 제대로 된 문장을 고르게 하고, 원본은 로그에만 남긴다.
      */
-    private fun detailOf(response: Response): String {
-        val body = runCatching { response.peekBody(ERROR_BODY_LIMIT).string() }.getOrNull()
-        return body?.trim()?.take(ERROR_BODY_LIMIT.toInt())?.takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
+    private fun failureOf(what: String, response: Response): DriveUploadException {
+        val raw = runCatching { response.peekBody(ERROR_BODY_LIMIT).string() }.getOrNull()
+        val parsed = parseRemoteErrorBody(raw)
+        Timber.w("%s failed %d reason=%s body=%s", what, response.code, parsed.reason, raw)
+        return DriveUploadException(
+            message = "$what 실패 (${response.code})${parsed.message?.let { ": $it" }.orEmpty()}",
+            httpCode = response.code,
+            reason = parsed.reason,
+        )
     }
 
     private fun parseFile(response: Response): DriveFileDto =
@@ -247,7 +257,7 @@ class DriveUploader @Inject constructor(
     private companion object {
         const val DEFAULT_MIME_TYPE = "application/octet-stream"
         val DEFAULT_MEDIA_TYPE = DEFAULT_MIME_TYPE.toMediaTypeOrNull()!!
-        const val ERROR_BODY_LIMIT = 300L
+        const val ERROR_BODY_LIMIT = 2000L
         const val MULTIPART_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" +
             "&fields=id,name,mimeType,parents"
         val MULTIPART_RELATED = "multipart/related".toMediaTypeOrNull()!!
