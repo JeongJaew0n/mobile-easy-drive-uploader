@@ -15,6 +15,13 @@ data class DriveFileDto(
     val capabilities: DriveCapabilitiesDto? = null,
     /** 소유자. 이름이 같은 폴더(A 의 Easy Gallery·B 의 Easy Gallery)를 가르는 데 쓴다 */
     val owners: List<DriveOwnerDto>? = null,
+    /**
+     * Drive 가 서버에서 만든 썸네일 주소. **몇 시간 뒤 만료된다**(API 문서). 격자 보기가 원본 대신 이걸 받는다
+     * (`docs/DRIVE_PHOTO_GRID.md`). 막 올린 파일은 아직 없을 수 있다.
+     */
+    val thumbnailLink: String? = null,
+    /** 썸네일이 바뀌면 오른다. 링크 대신 이걸로 기기 캐시를 가른다. Drive 는 int64 를 문자열로 준다 */
+    val thumbnailVersion: String? = null,
 )
 
 @Serializable

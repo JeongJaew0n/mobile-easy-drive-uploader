@@ -40,7 +40,8 @@ interface DriveApi {
         @Query("orderBy") orderBy: String = "folder,name_natural",
         @Query("spaces") spaces: String = "drive",
         @Query("fields") fields: String =
-            "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink,owners(emailAddress))",
+            "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink,owners(emailAddress)," +
+                "thumbnailLink,thumbnailVersion)",
     ): DriveFileListDto
 
     @POST("drive/v3/files")
@@ -84,6 +85,11 @@ interface DriveApi {
     companion object {
         const val BASE_URL = "https://www.googleapis.com/"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-        private const val DEFAULT_PAGE_SIZE = 100
+
+        /**
+         * 한 번에 받는 개수. 격자 보기는 칸이 작아 100개가 한두 번 튕기면 끝나 다음 쪽을 자주 부른다.
+         * 최대는 1,000 이다(API). 목록에도 해롭지 않다 — 요청 수가 준다(`docs/DRIVE_PHOTO_GRID.md`)
+         */
+        private const val DEFAULT_PAGE_SIZE = 300
     }
 }

@@ -54,6 +54,8 @@ class DriveBrowserViewModelTest {
     // Drive 링크를 열 때 연결 계정을 싣느라 읽는다(계정을 매번 고르라고 묻지 않게)
     private val prefs: UserPreferencesRepository = mockk {
         coEvery { current() } returns UserPreferences()
+        // 격자 보기 설정을 읽는다
+        every { preferences } returns flowOf(UserPreferences())
     }
     private val downloads: DownloadScheduler = mockk(relaxed = true)
     private val ledger: UploadLedgerRepository = mockk { every { observeRemoteIds(null) } returns flowOf(setOf("f2")) }

@@ -44,6 +44,8 @@ data class UserPreferences(
      * (`docs/plans/guest-account-upload/spec.md` §4.5). 로그인 정보가 아니라 알림 문구용 이메일이다.
      */
     val guestCleanupEmail: String? = null,
+    /** Drive 화면을 격자(썸네일)로 본다. 고른 모양은 다시 열어도 그대로다(`docs/DRIVE_PHOTO_GRID.md`) */
+    val driveGridView: Boolean = false,
     /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
     val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
@@ -105,6 +107,7 @@ class UserPreferencesRepository @Inject constructor(
             viewFolders = decodeViewFolders(prefs[KEY_VIEW_FOLDERS]),
             driveViewScopeGranted = prefs[KEY_DRIVE_VIEW_SCOPE] ?: false,
             guestCleanupEmail = prefs[KEY_GUEST_CLEANUP],
+            driveGridView = prefs[KEY_DRIVE_GRID] ?: false,
             uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,
@@ -187,6 +190,10 @@ class UserPreferencesRepository @Inject constructor(
                 prefs.remove(KEY_VIEW_FOLDERS)
             }
         }
+    }
+
+    suspend fun setDriveGridView(grid: Boolean) {
+        store.edit { it[KEY_DRIVE_GRID] = grid }
     }
 
     suspend fun setGuestCleanupEmail(email: String?) {
@@ -339,5 +346,6 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_VIEW_FOLDERS = stringPreferencesKey("view_folders")
         val KEY_DRIVE_VIEW_SCOPE = booleanPreferencesKey("drive_view_scope")
         val KEY_GUEST_CLEANUP = stringPreferencesKey("guest_cleanup_email")
+        val KEY_DRIVE_GRID = booleanPreferencesKey("drive_grid_view")
     }
 }

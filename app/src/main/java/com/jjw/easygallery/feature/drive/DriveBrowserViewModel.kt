@@ -30,9 +30,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -65,6 +68,14 @@ class DriveBrowserViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(DriveBrowserUiState())
     val uiState: StateFlow<DriveBrowserUiState> = _uiState.asStateFlow()
+
+    /** 격자(썸네일)로 보나. 설정에 남아 다시 열어도 그대로다 */
+    val gridView: StateFlow<Boolean> = prefs.preferences.map { it.driveGridView }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    fun toggleGridView() {
+        viewModelScope.launch { prefs.setDriveGridView(!gridView.value) }
+    }
 
     private val events = Channel<DriveBrowserEvent>(Channel.BUFFERED)
     val eventFlow = events.receiveAsFlow()
@@ -674,6 +685,8 @@ data class DriveBrowserUiState(
      */
     val isReadOnlyHere: Boolean get() = isReadOnly || (isRemoteSearchResult && viewScopeGranted)
 }
+
+private const val STOP_TIMEOUT_MILLIS = 5_000L
 
 /** 보기 전용 폴더에서 빼는 동작들 — 읽기 권한으로는 할 수 없다 */
 private val MUTATING_CAPABILITIES = setOf(

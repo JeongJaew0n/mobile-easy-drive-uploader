@@ -133,6 +133,8 @@ class DriveRestRepository @Inject constructor(
         modifiedTimeMillis = modifiedTime?.let { parseRfc3339(it) },
         webViewLink = webViewLink,
         ownerEmail = ownerEmail(),
+        thumbnailLink = thumbnailLink,
+        thumbnailVersion = thumbnailVersion,
     )
 
     private fun parseRfc3339(value: String): Long? = try {

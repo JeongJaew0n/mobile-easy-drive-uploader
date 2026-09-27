@@ -32,6 +32,10 @@ data class DriveEntry(
      * (`docs/plans/guest-account-upload/spec.md` §6).
      */
     val ownerEmail: String? = null,
+    /** 서버가 만든 썸네일 주소(몇 시간 뒤 만료). 없으면 아이콘으로 보인다 */
+    val thumbnailLink: String? = null,
+    /** 썸네일 캐시 키. 링크는 바뀌어도 이 값이 같으면 같은 그림이다 */
+    val thumbnailVersion: String? = null,
 ) {
     val isFolder: Boolean get() = mimeType == FOLDER_MIME_TYPE
     val isImage: Boolean get() = mimeType.startsWith("image/")

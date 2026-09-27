@@ -21,9 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -50,7 +47,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +57,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.ImageLoader
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.domain.model.Capability
@@ -69,8 +66,6 @@ import com.jjw.easygallery.core.domain.model.DriveFolder
 import com.jjw.easygallery.core.navigation.DriveBrowserKey
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 @Composable
 fun DriveBrowserRoute(
@@ -81,6 +76,7 @@ fun DriveBrowserRoute(
     viewModel: DriveBrowserViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val gridView by viewModel.gridView.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -167,6 +163,9 @@ fun DriveBrowserRoute(
         onCreateFolder = viewModel::createFolder,
         onSelectAsUploadFolder = viewModel::selectAsUploadFolder,
         onAddViewFolder = viewModel::startAddViewFolder,
+        gridView = gridView,
+        imageLoader = viewModel.driveImageLoader,
+        onToggleGrid = viewModel::toggleGridView,
         entryActions = DriveEntryActions(
             onOpen = { entry ->
                 if (entry.isImage || entry.isVideo) {
@@ -231,6 +230,10 @@ internal fun DriveBrowserScreen(
     onSelectAsUploadFolder: () -> Unit,
     onAddViewFolder: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** 격자(썸네일)로 본다. 이미지 로더가 없으면(미리보기) 목록으로 */
+    gridView: Boolean = false,
+    imageLoader: ImageLoader? = null,
+    onToggleGrid: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     entryActions: DriveEntryActions = DriveEntryActions(),
 ) {
@@ -242,16 +245,6 @@ internal fun DriveBrowserScreen(
     var deletingSelection by rememberSaveable { mutableStateOf(false) }
     val hasTrash = Capability.TRASH in uiState.capabilities
     BrowserBackHandlers(uiState, entryActions)
-    val listState = rememberLazyListState()
-    val motion = LocalMotion.current
-
-    // 마지막 항목 근처에 오면 다음 페이지 요청
-    LaunchedEffect(listState, uiState.entries.size) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
-            .filter { last -> last != null && last >= uiState.entries.size - LOAD_MORE_THRESHOLD }
-            .collect { onLoadMore() }
-    }
 
     Scaffold(
         modifier = modifier,
@@ -259,6 +252,8 @@ internal fun DriveBrowserScreen(
         topBar = {
             BrowserTopBar(
                 uiState = uiState,
+                gridView = gridView,
+                onToggleGrid = onToggleGrid,
                 onBackClick = onBackClick,
                 onRefresh = onRefresh,
                 onCreateFolder = { showCreateDialog = true },
@@ -308,55 +303,17 @@ internal fun DriveBrowserScreen(
                     onRefresh = onRefresh,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                        items(uiState.entries, key = { it.id }) { entry ->
-                            DriveEntryRow(
-                                entry = entry,
-                                onClick = {
-                                    if (uiState.isSelecting) entryActions.onToggleSelect(entry) else onEntryClick(entry)
-                                },
-                                onLongClick = { entryActions.onToggleSelect(entry) },
-                                selected = entry.id in uiState.selectedIds,
-                                selecting = uiState.isSelecting,
-                                enabled = !uiState.isMutating,
-                                menu = entryMenu(
-                                    entry,
-                                    uiState.capabilities,
-                                    allowMove = !uiState.isRemoteSearchResult,
-                                    isPickedRoot = uiState.isPickedRoot,
-                                    isReadOnly = uiState.isReadOnlyHere,
-                                ),
-                                uploadedFromDevice = entry.id in uiState.uploadedFromDeviceIds,
-                                onOpen = { entryActions.onOpen(entry) },
-                                onDownload = { entryActions.onDownload(entry) },
-                                onRename = { renaming = entry },
-                                onMove = { moving = entry },
-                                onTrash = { if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
-                                onRemoveFromList = { entryActions.onRemoveFromList(entry) },
-                                // 루트는 서로 다른 계정의 폴더가 섞이는 유일한 자리다
-                                ownerLabel = if (uiState.isPickedRoot) {
-                                    ownerLabelOf(entry.ownerEmail, uiState.accountEmail)
-                                } else {
-                                    null
-                                },
-                                modifier = Modifier.animateItem(
-                                    fadeInSpec = motion.quick(),
-                                    placementSpec = motion.settle(),
-                                    fadeOutSpec = motion.quick(),
-                                ),
-                            )
-                        }
-                        if (uiState.isLoadingMore) {
-                            item(key = "loading-more") {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
-                            }
-                        }
-                    }
+                    DriveEntries(
+                        uiState = uiState,
+                        gridView = gridView && imageLoader != null,
+                        imageLoader = imageLoader,
+                        onEntryClick = onEntryClick,
+                        onLoadMore = onLoadMore,
+                        entryActions = entryActions,
+                        onRename = { renaming = it },
+                        onMove = { moving = it },
+                        onTrash = { entry -> if (hasTrash) entryActions.onTrash(entry) else deleting = entry },
+                    )
                 }
             }
             if (uiState.isMutating) MutationProgressBar(uiState.mutationProgress)
@@ -474,6 +431,8 @@ private fun emptyMessageRes(uiState: DriveBrowserUiState): Int = when {
 @Composable
 private fun BrowserTopBar(
     uiState: DriveBrowserUiState,
+    gridView: Boolean,
+    onToggleGrid: () -> Unit,
     onBackClick: () -> Unit,
     onRefresh: () -> Unit,
     onCreateFolder: () -> Unit,
@@ -526,6 +485,13 @@ private fun BrowserTopBar(
             IconButton(onClick = entryActions.onStartSearch, enabled = !uiState.isMutating && !uiState.isLoading) {
                 Icon(Icons.Filled.Search, contentDescription = stringResource(searchHintRes(uiState)))
             }
+            IconButton(onClick = onToggleGrid) {
+                if (gridView) {
+                    Icon(painterResource(R.drawable.ic_view_list), stringResource(R.string.drive_view_as_list))
+                } else {
+                    Icon(painterResource(R.drawable.ic_grid_view), stringResource(R.string.drive_view_as_grid))
+                }
+            }
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
             }
@@ -559,8 +525,6 @@ private fun BrowserTitle(folderName: String?, accountName: String?, foreignOwner
         )
     }
 }
-
-private const val LOAD_MORE_THRESHOLD = 5
 
 /** "내 계정" / 소유자 이메일 / 모르면 null (`docs/plans/guest-account-upload/spec.md` §6) */
 @Composable
