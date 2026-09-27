@@ -104,7 +104,17 @@
     <string name="gallery_app_download">다운로드</string>
     <string name="gallery_app_documents">문서</string>
     <string name="gallery_app_screenshots">스크린샷</string>
+    <string name="gallery_tab_chosen">고른 사진</string>
     <string name="gallery_tab_all">전체</string>
+    <string name="gallery_chosen_empty">고른 사진이 없습니다.\n다른 탭에서 사진을 길게 눌러 선택한 뒤, 아래 막대의 \'고른 사진에 넣기\' 를 누르세요.</string>
+    <string name="action_choose">고른 사진에 넣기</string>
+    <string name="action_unchoose">고른 사진에서 빼기</string>
+    <plurals name="gallery_chosen_added">
+        <item quantity="other">%1$d개를 고른 사진에 넣었습니다</item>
+    </plurals>
+    <plurals name="gallery_chosen_removed">
+        <item quantity="other">%1$d개를 고른 사진에서 뺐습니다</item>
+    </plurals>
     <string name="gallery_tab_camera">카메라</string>
     <string name="gallery_tab_screenshot">스크린샷</string>
     <string name="gallery_tab_other">다른 앱</string>

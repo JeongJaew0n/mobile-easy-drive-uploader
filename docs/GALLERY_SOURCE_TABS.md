@@ -2,6 +2,9 @@
 
 갤러리 상단의 **전체 / 카메라 / 스크린샷 / 다른 앱** 탭. 진행 계획은 `docs/plans/gallery-source-tabs/`.
 
+2026-09-27 부터 맨 앞에 **고른 사진** 탭이 있고 앱은 이 탭에서 시작한다. 출처가 아니라 사용자가 모은 목록이라
+`MediaSource` 로 가르지 않고 `chosen_media` 의 ID 로 거른다 — `docs/plans/chosen-photos-tab/spec.md`.
+
 ## 1. 왜
 
 한 목록에 카메라 사진과 카카오톡 이미지가 날짜순으로 섞여 들어온다.

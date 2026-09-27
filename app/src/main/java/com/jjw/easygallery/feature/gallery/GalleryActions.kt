@@ -48,6 +48,7 @@ import com.jjw.easygallery.core.domain.model.Album
 internal fun SelectionBottomBar(
     selectedCount: Int,
     allFavorite: Boolean,
+    allChosen: Boolean,
     supportsTrashAndFavorites: Boolean,
     enabled: Boolean,
     onTrash: () -> Unit,
@@ -57,9 +58,19 @@ internal fun SelectionBottomBar(
     onMove: () -> Unit,
     onCategories: () -> Unit,
     onHide: () -> Unit,
+    onToggleChosen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BottomAppBar(modifier = modifier) {
+        // 맨 앞 — 이 앱의 첫 탭을 채우는 동작이다
+        IconButton(onClick = onToggleChosen, enabled = enabled) {
+            Icon(
+                painterResource(if (allChosen) R.drawable.ic_bookmark_remove else R.drawable.ic_bookmark_add),
+                contentDescription = stringResource(
+                    if (allChosen) R.string.action_unchoose else R.string.action_choose,
+                ),
+            )
+        }
         if (supportsTrashAndFavorites) {
             IconButton(onClick = onTrash, enabled = enabled) {
                 Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_trash))

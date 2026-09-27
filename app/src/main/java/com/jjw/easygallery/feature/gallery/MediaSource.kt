@@ -37,13 +37,20 @@ enum class MediaSource {
     }
 }
 
-/** 갤러리 상단 탭. [MediaSource] 에 "전체" 를 더한 것. `GalleryUiState` 에 실려 나가 public 이다 */
+/**
+ * 갤러리 상단 탭. [MediaSource] 에 "고른 사진"·"전체" 를 더한 것. `GalleryUiState` 에 실려 나가 public 이다.
+ *
+ * [CHOSEN] 은 출처가 아니라 사용자가 모은 목록이라 [matches] 로 가를 수 없다 — ViewModel 이 고른 ID 로 거른다.
+ */
 enum class GalleryTab(val source: MediaSource?) {
+    /** 고른 사진(`docs/plans/chosen-photos-tab/spec.md`). 맨 앞이고, 앱을 켜면 이 탭부터 */
+    CHOSEN(null),
     ALL(null),
     CAMERA(MediaSource.CAMERA),
     SCREENSHOT(MediaSource.SCREENSHOT),
     OTHER(MediaSource.OTHER),
     ;
 
+    /** 출처 탭만 판정한다. [CHOSEN] 은 여기서 고를 수 없어 [ALL] 처럼 전부 통과시킨다 */
     fun matches(item: MediaItem): Boolean = source == null || MediaSource.of(item) == source
 }

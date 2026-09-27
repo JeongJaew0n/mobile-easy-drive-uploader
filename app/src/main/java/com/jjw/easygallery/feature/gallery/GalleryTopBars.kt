@@ -174,7 +174,8 @@ internal fun SelectionTopBar(
  */
 @Composable
 internal fun GallerySourceTabs(tab: GalleryTab?, onSelect: (GalleryTab) -> Unit) {
-    val selected = tab ?: GalleryTab.ALL
+    // 첫 목록이 오기 전에도 시작 탭에 밑줄을 둔다 — 로딩 뒤에 밑줄이 옮겨 가면 흔들려 보인다
+    val selected = tab ?: GalleryTab.CHOSEN
     PrimaryTabRow(selectedTabIndex = selected.ordinal) {
         GalleryTab.entries.forEach { entry ->
             Tab(
@@ -187,6 +188,7 @@ internal fun GallerySourceTabs(tab: GalleryTab?, onSelect: (GalleryTab) -> Unit)
 }
 
 private fun GalleryTab.labelRes(): Int = when (this) {
+    GalleryTab.CHOSEN -> R.string.gallery_tab_chosen
     GalleryTab.ALL -> R.string.gallery_tab_all
     GalleryTab.CAMERA -> R.string.gallery_tab_camera
     GalleryTab.SCREENSHOT -> R.string.gallery_tab_screenshot

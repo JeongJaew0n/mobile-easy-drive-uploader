@@ -44,6 +44,9 @@ object DatabaseModule {
     fun providesHiddenMediaDao(db: AppDatabase): HiddenMediaDao = db.hiddenMediaDao()
 
     @Provides
+    fun providesChosenMediaDao(db: AppDatabase): ChosenMediaDao = db.chosenMediaDao()
+
+    @Provides
     @Singleton
     fun providesVideoCompressor(impl: Media3VideoCompressor): VideoCompressor = impl
 }

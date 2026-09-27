@@ -23,16 +23,7 @@ internal suspend fun showGalleryEvent(
             if (result == SnackbarResult.ActionPerformed) onSettingsClick()
         }
         // 하나도 안 들어갔으면 "0개 추가" 라고 말하지 않는다 — 왜 아무 일도 없는지를 알려준다
-        is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(
-            when {
-                event.added == 0 ->
-                    resources.getString(R.string.gallery_upload_all_skipped, event.skipped)
-                event.skipped == 0 ->
-                    resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
-                else ->
-                    resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
-            },
-        )
+        is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(enqueuedMessage(event, resources))
         GalleryEvent.NoUploadedToTrash ->
             snackbarHostState.showSnackbar(resources.getString(R.string.gallery_no_uploaded_to_trash))
         is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
@@ -41,9 +32,25 @@ internal suspend fun showGalleryEvent(
         is GalleryEvent.Hidden -> snackbarHostState.showSnackbar(
             resources.getQuantityString(R.plurals.gallery_hidden_done, event.count, event.count),
         )
+        is GalleryEvent.Chosen -> snackbarHostState.showSnackbar(
+            resources.getQuantityString(
+                if (event.added) R.plurals.gallery_chosen_added else R.plurals.gallery_chosen_removed,
+                event.count,
+                event.count,
+            ),
+        )
         is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
         is GalleryEvent.GuestChooser -> onGuestChooser(event.pendingIntent)
         is GalleryEvent.GuestStarted, GalleryEvent.GuestIsPrimary ->
             guestEventMessage(event, resources)?.let { snackbarHostState.showSnackbar(it) }
     }
+}
+
+private fun enqueuedMessage(event: GalleryEvent.Enqueued, resources: Resources): String = when {
+    event.added == 0 ->
+        resources.getString(R.string.gallery_upload_all_skipped, event.skipped)
+    event.skipped == 0 ->
+        resources.getQuantityString(R.plurals.gallery_upload_enqueued, event.added, event.added)
+    else ->
+        resources.getString(R.string.gallery_upload_enqueued_skipped, event.added, event.skipped)
 }

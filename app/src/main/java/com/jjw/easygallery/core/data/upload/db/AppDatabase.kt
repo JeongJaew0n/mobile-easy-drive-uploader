@@ -15,8 +15,9 @@ import androidx.room.RoomDatabase
         AutoTagEntity::class,
         AutoTagScanEntity::class,
         HiddenMediaEntity::class,
+        ChosenMediaEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -31,6 +32,8 @@ import androidx.room.RoomDatabase
         // 11: upload_tasks.errorReason — 실패 사유를 코드로 남겨 화면이 문장을 고른다
         AutoMigration(from = 10, to = 11),
         // 12 는 수동 — 기본 키가 바뀌고 새 칸을 기존 칸에서 계산해야 한다(Migrations.kt)
+        // 13: chosen_media — 고른 사진 탭
+        AutoMigration(from = 12, to = 13),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +45,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun autoTagDao(): AutoTagDao
 
     abstract fun hiddenMediaDao(): HiddenMediaDao
+
+    abstract fun chosenMediaDao(): ChosenMediaDao
 
     companion object {
         const val NAME = "easy_gallery.db"

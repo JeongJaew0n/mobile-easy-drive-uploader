@@ -10,6 +10,7 @@ import com.jjw.easygallery.core.data.auth.GuestPick
 import com.jjw.easygallery.core.data.auth.SignInCancelledException
 import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
+import com.jjw.easygallery.core.data.chosen.ChosenMediaRepository
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
@@ -81,6 +82,7 @@ class GalleryViewModel @Inject constructor(
     orphanCleaner: OrphanAssignmentCleaner,
     private val prefs: UserPreferencesRepository,
     private val hiddenMedia: HiddenMediaRepository,
+    private val chosenMedia: ChosenMediaRepository,
     private val conditions: DeviceConditionsMonitor,
     remoteAccounts: RemoteAccountRepository,
     private val auth: AuthRepository,
@@ -126,7 +128,9 @@ class GalleryViewModel @Inject constructor(
     private val dateRange = MutableStateFlow<DateRange?>(null)
     private val notBackedUpOnly = MutableStateFlow(false)
     private val categoryFilter = MutableStateFlow<CategoryFilter?>(null)
-    private val tab = MutableStateFlow(GalleryTab.ALL)
+
+    // 앱을 켜면 고른 사진부터(2026-09-27 사용자 결정)
+    private val tab = MutableStateFlow(GalleryTab.CHOSEN)
 
     // 배지·"백업 안 됨" 필터는 현재 업로드 대상 계정 기준(다른 계정에 올린 건 그 계정을 골랐을 때 보인다)
     private val uploadedIds: Flow<Set<Long>> = prefs.preferences
@@ -168,6 +172,9 @@ class GalleryViewModel @Inject constructor(
 
     /** 원장 기준 "이미 올린" 미디어. 올린 것만 골라 지울 때 쓴다 */
     private var latestUploadedIds: Set<Long> = emptySet()
+
+    /** 하단바 토글이 넣을지 뺄지 정한다. 목록이 갱신될 때마다 바뀐다 */
+    private var latestChosenIds: Set<Long> = emptySet()
 
     val uiState: StateFlow<GalleryUiState> = combine(permissionStatus, filter) { status, f -> status to f }
         .flatMapLatest { (status, f) -> stateFor(status, f) }
@@ -276,6 +283,21 @@ class GalleryViewModel @Inject constructor(
             hiddenMedia.hide(ids)
             clearSelection()
             events.send(GalleryEvent.Hidden(ids.size))
+        }
+    }
+
+    /**
+     * 선택한 항목을 고른 사진에 넣는다. 이미 전부 들어 있으면 뺀다 — 하단바의 같은 버튼으로 되돌린다.
+     * 파일은 건드리지 않으므로 동의 창이 없다.
+     */
+    fun toggleChosenSelected() {
+        val ids = selectedIds.value
+        if (ids.isEmpty()) return
+        val remove = ids.all { it in latestChosenIds }
+        viewModelScope.launch {
+            if (remove) chosenMedia.unchoose(ids) else chosenMedia.choose(ids)
+            clearSelection()
+            events.send(GalleryEvent.Chosen(ids.size, added = !remove))
         }
     }
 
@@ -472,6 +494,7 @@ class GalleryViewModel @Inject constructor(
         val assignments: CategoryAssignments,
         val categoryFilter: CategoryFilter?,
         val tab: GalleryTab,
+        val chosenIds: Set<Long>,
         val version: Int,
     )
 
@@ -483,6 +506,8 @@ class GalleryViewModel @Inject constructor(
         val tab: GalleryTab,
         /** 숨긴 사진. 어느 탭·필터에서도 보이지 않는다 */
         val hidden: Set<Long>,
+        /** 고른 사진. [GalleryTab.CHOSEN] 탭의 기준이자 하단바 토글의 상태 */
+        val chosen: Set<Long>,
     )
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
@@ -493,9 +518,9 @@ class GalleryViewModel @Inject constructor(
             notBackedUpOnly,
             categoryFilter,
             tab,
-            hiddenMedia.observeHiddenIds(),
-        ) { range, pending, category, t, hidden ->
-            MemoryFilters(range, pending, category, t, hidden)
+            combine(hiddenMedia.observeHiddenIds(), chosenMedia.observeChosenIds(), ::Pair),
+        ) { range, pending, category, t, (hidden, chosen) ->
+            MemoryFilters(range, pending, category, t, hidden, chosen)
         }
         val catalog = combine(
             mediaRepository.observeMedia(filter),
@@ -508,12 +533,17 @@ class GalleryViewModel @Inject constructor(
             // 기간 달력(dayCounts)은 기간 직전 목록으로 센다.
             // 숨김이 가장 바깥이다 — 탭을 바꾸거나 필터를 걸어도 숨긴 사진은 나오면 안 된다.
             val visible = if (f.hidden.isEmpty()) all else all.filterNot { it.id in f.hidden }
-            val inTab = if (f.tab == GalleryTab.ALL) visible else visible.filter { f.tab.matches(it) }
+            val inTab = when (f.tab) {
+                GalleryTab.ALL -> visible
+                GalleryTab.CHOSEN -> visible.filter { it.id in f.chosen }
+                else -> visible.filter { f.tab.matches(it) }
+            }
             val pending = if (f.notBackedUpOnly) inTab.filter { it.id !in uploaded } else inTab
             val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
             val items = categorized.filterByDate(f.range)
             latestItems = items
             latestUploadedIds = uploaded
+            latestChosenIds = f.chosen
             Catalog(
                 items = items,
                 // '다른 앱' 탭은 날짜 대신 앱으로 묶는다 — 카카오톡 사진 1000여 장이
@@ -533,6 +563,7 @@ class GalleryViewModel @Inject constructor(
                 assignments = assignments,
                 categoryFilter = f.category,
                 tab = f.tab,
+                chosenIds = f.chosen,
                 version = filterVersion,
             )
         }
@@ -562,6 +593,7 @@ class GalleryViewModel @Inject constructor(
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
+                selectedAllChosen = selected.isNotEmpty() && selected.all { it in c.chosenIds },
                 isMutating = mutating,
                 animateItemChanges = animate,
             ) as GalleryUiState
@@ -606,11 +638,13 @@ sealed interface GalleryUiState {
         val assignments: CategoryAssignments = emptyMap(),
         val categoryFilter: CategoryFilter? = null,
         /** 지금 보고 있는 출처 탭 */
-        val tab: GalleryTab = GalleryTab.ALL,
+        val tab: GalleryTab = GalleryTab.CHOSEN,
         val showCategoryBadges: Boolean = true,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
+        /** 선택이 전부 고른 사진이면 하단바 버튼이 "빼기" 가 된다 */
+        val selectedAllChosen: Boolean = false,
         val isMutating: Boolean = false,
         /** false 면 그리드가 항목 이동/등장 애니메이션을 생략한다(필터 전환 직후) */
         val animateItemChanges: Boolean = true,
@@ -638,5 +672,8 @@ sealed interface GalleryEvent {
     data object NoUploadedToTrash : GalleryEvent
     data class CategoriesAssigned(val count: Int) : GalleryEvent
     data class Hidden(val count: Int) : GalleryEvent
+
+    /** 고른 사진에 [count] 개를 넣었다([added]) 또는 뺐다 */
+    data class Chosen(val count: Int, val added: Boolean) : GalleryEvent
     data class Error(val message: String) : GalleryEvent
 }

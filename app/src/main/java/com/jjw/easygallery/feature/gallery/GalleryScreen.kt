@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
@@ -74,6 +75,7 @@ internal fun GalleryScreen(
     onDuplicatesClick: () -> Unit = {},
     onHiddenClick: () -> Unit = {},
     onHideSelected: () -> Unit = {},
+    onToggleChosenSelected: () -> Unit = {},
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     guest: GuestUploadUi = GuestUploadUi(),
@@ -144,6 +146,7 @@ internal fun GalleryScreen(
                     SelectionBottomBar(
                         selectedCount = content.selectedIds.size,
                         allFavorite = content.selectedAllFavorite,
+                        allChosen = content.selectedAllChosen,
                         supportsTrashAndFavorites = content.supportsTrashAndFavorites,
                         enabled = !content.isMutating,
                         onTrash = actions.onTrash,
@@ -153,6 +156,7 @@ internal fun GalleryScreen(
                         onMove = { showMove = true },
                         onCategories = { showCategoryPicker = true },
                         onHide = onHideSelected,
+                        onToggleChosen = onToggleChosenSelected,
                     )
                 }
             }
@@ -413,9 +417,12 @@ private fun GalleryContent(
                             uiState.categoryFilter != null -> R.string.gallery_category_empty
                             uiState.dateRange != null -> R.string.gallery_date_empty
                             uiState.favoritesOnly -> R.string.gallery_favorites_empty
+                            uiState.tab == GalleryTab.CHOSEN -> R.string.gallery_chosen_empty
                             else -> R.string.gallery_empty
                         },
                     ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 32.dp),
                 )
             }
         } else {

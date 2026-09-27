@@ -4,6 +4,7 @@ import android.net.Uri
 import app.cash.turbine.test
 import com.jjw.easygallery.core.data.category.CategoryRepository
 import com.jjw.easygallery.core.data.category.OrphanAssignmentCleaner
+import com.jjw.easygallery.core.data.chosen.ChosenMediaRepository
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionRunner
@@ -33,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -72,6 +74,12 @@ class GalleryViewModelTest {
         every { observeHiddenIds() } returns hiddenIds
         coEvery { hide(any()) } answers { hiddenIds.value = hiddenIds.value + firstArg<Collection<Long>>() }
     }
+    private val chosenIds = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
+    private val chosenMedia: ChosenMediaRepository = mockk {
+        every { observeChosenIds() } returns chosenIds
+        coEvery { choose(any()) } answers { chosenIds.value = chosenIds.value + firstArg<Collection<Long>>() }
+        coEvery { unchoose(any()) } answers { chosenIds.value = chosenIds.value - firstArg<Collection<Long>>().toSet() }
+    }
 
     // 기본은 "무제한 회선 + 충전 중" — 대기 이유가 생기지 않아 기존 기대값이 그대로 유지된다
     private val conditions: DeviceConditionsMonitor = mockk {
@@ -94,7 +102,11 @@ class GalleryViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel() =
+    /**
+     * 앱은 고른 사진 탭에서 시작한다. 기존 테스트는 "전체" 를 전제로 쓰였으므로 기본으로 [GalleryTab.ALL] 로 옮겨 둔다.
+     * 시작 탭 자체를 볼 때만 [startOnAll] 을 끈다.
+     */
+    private fun createViewModel(startOnAll: Boolean = true) =
         GalleryViewModel(
             repository,
             uploadQueue,
@@ -107,11 +119,12 @@ class GalleryViewModelTest {
             OrphanAssignmentCleaner(repository, categoryRepository),
             prefs,
             hiddenMedia,
+            chosenMedia,
             conditions,
             remoteAccounts,
             auth = mockk(relaxed = true),
             startGuestUpload = mockk(relaxed = true),
-        )
+        ).also { if (startOnAll) it.setTab(GalleryTab.ALL) }
 
     @Test
     fun `stays Loading and does not query until permission status is known`() = runTest(testDispatcher) {
@@ -454,6 +467,61 @@ class GalleryViewModelTest {
 
             viewModel.setCategoryFilter(null)
             assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+        }
+    }
+
+    @Test
+    fun `앱은 고른 사진 탭에서 시작하고 고른 것만 보인다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2), sampleItem(3)))
+        chosenIds.value = setOf(2L)
+        val viewModel = createViewModel(startOnAll = false)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            (awaitItem() as GalleryUiState.Content).let {
+                assertEquals(GalleryTab.CHOSEN, it.tab)
+                assertEquals(1, it.itemCount)
+            }
+        }
+    }
+
+    @Test
+    fun `숨긴 사진은 고른 사진이어도 보이지 않는다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2)))
+        chosenIds.value = setOf(1L, 2L)
+        hiddenIds.value = setOf(1L)
+        val viewModel = createViewModel(startOnAll = false)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(1, (awaitItem() as GalleryUiState.Content).itemCount)
+        }
+    }
+
+    @Test
+    fun `하단바 토글은 넣고, 전부 들어 있으면 뺀다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2)))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+
+            viewModel.setSelection(setOf(1L, 2L))
+            assertEquals(false, (awaitItem() as GalleryUiState.Content).selectedAllChosen)
+            viewModel.toggleChosenSelected()
+            advanceUntilIdle()
+            assertEquals(setOf(1L, 2L), chosenIds.value)
+
+            viewModel.setSelection(setOf(1L, 2L))
+            advanceUntilIdle()
+            viewModel.toggleChosenSelected()
+            advanceUntilIdle()
+            assertEquals(emptySet<Long>(), chosenIds.value)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 }

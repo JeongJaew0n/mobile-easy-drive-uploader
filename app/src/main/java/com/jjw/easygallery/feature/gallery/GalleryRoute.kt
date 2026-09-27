@@ -144,6 +144,7 @@ fun GalleryRoute(
         onDuplicatesClick = onDuplicatesClick,
         onHiddenClick = onHiddenClick,
         onHideSelected = viewModel::hideSelected,
+        onToggleChosenSelected = viewModel::toggleChosenSelected,
         onOpenItem = onOpenItem,
         guest = GuestUploadUi(
             available = guestAvailable,
