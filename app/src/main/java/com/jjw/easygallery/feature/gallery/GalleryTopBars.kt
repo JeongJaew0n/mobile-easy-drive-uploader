@@ -3,6 +3,8 @@ package com.jjw.easygallery.feature.gallery
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
@@ -22,9 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -178,11 +183,21 @@ internal fun GallerySourceTabs(tab: GalleryTab?, onSelect: (GalleryTab) -> Unit)
     val selected = tab ?: GalleryTab.CHOSEN
     PrimaryTabRow(selectedTabIndex = selected.ordinal) {
         GalleryTab.entries.forEach { entry ->
+            // text= 슬롯은 양옆 16dp 여백을 강제한다. 탭 다섯 개면 S23+(411dp, 글꼴 1.1)에서 칸이 82dp 라
+            // 글자 자리가 50dp 뿐이고 "고른 사진"·"스크린샷" 이 두 줄로 꺾인다 — 여백을 줄이고 한 줄로 묶는다
             Tab(
                 selected = entry == selected,
                 onClick = { onSelect(entry) },
-                text = { Text(stringResource(entry.labelRes())) },
-            )
+                modifier = Modifier.height(TAB_HEIGHT_DP.dp),
+            ) {
+                Text(
+                    text = stringResource(entry.labelRes()),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = TAB_TEXT_PADDING_DP.dp),
+                )
+            }
         }
     }
 }
@@ -194,3 +209,6 @@ private fun GalleryTab.labelRes(): Int = when (this) {
     GalleryTab.SCREENSHOT -> R.string.gallery_tab_screenshot
     GalleryTab.OTHER -> R.string.gallery_tab_other
 }
+
+private const val TAB_HEIGHT_DP = 48
+private const val TAB_TEXT_PADDING_DP = 4
