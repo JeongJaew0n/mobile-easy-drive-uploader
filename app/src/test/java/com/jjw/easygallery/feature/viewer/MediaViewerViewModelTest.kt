@@ -13,6 +13,7 @@ import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.feature.gallery.GalleryTab
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -184,6 +185,43 @@ class MediaViewerViewModelTest {
         io.mockk.coVerify(exactly = 1) { repository.readDetails(match { it.id == 1L }) }
     }
 
+    @Test
+    fun `고른 사진 탭에서 열면 고른 것 안에서만 넘긴다`() = runTest(testDispatcher) {
+        chosenIds.value = setOf(1L, 3L)
+        val viewModel = createViewModel()
+        collectState(viewModel)
+
+        viewModel.load(mediaId = 3, favoritesOnly = false, tab = GalleryTab.CHOSEN)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 3L), viewModel.uiState.value.items.map { it.id })
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
+    @Test
+    fun `앨범에서 열면 그 앨범 안에서만 넘긴다`() = runTest(testDispatcher) {
+        items.value = listOf(item(1), item(2).copy(relativePath = "DCIM/행복이/"), item(3))
+        val viewModel = createViewModel()
+        collectState(viewModel)
+
+        viewModel.load(mediaId = 2, favoritesOnly = false, albumPath = "DCIM/행복이/")
+        advanceUntilIdle()
+
+        assertEquals(listOf(2L), viewModel.uiState.value.items.map { it.id })
+    }
+
+    @Test
+    fun `출처 탭에서 열면 그 출처 안에서만 넘긴다`() = runTest(testDispatcher) {
+        items.value = listOf(item(1), item(2).copy(relativePath = "Pictures/KakaoTalk/"), item(3))
+        val viewModel = createViewModel()
+        collectState(viewModel)
+
+        viewModel.load(mediaId = 1, favoritesOnly = false, tab = GalleryTab.CAMERA)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 3L), viewModel.uiState.value.items.map { it.id })
+    }
+
     /** uiState 는 WhileSubscribed 라 구독자가 있어야 흐른다. */
     private fun kotlinx.coroutines.test.TestScope.collectState(viewModel: MediaViewerViewModel) {
         backgroundScope.launch { viewModel.uiState.collect { } }
@@ -197,8 +235,11 @@ class MediaViewerViewModelTest {
         categoryRepository = categoryRepository,
         assignCategories = AssignCategoriesUseCase(categoryRepository),
         hiddenMedia = mockk { every { observeHiddenIds() } returns MutableStateFlow(emptySet()) },
+        chosenMedia = mockk { every { observeChosenIds() } returns chosenIds },
         prefs = mockk { every { preferences } returns MutableStateFlow(UserPreferences()) },
     )
+
+    private val chosenIds = MutableStateFlow<Set<Long>>(emptySet())
 
     private val categoryRepository: CategoryRepository = mockk {
         every { observeAssignments() } returns MutableStateFlow(emptyMap())

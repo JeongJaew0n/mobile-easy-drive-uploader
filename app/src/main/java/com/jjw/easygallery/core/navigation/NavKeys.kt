@@ -64,6 +64,10 @@ data class MediaViewerKey(
     val uncategorizedOnly: Boolean = false,
     /** 숨긴 사진 화면에서 열었다. 이때는 **숨긴 것만** 보여준다(`docs/PHOTO_HIDING.md`) */
     val hiddenOnly: Boolean = false,
+    /** 갤러리 탭(`GalleryTab.name`). null 이면 전체 — 고른 사진·카메라 탭에서 열면 그 탭 안에서만 넘긴다 */
+    val tab: String? = null,
+    /** 앨범 필터(`relativePath`). 앨범에서 열면 그 앨범 안에서만 넘긴다(`docs/plans/album-view/spec.md`) */
+    val albumPath: String? = null,
     val hero: HeroOrigin? = null,
 ) : AppNavKey
 

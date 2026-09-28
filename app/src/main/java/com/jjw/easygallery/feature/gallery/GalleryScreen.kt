@@ -65,6 +65,7 @@ internal fun GalleryScreen(
     onSelectAllVisible: () -> Unit = {},
     onTrashUploaded: () -> Unit = {},
     onCategoryFilterChange: (CategoryFilter?) -> Unit = {},
+    onAlbumFilterChange: (String?) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
         Result.failure(IllegalStateException("카테고리 생성이 연결되지 않았습니다"))
@@ -88,6 +89,7 @@ internal fun GalleryScreen(
     var showMove by rememberSaveable { mutableStateOf(false) }
     var showDateRange by rememberSaveable { mutableStateOf(false) }
     var showCategoryFilter by rememberSaveable { mutableStateOf(false) }
+    var showAlbumPicker by rememberSaveable { mutableStateOf(false) }
     var showCategoryPicker by rememberSaveable { mutableStateOf(false) }
 
     // 선택 모드에서 뒤로가기는 선택 해제
@@ -128,6 +130,7 @@ internal fun GalleryScreen(
                             onHiddenClick = onHiddenClick,
                             onPickDateRange = { showDateRange = true },
                             onPickCategory = { showCategoryFilter = true },
+                            onPickAlbum = { showAlbumPicker = true },
                             onTrashUploaded = onTrashUploaded,
                         )
                         GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
@@ -194,6 +197,7 @@ internal fun GalleryScreen(
                     onClearDateRange = { onDateRangeChange(null) },
                     onSelectAllVisible = onSelectAllVisible,
                     onClearCategoryFilter = { onCategoryFilterChange(null) },
+                    onClearAlbumFilter = { onAlbumFilterChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -220,6 +224,17 @@ internal fun GalleryScreen(
             onManageCategories = onManageCategories,
             onCreateCategory = onCreateCategory,
             onAssignCategories = onAssignCategories,
+        )
+    }
+    if (content != null && showAlbumPicker) {
+        AlbumPickerSheet(
+            albums = content.albums,
+            current = content.albumFilter?.relativePath,
+            onPick = { album ->
+                showAlbumPicker = false
+                onAlbumFilterChange(album.relativePath)
+            },
+            onDismiss = { showAlbumPicker = false },
         )
     }
     if (content != null) {
@@ -335,6 +350,7 @@ private fun GalleryContent(
     onClearDateRange: () -> Unit,
     onSelectAllVisible: () -> Unit,
     onClearCategoryFilter: () -> Unit,
+    onClearAlbumFilter: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -380,47 +396,17 @@ private fun GalleryContent(
         ) {
             PartialAccessBanner(onManageSelection = onRequestPermission)
         }
-        // 사라지는 동안에도 마지막 기간을 보여주기 위해 non-null 값을 기억
-        val lastRange = remember { mutableStateOf(uiState.dateRange) }
-        if (uiState.dateRange != null) lastRange.value = uiState.dateRange
-        AnimatedVisibility(
-            visible = uiState.dateRange != null,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            lastRange.value?.let { range ->
-                DateRangeBar(
-                    range = range,
-                    onClear = onClearDateRange,
-                    onSelectAll = onSelectAllVisible,
-                    allSelected = uiState.itemCount > 0 && uiState.selectedIds.size >= uiState.itemCount,
-                )
-            }
-        }
-        val lastCategory = remember { mutableStateOf(uiState.categoryFilter) }
-        if (uiState.categoryFilter != null) lastCategory.value = uiState.categoryFilter
-        AnimatedVisibility(
-            visible = uiState.categoryFilter != null,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            lastCategory.value?.let { filter ->
-                CategoryFilterBar(filter = filter, categories = uiState.categories, onClear = onClearCategoryFilter)
-            }
-        }
+        GalleryFilterBars(
+            uiState = uiState,
+            onClearDateRange = onClearDateRange,
+            onSelectAllVisible = onSelectAllVisible,
+            onClearCategoryFilter = onClearCategoryFilter,
+            onClearAlbumFilter = onClearAlbumFilter,
+        )
         if (uiState.sections.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    stringResource(
-                        when {
-                            uiState.notBackedUpOnly -> R.string.gallery_not_backed_up_empty
-                            uiState.categoryFilter != null -> R.string.gallery_category_empty
-                            uiState.dateRange != null -> R.string.gallery_date_empty
-                            uiState.favoritesOnly -> R.string.gallery_favorites_empty
-                            uiState.tab == GalleryTab.CHOSEN -> R.string.gallery_chosen_empty
-                            else -> R.string.gallery_empty
-                        },
-                    ),
+                    stringResource(uiState.emptyMessageRes()),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 32.dp),
                 )
@@ -498,9 +484,14 @@ data class ViewerFilters(
     val favoritesOnly: Boolean,
     val range: DateRange?,
     val category: CategoryFilter?,
+    /** 탭(고른 사진·출처). 없으면 좌우로 넘길 때 탭 밖 사진이 나온다 */
+    val tab: GalleryTab = GalleryTab.ALL,
+    /** 앨범 필터(`relativePath`) */
+    val albumPath: String? = null,
 )
 
-internal fun GalleryUiState.Content.viewerFilters() = ViewerFilters(favoritesOnly, dateRange, categoryFilter)
+internal fun GalleryUiState.Content.viewerFilters() =
+    ViewerFilters(favoritesOnly, dateRange, categoryFilter, tab, albumFilter?.relativePath)
 
 /** 카테고리 필터가 켜져 있을 때의 상단 제목. 하나면 그 이름, 여럿이면 개수, 미분류면 전용 문구 */
 @Composable

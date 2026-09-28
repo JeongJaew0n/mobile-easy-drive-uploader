@@ -17,6 +17,12 @@
     <string name="gallery_menu_drive">Google Drive</string>
     <string name="gallery_menu_date_range">기간 선택</string>
     <string name="gallery_menu_category">카테고리</string>
+    <string name="gallery_menu_album">앨범</string>
+    <string name="album_picker_title">앨범</string>
+    <string name="album_picker_empty">앨범이 없습니다</string>
+    <string name="album_filter_label">%1$s · %2$s</string>
+    <string name="album_filter_clear">앨범 필터 해제</string>
+    <string name="gallery_album_empty">이 앨범에 사진이 없습니다</string>
     <string name="gallery_title_category_count">카테고리 %1$d개</string>
     <string name="gallery_title_uncategorized">미분류</string>
     <string name="category_title">카테고리</string>

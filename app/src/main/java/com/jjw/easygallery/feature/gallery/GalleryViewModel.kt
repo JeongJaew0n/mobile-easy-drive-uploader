@@ -132,6 +132,9 @@ class GalleryViewModel @Inject constructor(
     // 앱을 켜면 고른 사진부터(2026-09-27 사용자 결정)
     private val tab = MutableStateFlow(GalleryTab.CHOSEN)
 
+    /** 앨범 필터 — 앨범(폴더)의 `relativePath`. null 이면 없음(`docs/plans/album-view/spec.md`) */
+    private val albumFilter = MutableStateFlow<String?>(null)
+
     // 배지·"백업 안 됨" 필터는 현재 업로드 대상 계정 기준(다른 계정에 올린 건 그 계정을 골랐을 때 보인다)
     private val uploadedIds: Flow<Set<Long>> = prefs.preferences
         .map { it.uploadAccountId }
@@ -235,6 +238,19 @@ class GalleryViewModel @Inject constructor(
         dateRange.value = null
         notBackedUpOnly.value = false
         categoryFilter.value = null
+        albumFilter.value = null
+    }
+
+    /**
+     * 앨범 하나만 본다. 고르면 탭을 '전체' 로 옮긴다 — "고른 사진" 탭 안에서 앨범을 고르면 두 조건이 겹쳐
+     * 비어 보이고, 왜 비었는지 알기 어렵다. 탭을 옮기면 다른 필터도 풀린다(탭 규칙 그대로).
+     */
+    fun setAlbumFilter(relativePath: String?) {
+        if (albumFilter.value == relativePath) return
+        if (relativePath != null && tab.value != GalleryTab.ALL) setTab(GalleryTab.ALL)
+        clearSelection()
+        filterVersion++
+        albumFilter.value = relativePath
     }
 
     // ---------- 카테고리 ----------
@@ -495,6 +511,7 @@ class GalleryViewModel @Inject constructor(
         val categoryFilter: CategoryFilter?,
         val tab: GalleryTab,
         val chosenIds: Set<Long>,
+        val albumFilter: String?,
         val version: Int,
     )
 
@@ -508,7 +525,33 @@ class GalleryViewModel @Inject constructor(
         val hidden: Set<Long>,
         /** 고른 사진. [GalleryTab.CHOSEN] 탭의 기준이자 하단바 토글의 상태 */
         val chosen: Set<Long>,
+        /** 앨범 필터(`relativePath`) */
+        val album: String?,
     )
+
+    /**
+     * 순서: 숨김 → 탭(출처) → 앨범 → 백업 → 카테고리 → 기간.
+     * 숨김이 가장 바깥이다 — 탭을 바꾸거나 필터를 걸어도 숨긴 사진은 나오면 안 된다.
+     *
+     * 중간 단계 둘을 함께 돌려준다 — 앨범 목록은 숨김만 뺀 것([Triple.first])에서, 기간 달력(dayCounts)은
+     * 기간 직전 목록([Triple.second])에서 센다.
+     */
+    private fun MemoryFilters.applyTo(
+        all: List<MediaItem>,
+        uploaded: Set<Long>,
+        assignments: CategoryAssignments,
+    ): Triple<List<MediaItem>, List<MediaItem>, List<MediaItem>> {
+        val visible = if (hidden.isEmpty()) all else all.filterNot { it.id in hidden }
+        val inTab = when (tab) {
+            GalleryTab.ALL -> visible
+            GalleryTab.CHOSEN -> visible.filter { it.id in chosen }
+            else -> visible.filter { tab.matches(it) }
+        }
+        val inAlbum = album?.let { path -> inTab.filter { it.relativePath == path } } ?: inTab
+        val pending = if (notBackedUpOnly) inAlbum.filter { it.id !in uploaded } else inAlbum
+        val categorized = category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
+        return Triple(visible, categorized, categorized.filterByDate(range))
+    }
 
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
@@ -518,9 +561,9 @@ class GalleryViewModel @Inject constructor(
             notBackedUpOnly,
             categoryFilter,
             tab,
-            combine(hiddenMedia.observeHiddenIds(), chosenMedia.observeChosenIds(), ::Pair),
-        ) { range, pending, category, t, (hidden, chosen) ->
-            MemoryFilters(range, pending, category, t, hidden, chosen)
+            combine(hiddenMedia.observeHiddenIds(), chosenMedia.observeChosenIds(), albumFilter, ::Triple),
+        ) { range, pending, category, t, (hidden, chosen, album) ->
+            MemoryFilters(range, pending, category, t, hidden, chosen, album)
         }
         val catalog = combine(
             mediaRepository.observeMedia(filter),
@@ -529,18 +572,7 @@ class GalleryViewModel @Inject constructor(
             categoryRepository.observeCategories(),
             categoryRepository.observeAssignments(),
         ) { all, f, uploaded, categories, assignments ->
-            // 순서: 숨김 → 탭(출처) → 백업 → 카테고리 → 기간.
-            // 기간 달력(dayCounts)은 기간 직전 목록으로 센다.
-            // 숨김이 가장 바깥이다 — 탭을 바꾸거나 필터를 걸어도 숨긴 사진은 나오면 안 된다.
-            val visible = if (f.hidden.isEmpty()) all else all.filterNot { it.id in f.hidden }
-            val inTab = when (f.tab) {
-                GalleryTab.ALL -> visible
-                GalleryTab.CHOSEN -> visible.filter { it.id in f.chosen }
-                else -> visible.filter { f.tab.matches(it) }
-            }
-            val pending = if (f.notBackedUpOnly) inTab.filter { it.id !in uploaded } else inTab
-            val categorized = f.category?.let { c -> pending.filter { c.matches(assignments[it.id]) } } ?: pending
-            val items = categorized.filterByDate(f.range)
+            val (visible, categorized, items) = f.applyTo(all, uploaded, assignments)
             latestItems = items
             latestUploadedIds = uploaded
             latestChosenIds = f.chosen
@@ -564,6 +596,7 @@ class GalleryViewModel @Inject constructor(
                 categoryFilter = f.category,
                 tab = f.tab,
                 chosenIds = f.chosen,
+                albumFilter = f.album,
                 version = filterVersion,
             )
         }
@@ -589,6 +622,10 @@ class GalleryViewModel @Inject constructor(
                 assignments = c.assignments,
                 categoryFilter = c.categoryFilter,
                 tab = c.tab,
+                // 이름·대표 사진은 앨범 목록에서 찾는다. 사진을 다 옮겨 앨범이 사라지면 경로만 남는다
+                albumFilter = c.albumFilter?.let { path ->
+                    c.albums.find { it.relativePath == path } ?: Album(path.trimEnd('/'), path, itemCount = 0)
+                },
                 showCategoryBadges = badges,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
@@ -639,6 +676,8 @@ sealed interface GalleryUiState {
         val categoryFilter: CategoryFilter? = null,
         /** 지금 보고 있는 출처 탭 */
         val tab: GalleryTab = GalleryTab.CHOSEN,
+        /** 앨범 하나만 보고 있으면 그 앨범 */
+        val albumFilter: Album? = null,
         val showCategoryBadges: Boolean = true,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,

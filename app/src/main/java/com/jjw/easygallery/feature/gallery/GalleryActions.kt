@@ -128,6 +128,7 @@ internal fun GalleryOverflowMenu(
     onOpenHidden: () -> Unit,
     onPickCategory: () -> Unit,
     onTrashUploaded: () -> Unit,
+    onPickAlbum: () -> Unit = {},
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
@@ -135,6 +136,15 @@ internal fun GalleryOverflowMenu(
     }
     // 기간 선택은 자주 쓰는 것이라 여기 두지 않고 상단바 아이콘으로 뺐다(GalleryTopBar)
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        // 맨 위 — 카톡처럼 앨범(폴더)으로 골라 보기(docs/plans/album-view/spec.md)
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.gallery_menu_album)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+            onClick = {
+                expanded = false
+                onPickAlbum()
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.hidden_menu_open)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_visibility_off), contentDescription = null) },

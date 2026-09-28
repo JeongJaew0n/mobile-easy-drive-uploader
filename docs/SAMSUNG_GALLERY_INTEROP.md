@@ -201,6 +201,8 @@ adb shell dumpsys package | awk '/^  Package \[/{pkg=$2}
 
 어느 쪽이든 `albumsFrom(visible)` 을 그대로 쓰고, 숨긴 사진만 있는 폴더는 목록에서 뺀다(지금 이동 대상과 같은 규칙).
 
+**2026-09-28 구현: ⋮ 메뉴 "앨범"** 으로 했다 — `docs/plans/album-view/spec.md`.
+
 ## 5. 권장
 
 **할 일이 없다.** 즐겨찾기와 앨범은 이미 공유되고 있고, 그룹은 길이 없다.

@@ -23,6 +23,7 @@ import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
+import com.jjw.easygallery.feature.gallery.GalleryTab
 import com.jjw.easygallery.feature.hidden.HiddenRoute
 import com.jjw.easygallery.feature.remote.AddRemoteAccountRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
@@ -79,6 +80,8 @@ fun AppNavigation() {
                                 endEpochDay = filters.range?.endInclusive?.toEpochDay(),
                                 categoryIds = (filters.category as? CategoryFilter.Any)?.ids?.toList(),
                                 uncategorizedOnly = filters.category is CategoryFilter.Uncategorized,
+                                tab = filters.tab.takeUnless { it == GalleryTab.ALL }?.name,
+                                albumPath = filters.albumPath,
                                 hero = hero,
                             ),
                         )

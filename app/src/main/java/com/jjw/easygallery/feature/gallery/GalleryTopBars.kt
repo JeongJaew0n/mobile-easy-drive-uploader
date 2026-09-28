@@ -47,13 +47,15 @@ internal fun GalleryTopBar(
     onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit = {},
     onTrashUploaded: () -> Unit = {},
+    onPickAlbum: () -> Unit = {},
 ) {
     val itemCount = content?.itemCount
     val uploadedCount = content?.uploadedCount ?: 0
     val favoritesOnly = content?.favoritesOnly == true
     val notBackedUpOnly = content?.notBackedUpOnly == true
     val supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true
-    val categoryTitle = content?.let { categoryTitle(it.categoryFilter, it.categories) }
+    // 앨범을 보고 있으면 앨범 이름이 제목이다 — 카테고리보다 앞(앨범이 더 좁은 범위라 먼저 눈에 들어와야 한다)
+    val categoryTitle = content?.albumFilter?.name ?: content?.let { categoryTitle(it.categoryFilter, it.categories) }
     TopAppBar(
         title = {
             Column {
@@ -101,6 +103,7 @@ internal fun GalleryTopBar(
                 onOpenHidden = onHiddenClick,
                 onPickCategory = onPickCategory,
                 onTrashUploaded = onTrashUploaded,
+                onPickAlbum = onPickAlbum,
             )
         },
     )

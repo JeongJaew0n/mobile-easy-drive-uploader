@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.category.CategoryRepository
+import com.jjw.easygallery.core.data.chosen.ChosenMediaRepository
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
@@ -22,6 +23,7 @@ import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.feature.gallery.GalleryTab
 import com.jjw.easygallery.feature.gallery.normalizeDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -52,6 +54,7 @@ class MediaViewerViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
     private val hiddenMedia: HiddenMediaRepository,
+    private val chosenMedia: ChosenMediaRepository,
     prefs: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -64,6 +67,8 @@ class MediaViewerViewModel @Inject constructor(
     private var dateRange: DateRange? = null
     private var categoryFilter: CategoryFilter? = null
     private var hiddenOnly = false
+    private var tab = GalleryTab.ALL
+    private var albumPath: String? = null
     private val currentId = MutableStateFlow<Long?>(null)
     private val details = MutableStateFlow<Map<Long, MediaDetails>>(emptyMap())
     private val showInfo = MutableStateFlow(false)
@@ -88,12 +93,16 @@ class MediaViewerViewModel @Inject constructor(
         range: DateRange? = null,
         category: CategoryFilter? = null,
         hiddenOnly: Boolean = false,
+        tab: GalleryTab = GalleryTab.ALL,
+        albumPath: String? = null,
     ) {
         if (filter.value != null) return
         currentId.value = mediaId
         dateRange = range
         categoryFilter = category
         this.hiddenOnly = hiddenOnly
+        this.tab = tab
+        this.albumPath = albumPath
         filter.value = if (favoritesOnly) MediaFilter.Favorites else MediaFilter.All
     }
 
@@ -237,16 +246,23 @@ class MediaViewerViewModel @Inject constructor(
     }
 
     /**
-     * 갤러리와 같은 순서로 거른다: 숨김 → 카테고리 → 기간.
+     * 갤러리와 같은 순서로 거른다: 숨김 → 탭 → 앨범 → 카테고리 → 기간.
      * 갤러리에서 안 보이는 사진이 스와이프로 나오면 숨김이 아니다.
      */
     private fun filteredMedia(mediaFilter: MediaFilter): Flow<List<MediaItem>> {
         val visible = combine(
             mediaRepository.observeMedia(mediaFilter),
             hiddenMedia.observeHiddenIds(),
-        ) { list, hidden ->
+            chosenMedia.observeChosenIds(),
+        ) { list, hidden, chosen ->
             // 숨긴 사진 화면에서 열었으면 반대로 숨긴 것만 본다 — 그래야 좌우 스와이프가 그 목록과 맞는다
-            if (hiddenOnly) list.filter { it.id in hidden } else list.filterNot { it.id in hidden }
+            val shown = if (hiddenOnly) list.filter { it.id in hidden } else list.filterNot { it.id in hidden }
+            val inTab = when (tab) {
+                GalleryTab.ALL -> shown
+                GalleryTab.CHOSEN -> shown.filter { it.id in chosen }
+                else -> shown.filter { tab.matches(it) }
+            }
+            albumPath?.let { path -> inTab.filter { it.relativePath == path } } ?: inTab
         }
         val category = categoryFilter ?: return visible.map { it.filterByDate(dateRange) }
         return combine(visible, categoryRepository.observeAssignments()) { list, assignments ->

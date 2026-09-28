@@ -22,6 +22,7 @@ import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
+import com.jjw.easygallery.feature.gallery.GalleryTab
 
 @Composable
 fun MediaViewerRoute(
@@ -35,17 +36,15 @@ fun MediaViewerRoute(
     val resources = LocalResources.current
 
     LaunchedEffect(key) {
-        val range = if (key.startEpochDay != null && key.endEpochDay != null) {
-            DateRange.of(key.startEpochDay, key.endEpochDay)
-        } else {
-            null
-        }
-        val category = when {
-            key.uncategorizedOnly -> CategoryFilter.Uncategorized
-            !key.categoryIds.isNullOrEmpty() -> CategoryFilter.Any(key.categoryIds.toSet())
-            else -> null
-        }
-        viewModel.load(key.mediaId, key.favoritesOnly, range, category, key.hiddenOnly)
+        viewModel.load(
+            mediaId = key.mediaId,
+            favoritesOnly = key.favoritesOnly,
+            range = key.dateRange(),
+            category = key.categoryFilter(),
+            hiddenOnly = key.hiddenOnly,
+            tab = key.galleryTab(),
+            albumPath = key.albumPath,
+        )
     }
 
     MediaActionEffect(
@@ -106,3 +105,16 @@ fun MediaViewerRoute(
         }
     }
 }
+
+private fun MediaViewerKey.dateRange(): DateRange? =
+    if (startEpochDay != null && endEpochDay != null) DateRange.of(startEpochDay, endEpochDay) else null
+
+private fun MediaViewerKey.categoryFilter(): CategoryFilter? = when {
+    uncategorizedOnly -> CategoryFilter.Uncategorized
+    !categoryIds.isNullOrEmpty() -> CategoryFilter.Any(categoryIds.toSet())
+    else -> null
+}
+
+/** 모르는 이름(앱을 올리며 탭이 바뀐 뒤 복원된 키)이면 전체로 본다 */
+private fun MediaViewerKey.galleryTab(): GalleryTab =
+    tab?.let { name -> GalleryTab.entries.find { it.name == name } } ?: GalleryTab.ALL

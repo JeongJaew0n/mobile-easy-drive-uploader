@@ -524,4 +524,83 @@ class GalleryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `앨범을 고르면 그 폴더 사진만 보이고 이름이 붙는다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(
+            listOf(sampleItem(1), sampleItem(2).copy(relativePath = "DCIM/행복이/", bucketName = "행복이"), sampleItem(3)),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+
+            viewModel.setAlbumFilter("DCIM/행복이/")
+            (awaitItem() as GalleryUiState.Content).let {
+                assertEquals(1, it.itemCount)
+                assertEquals("행복이", it.albumFilter?.name)
+            }
+            viewModel.setAlbumFilter(null)
+            assertEquals(3, (awaitItem() as GalleryUiState.Content).itemCount)
+        }
+    }
+
+    @Test
+    fun `고른 사진 탭에서 앨범을 고르면 전체 탭으로 옮긴다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(
+            listOf(sampleItem(1), sampleItem(2).copy(relativePath = "DCIM/행복이/")),
+        )
+        val viewModel = createViewModel(startOnAll = false)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            assertEquals(GalleryTab.CHOSEN, (awaitItem() as GalleryUiState.Content).tab)
+
+            viewModel.setAlbumFilter("DCIM/행복이/")
+            advanceUntilIdle()
+            (expectMostRecentItem() as GalleryUiState.Content).let {
+                assertEquals(GalleryTab.ALL, it.tab)
+                assertEquals(1, it.itemCount)
+            }
+        }
+    }
+
+    @Test
+    fun `탭을 바꾸면 앨범 필터가 풀린다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(
+            listOf(sampleItem(1), sampleItem(2).copy(relativePath = "DCIM/행복이/")),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+            viewModel.setAlbumFilter("DCIM/행복이/")
+            awaitItem()
+
+            viewModel.setTab(GalleryTab.CAMERA)
+            advanceUntilIdle()
+            assertEquals(null, (expectMostRecentItem() as GalleryUiState.Content).albumFilter)
+        }
+    }
+
+    @Test
+    fun `상세보기로 탭과 앨범을 넘긴다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1).copy(relativePath = "DCIM/행복이/")))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            awaitItem()
+            viewModel.setAlbumFilter("DCIM/행복이/")
+            val filters = (awaitItem() as GalleryUiState.Content).viewerFilters()
+            assertEquals(GalleryTab.ALL, filters.tab)
+            assertEquals("DCIM/행복이/", filters.albumPath)
+        }
+    }
 }
