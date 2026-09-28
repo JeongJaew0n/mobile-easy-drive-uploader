@@ -15,6 +15,9 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +51,8 @@ interface VideoCompressor {
     fun cleanup(source: UploadSource)
 }
 
-class CompressionException(message: String, cause: Throwable? = null) : IOException(message, cause)
+class CompressionException(message: String, cause: Throwable? = null, override val uiText: UiText? = null) :
+    IOException(message, cause), LocalizedError
 
 @Singleton
 @androidx.annotation.OptIn(UnstableApi::class) // Transformer/ExportException 전체가 UnstableApi
@@ -93,9 +97,21 @@ class Media3VideoCompressor @Inject constructor(
             transcode(source.uri, temp, shortSide, bitrate, onProgress)
         } catch (e: ExportException) {
             temp.delete()
-            throw CompressionException("영상 압축 실패: ${e.message}", e)
+            throw CompressionException(
+                "video compression failed: ${e.message}",
+                e,
+                UiText(R.string.error_compression_failed, e.message ?: e.javaClass.simpleName),
+            )
         }
-        if (!temp.renameTo(output)) throw CompressionException("압축 결과 저장 실패")
+        if (!temp.renameTo(
+                output,
+            )
+        ) {
+            throw CompressionException(
+                "could not save compressed file",
+                uiText = UiText(R.string.error_compression_save_failed),
+            )
+        }
         Timber.i("compressed %s: %d → %d bytes", source.displayName, source.sizeBytes, output.length())
     }
 

@@ -7,6 +7,9 @@ import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.Closeable
@@ -19,7 +22,9 @@ data class AutoLabel(val label: String, val confidence: Float)
 
 /** 모델을 아직 못 받았을 때. 계속 돌려도 전부 실패하므로 훑기를 멈춘다 */
 class LabelModelUnavailableException(cause: Throwable?) :
-    IllegalStateException("이미지 인식 모델을 준비하는 중입니다", cause)
+    IllegalStateException("label model not ready", cause), LocalizedError {
+    override val uiText = UiText(R.string.error_model_preparing)
+}
 
 /** 실기기에서만 도는 ML Kit 을 가려, 저장소를 가짜 구현으로 테스트할 수 있게 한다 */
 interface ImageLabeler : Closeable {
@@ -69,7 +74,7 @@ class MlKitImageLabeler @Inject constructor(
         if (decoded.config == Bitmap.Config.ARGB_8888) return decoded
         val converted = decoded.copy(Bitmap.Config.ARGB_8888, false)
         decoded.recycle()
-        return requireNotNull(converted) { "비트맵을 ARGB_8888 로 바꾸지 못했습니다" }
+        return requireNotNull(converted) { "could not convert bitmap to ARGB_8888" }
     }
 
     private suspend fun runLabeler(image: InputImage): List<AutoLabel> =

@@ -9,7 +9,7 @@ data class DateRange(
     val endInclusive: LocalDate,
 ) {
     init {
-        require(!endInclusive.isBefore(start)) { "종료일이 시작일보다 빠를 수 없습니다" }
+        require(!endInclusive.isBefore(start)) { "end date is before start date" }
     }
 
     fun startMillis(zone: ZoneId = ZoneId.systemDefault()): Long =

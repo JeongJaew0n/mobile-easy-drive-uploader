@@ -18,8 +18,11 @@ import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.domain.model.MediaDetails
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
@@ -163,7 +166,7 @@ class MediaStoreRepository @Inject constructor(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 MediaMutation.NeedsConsent(MediaStore.createTrashRequest(resolver, items.uris(), trashed).intentSender)
             } else {
-                error(UNSUPPORTED_MESSAGE)
+                throw TrashFavoritesUnsupportedException()
             }
         }
 
@@ -174,7 +177,7 @@ class MediaStoreRepository @Inject constructor(
                     MediaStore.createFavoriteRequest(resolver, items.uris(), favorite).intentSender,
                 )
             } else {
-                error(UNSUPPORTED_MESSAGE)
+                throw TrashFavoritesUnsupportedException()
             }
         }
 
@@ -361,10 +364,15 @@ class MediaStoreRepository @Inject constructor(
     }
 
     private companion object {
-        const val UNSUPPORTED_MESSAGE = "휴지통·즐겨찾기는 Android 11 이상에서만 지원됩니다"
         const val CHANGE_DEBOUNCE_MILLIS = 300L
         const val SHARE_STOP_TIMEOUT_MILLIS = 5_000L
         const val MILLIS_PER_SECOND = 1_000L
         const val HALF_TURN_DEGREES = 180
     }
+}
+
+/** 휴지통·즐겨찾기는 API 30 의 MediaStore 요청으로만 된다. UI 는 `supportsTrashAndFavorites` 로 미리 숨긴다 */
+class TrashFavoritesUnsupportedException :
+    UnsupportedOperationException("trash/favorite needs API 30+"), LocalizedError {
+    override val uiText = UiText(R.string.error_trash_favorites_unsupported)
 }

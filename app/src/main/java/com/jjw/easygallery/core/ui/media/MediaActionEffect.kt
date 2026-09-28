@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalResources
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.media.MediaActionEvent
 import com.jjw.easygallery.feature.gallery.actionDoneMessage
 import kotlinx.coroutines.flow.Flow
@@ -39,7 +40,7 @@ fun MediaActionEffect(
                 }
                 MediaActionEvent.Cancelled ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.gallery_action_cancelled))
-                is MediaActionEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+                is MediaActionEvent.Failed -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
             }
         }
     }

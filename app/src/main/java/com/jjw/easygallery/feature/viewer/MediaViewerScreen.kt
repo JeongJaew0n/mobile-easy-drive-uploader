@@ -52,7 +52,7 @@ internal fun MediaViewerScreen(
     onToggleInfo: () -> Unit,
     modifier: Modifier = Modifier,
     onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
-        Result.failure(IllegalStateException("카테고리 생성이 연결되지 않았습니다"))
+        Result.failure(IllegalStateException("createCategory not wired"))
     },
     onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit = { _, _ -> },
     /** 히어로 오버레이가 진행 중이면 페이저·스피너를 숨겨 두 이미지가 겹쳐 보이지 않게 한다 */

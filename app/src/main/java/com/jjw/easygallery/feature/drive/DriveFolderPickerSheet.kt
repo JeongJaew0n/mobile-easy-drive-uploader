@@ -36,10 +36,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.domain.model.DriveFolder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -84,6 +86,8 @@ internal fun DriveFolderPickerSheet(
     val scope = rememberCoroutineScope()
     val here = path.last()
     val rootName = rootLabel ?: stringResource(R.string.drive_root_name)
+    // LaunchedEffect 안에서 문장을 만든다 — Composable 밖이라 리소스를 미리 잡아 둔다
+    val resources = LocalResources.current
 
     LaunchedEffect(here.id) {
         folders = null
@@ -93,7 +97,7 @@ internal fun DriveFolderPickerSheet(
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            error = e.message ?: e.toString()
+            error = e.displayMessage(resources)
             folders = emptyList()
         }
     }
@@ -155,7 +159,7 @@ internal fun DriveFolderPickerSheet(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                        error = e.message ?: e.toString()
+                        error = e.displayMessage(resources)
                     }
                 }
             },

@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
@@ -65,7 +66,7 @@ fun MediaViewerRoute(
                 }
                 MediaViewerEvent.Hidden ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.viewer_hidden_done))
-                is MediaViewerEvent.Error -> snackbarHostState.showSnackbar(event.message)
+                is MediaViewerEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
             }
         }
     }

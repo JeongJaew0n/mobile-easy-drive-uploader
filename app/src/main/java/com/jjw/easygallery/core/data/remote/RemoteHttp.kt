@@ -1,5 +1,9 @@
 package com.jjw.easygallery.core.data.remote
 
+import androidx.annotation.StringRes
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -14,12 +18,17 @@ import kotlin.coroutines.resumeWithException
  * [reason] 은 서버가 준 기계용 코드(`storageQuotaExceeded` 등)다. 화면은 이걸로 제대로 된
  * 한국어 문장을 고르고, 워커는 "다시 해도 소용없는 오류" 를 가려낸다.
  */
+/**
+ * 원격 저장소 오류. `message` 는 로그용 영어, [uiText] 가 화면 문장이다(`docs/plans/i18n/spec.md`).
+ * [uiText] 가 없으면 화면은 `message` 를 그대로 보인다.
+ */
 open class RemoteStorageException(
     message: String,
     val httpCode: Int? = null,
     cause: Throwable? = null,
     val reason: String? = null,
-) : IOException(message, cause) {
+    override val uiText: UiText? = null,
+) : IOException(message, cause), LocalizedError {
 
     /**
      * 요청 한도에 걸린 것인가. 4xx 지만 **다시 하면 되는** 오류라 영구 실패로 버리면 안 된다.
@@ -64,7 +73,26 @@ open class RemoteStorageException(
 }
 
 /** 제공자가 지원하지 않는 동작(폴더 이름 변경 등). UI 는 능력 집합으로 미리 숨기므로 방어용 */
-class UnsupportedOperationException(message: String) : RemoteStorageException(message)
+class UnsupportedOperationException(uiText: UiText) :
+    RemoteStorageException("unsupported operation", uiText = uiText)
+
+/**
+ * "목록 조회 실패 (403): 이유" — [operation] 은 작업 이름 문자열(`R.string.op_*`).
+ * 서버가 준 [detail] 은 번역하지 않는다(서버의 언어다).
+ */
+fun remoteFailureText(@StringRes operation: Int, code: Int, detail: String? = null): UiText =
+    if (detail == null) {
+        UiText(R.string.error_op_failed, UiText(operation), code)
+    } else {
+        UiText(R.string.error_op_failed_detail, UiText(operation), code, detail)
+    }
+
+/** 올린 바이트 수가 원본 크기와 다르다(연결이 중간에 끊긴 경우). 재시도 대상이다 */
+class UploadSizeMismatchException(written: Long, length: Long) :
+    RemoteStorageException(
+        "uploaded size differs: $written / $length",
+        uiText = UiText(R.string.error_upload_size_mismatch, written, length),
+    )
 
 /** OkHttp 호출을 코루틴으로. 취소하면 요청도 취소한다 */
 suspend fun Call.awaitResponse(): Response = suspendCancellableCoroutine { cont ->
@@ -82,17 +110,18 @@ suspend fun Call.awaitResponse(): Response = suspendCancellableCoroutine { cont 
     cont.invokeOnCancellation { cancel() }
 }
 
-/** 성공(2xx)이 아니면 본문 앞부분을 담아 던진다 */
-fun Response.requireSuccess(what: String): Response {
+/** 성공(2xx)이 아니면 본문 앞부분을 담아 던진다. [what] 은 작업 이름(`R.string.op_*`) */
+fun Response.requireSuccess(@StringRes what: Int): Response {
     if (isSuccessful) return this
     val raw = runCatching { body.string().take(MAX_ERROR_BODY) }.getOrNull()
     close()
     // 본문을 통째로 붙이지 않는다 — 목록 한 칸에 JSON 이 들어가면 잘려서 아무것도 못 읽는다
     val parsed = parseRemoteErrorBody(raw)
     throw RemoteStorageException(
-        message = "$what 실패 ($code)${parsed.message?.let { ": $it" }.orEmpty()}",
+        message = "remote request failed ($code)${parsed.message?.let { ": $it" }.orEmpty()}",
         httpCode = code,
         reason = parsed.reason,
+        uiText = remoteFailureText(what, code, parsed.message),
     )
 }
 

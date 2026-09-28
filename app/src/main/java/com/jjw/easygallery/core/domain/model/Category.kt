@@ -34,9 +34,9 @@ sealed interface CategoryFilter {
 
 /** 카테고리 이름·생성 규칙 위반. Exception 은 Serializable 이라 data object 대신 클래스로 둔다 */
 sealed class CategoryError(message: String) : Exception(message) {
-    class EmptyName : CategoryError("카테고리 이름이 비어 있습니다")
-    class NameTooLong : CategoryError("카테고리 이름은 $CATEGORY_NAME_MAX_LENGTH 자까지입니다")
-    class DuplicateName : CategoryError("같은 이름의 카테고리가 있습니다")
+    class EmptyName : CategoryError("category name is empty")
+    class NameTooLong : CategoryError("category name longer than $CATEGORY_NAME_MAX_LENGTH")
+    class DuplicateName : CategoryError("duplicate category name")
 }
 
 const val CATEGORY_COLOR_COUNT = 8

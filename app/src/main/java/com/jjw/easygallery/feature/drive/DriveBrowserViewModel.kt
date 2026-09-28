@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.datasource.DataSource
 import coil3.ImageLoader
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedException
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.auth.SignInStep
@@ -134,7 +137,7 @@ class DriveBrowserViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "storage unavailable")
-                _uiState.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
+                _uiState.update { it.copy(isLoading = false, error = e) }
             }
         }
     }
@@ -267,7 +270,7 @@ class DriveBrowserViewModel @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "create folder failed")
                 _uiState.update { it.copy(isMutating = false) }
-                events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+                events.send(DriveBrowserEvent.Error(e))
             }
         }
     }
@@ -368,7 +371,11 @@ class DriveBrowserViewModel @Inject constructor(
         val targets = selectedEntries()
         if (targets.isEmpty() || target.id == current.id) return
         if (targets.any { it.isFolder && target.id.isUnder(it.id) }) {
-            viewModelScope.launch { events.send(DriveBrowserEvent.Error(MOVE_INTO_SELF_MESSAGE)) }
+            viewModelScope.launch {
+                events.send(
+                    DriveBrowserEvent.Error(LocalizedException(UiText(R.string.error_folder_into_self))),
+                )
+            }
             return
         }
         mutateBatch(
@@ -475,7 +482,7 @@ class DriveBrowserViewModel @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "drive mutation failed")
                 _uiState.update { it.copy(entries = before, isMutating = false) }
-                events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+                events.send(DriveBrowserEvent.Error(e))
             }
         }
     }
@@ -510,7 +517,7 @@ class DriveBrowserViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "view scope consent failed")
-                events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+                events.send(DriveBrowserEvent.Error(e))
             }
         }
     }
@@ -607,23 +614,21 @@ class DriveBrowserViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "drive list failed")
-                val message = e.message ?: e.toString()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
                         isLoadingMore = false,
-                        error = if (reset) message else null,
+                        error = if (reset) e else null,
                         authRecovery = (e as? AuthorizationRequiredException)?.pendingIntent,
                     )
                 }
-                if (!reset) events.send(DriveBrowserEvent.Error(e.message ?: e.toString()))
+                if (!reset) events.send(DriveBrowserEvent.Error(e))
             }
         }
     }
 }
 
-private const val MOVE_INTO_SELF_MESSAGE = "폴더를 자기 자신 안으로 옮길 수 없습니다"
 private const val SEARCH_DEBOUNCE_MILLIS = 350L
 
 data class DriveBrowserUiState(
@@ -643,7 +648,8 @@ data class DriveBrowserUiState(
     val uploadedFromDeviceIds: Set<String> = emptySet(),
     /** 변경 중 오브젝트 단위 진행(S3 폴더 이름 변경·이동·삭제). null 이면 불확정 진행바 */
     val mutationProgress: MutationProgress? = null,
-    val error: String? = null,
+    /** 목록을 못 읽었다. 화면이 지금 언어로 문장을 만든다(`displayMessage`) */
+    val error: Throwable? = null,
     /**
      * 권한이 끊겨서 재동의가 필요할 때 띄울 인텐트. 있으면 오류 화면이 "다시 시도" 대신
      * 재동의 버튼을 보여준다 — 없으면 앱 안에서 빠져나갈 길이 없다(SS-11).
@@ -738,5 +744,5 @@ sealed interface DriveBrowserEvent {
     data class ViewFolderAdded(val name: String) : DriveBrowserEvent
     data class ViewFolderAlreadyThere(val name: String) : DriveBrowserEvent
     data class ViewFolderRemoved(val name: String) : DriveBrowserEvent
-    data class Error(val message: String) : DriveBrowserEvent
+    data class Error(val error: Throwable) : DriveBrowserEvent
 }

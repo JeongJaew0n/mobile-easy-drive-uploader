@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.feature.gallery.GalleryGrid
 
@@ -154,7 +156,7 @@ internal fun TrashScreen(
         ) {
             when {
                 uiState.error != null -> Text(
-                    text = uiState.error,
+                    text = uiState.error.displayMessage(LocalResources.current),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
                         .align(Alignment.Center)

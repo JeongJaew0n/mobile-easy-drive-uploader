@@ -1,6 +1,9 @@
 package com.jjw.easygallery.core.data.remote.s3
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
@@ -12,6 +15,7 @@ import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.ReportsMutationProgress
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.remote.awaitResponse
+import com.jjw.easygallery.core.data.remote.remoteFailureText
 import com.jjw.easygallery.core.data.remote.requireSuccess
 import com.jjw.easygallery.core.data.upload.ContentUriRequestBody
 import com.jjw.easygallery.core.data.upload.SessionStatus
@@ -57,7 +61,7 @@ class S3Storage(
     private val _mutationProgress = MutableStateFlow<MutationProgress?>(null)
     override val mutationProgress: StateFlow<MutationProgress?> = _mutationProgress.asStateFlow()
 
-    private val bucket = requireNotNull(account.bucketOrRoot) { "S3 계정에 버킷이 없습니다" }
+    private val bucket = requireNotNull(account.bucketOrRoot) { "S3 account has no bucket" }
     private val signer = S3Signer(requireNotNull(account.username), secretKey, account.region ?: DEFAULT_REGION)
     private val client: OkHttpClient = baseClient.newBuilder()
         .addInterceptor { chain -> chain.proceed(signer.sign(chain.request())) }
@@ -90,7 +94,7 @@ class S3Storage(
                 if (pageToken != null) addQueryParameter("continuation-token", pageToken)
             }
             .build()
-        val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
+        val result = execute(Request.Builder().url(url).get().build(), R.string.op_list) { S3Xml.parseListResult(it) }
         val folders = result.commonPrefixes.map { prefix ->
             RemoteEntry(
                 id = prefix,
@@ -123,7 +127,10 @@ class S3Storage(
 
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder {
         val key = "$parentId${name.trim().trim('/')}/"
-        execute(Request.Builder().url(keyUrl(key)).put(ByteArray(0).toRequestBody(null)).build(), "폴더 생성") { }
+        execute(
+            Request.Builder().url(keyUrl(key)).put(ByteArray(0).toRequestBody(null)).build(),
+            R.string.op_create_folder,
+        ) { }
         return RemoteFolder(key, name.trim())
     }
 
@@ -150,13 +157,20 @@ class S3Storage(
      * 진행 표시는 후속(`docs/MULTI_CLOUD.md` §4).
      */
     private suspend fun movePrefix(fromPrefix: String, toPrefix: String): RemoteEntry {
-        if (toPrefix.startsWith(fromPrefix)) throw UnsupportedOperationException("폴더를 자기 자신 아래로 옮길 수 없습니다")
+        if (toPrefix.startsWith(fromPrefix)) {
+            throw UnsupportedOperationException(UiText(R.string.error_folder_into_self))
+        }
         // 대상이 이미 있으면 조용히 합쳐지고 같은 이름 오브젝트는 덮어써진다 — WebDAV 처럼 먼저 막는다
-        if (prefixExists(toPrefix)) throw RemoteStorageException("이미 같은 이름의 폴더가 있습니다")
+        if (prefixExists(toPrefix)) {
+            throw RemoteStorageException("folder already exists", uiText = UiText(R.string.error_folder_exists))
+        }
         forEachKeyUnder(fromPrefix) { key -> copyThenDelete(key, toPrefix + key.removePrefix(fromPrefix)) }
         // 마커 오브젝트(있으면) 정리, 새 마커 생성
         runCatching { deleteKey(fromPrefix) }
-        execute(Request.Builder().url(keyUrl(toPrefix)).put(ByteArray(0).toRequestBody(null)).build(), "폴더 생성") { }
+        execute(
+            Request.Builder().url(keyUrl(toPrefix)).put(ByteArray(0).toRequestBody(null)).build(),
+            R.string.op_create_folder,
+        ) { }
         val name = toPrefix.removeSuffix("/").substringAfterLast('/')
         return RemoteEntry(toPrefix, name, RemoteEntry.FOLDER_MIME_TYPE, null, System.currentTimeMillis(), null)
     }
@@ -185,7 +199,7 @@ class S3Storage(
             .addQueryParameter("prefix", prefix)
             .addQueryParameter("max-keys", "1")
             .build()
-        val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
+        val result = execute(Request.Builder().url(url).get().build(), R.string.op_list) { S3Xml.parseListResult(it) }
         return result.objects.isNotEmpty() || result.commonPrefixes.isNotEmpty()
     }
 
@@ -199,7 +213,10 @@ class S3Storage(
                 .addQueryParameter("max-keys", PAGE_SIZE.toString())
                 .apply { if (token != null) addQueryParameter("continuation-token", token) }
                 .build()
-            val result = execute(Request.Builder().url(url).get().build(), "목록 조회") { S3Xml.parseListResult(it) }
+            val result = execute(
+                Request.Builder().url(url).get().build(),
+                R.string.op_list,
+            ) { S3Xml.parseListResult(it) }
             result.objects.filter { it.key != prefix }.forEach { keys += it.key }
             val next = result.nextContinuationToken
             // 같은 토큰을 계속 돌려주는 서버를 만나면 리스트가 무한히 자란다
@@ -219,11 +236,13 @@ class S3Storage(
         deleteKey(entryId)
     }
 
-    override suspend fun restore(entryId: String) = throw UnsupportedOperationException("S3 에는 휴지통이 없습니다")
+    override suspend fun restore(entryId: String) = throw UnsupportedOperationException(
+        UiText(R.string.error_no_trash, "S3"),
+    )
 
     override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
         client.newCall(Request.Builder().url(keyUrl(entryId)).get().build())
-            .awaitResponse().requireSuccess("다운로드").body.byteStream()
+            .awaitResponse().requireSuccess(R.string.op_download).body.byteStream()
     }
 
     override fun uploader(): RemoteUploader = S3Uploader()
@@ -234,20 +253,20 @@ class S3Storage(
             .header("x-amz-copy-source", "/$bucket/${S3Signer.uriEncode(fromKey, encodeSlash = false)}")
             .put(ByteArray(0).toRequestBody(null))
             .build()
-        execute(copy, "복사") { }
+        execute(copy, R.string.op_copy) { }
         deleteKey(fromKey)
         val name = toKey.substringAfterLast('/')
         return RemoteEntry(toKey, name, guessMimeType(name), null, System.currentTimeMillis(), null)
     }
 
     private suspend fun deleteKey(key: String) {
-        execute(Request.Builder().url(keyUrl(key)).delete().build(), "삭제") { }
+        execute(Request.Builder().url(keyUrl(key)).delete().build(), R.string.op_delete) { }
     }
 
     private fun keyUrl(key: String): HttpUrl =
         bucketUrl.newBuilder().apply { key.split('/').forEach { addPathSegment(it) } }.build()
 
-    private suspend fun <T> execute(request: Request, what: String, parse: (String) -> T): T =
+    private suspend fun <T> execute(request: Request, @StringRes what: Int, parse: (String) -> T): T =
         withContext(ioDispatcher) {
             client.newCall(request).awaitResponse().requireSuccess(what).use { response ->
                 parse(response.body.string())
@@ -273,8 +292,8 @@ class S3Storage(
                 .header("Content-Type", source.mimeType.ifBlank { DEFAULT_MEDIA_TYPE.toString() })
                 .post(ByteArray(0).toRequestBody(null))
                 .build()
-            val uploadId = execute(request, "멀티파트 시작") { S3Xml.parseUploadId(it) }
-                ?: throw RemoteStorageException("멀티파트 UploadId 가 없습니다")
+            val uploadId = execute(request, R.string.op_multipart_start) { S3Xml.parseUploadId(it) }
+                ?: throw RemoteStorageException("multipart UploadId missing")
             return "$MPU_PREFIX$uploadId|$key"
         }
 
@@ -284,7 +303,11 @@ class S3Storage(
             response.use {
                 when {
                     it.code == HTTP_NOT_FOUND -> SessionStatus.Expired
-                    !it.isSuccessful -> throw RemoteStorageException("파트 조회 실패 (${it.code})", it.code)
+                    !it.isSuccessful -> throw RemoteStorageException(
+                        "list parts failed (${it.code})",
+                        it.code,
+                        uiText = remoteFailureText(R.string.op_part_list, it.code),
+                    )
                     else -> SessionStatus.Incomplete(contiguousBytes(S3Xml.parseListParts(it.body.string())))
                 }
             }
@@ -321,7 +344,7 @@ class S3Storage(
             emit(UploadEvent.Progress(0, length))
             val body = requestBody(source, 0, length, length, emit)
             client.newCall(Request.Builder().url(keyUrl(key)).put(body).build()).awaitResponse()
-                .requireSuccess("업로드").close()
+                .requireSuccess(R.string.op_upload).close()
             Timber.d("uploaded %s -> s3://%s/%s", source.displayName, bucket, key)
         }
 
@@ -336,7 +359,7 @@ class S3Storage(
             val etags = HashMap<Int, String>()
             if (offset > 0) {
                 val listed = client.newCall(Request.Builder().url(mpu.listPartsUrl()).get().build()).awaitResponse()
-                    .requireSuccess("파트 조회").use { S3Xml.parseListParts(it.body.string()) }
+                    .requireSuccess(R.string.op_part_list).use { S3Xml.parseListParts(it.body.string()) }
                 listed.forEach { etags[it.partNumber] = it.eTag }
             }
             emit(UploadEvent.Progress(offset, length))
@@ -350,8 +373,8 @@ class S3Storage(
                     .build()
                 val body = requestBody(source, start, end, length, emit)
                 val etag = client.newCall(Request.Builder().url(url).put(body).build()).awaitResponse()
-                    .requireSuccess("파트 업로드").use { it.header("ETag") }
-                    ?: throw RemoteStorageException("파트 $partNumber 의 ETag 가 없습니다")
+                    .requireSuccess(R.string.op_part_upload).use { it.header("ETag") }
+                    ?: throw RemoteStorageException("ETag missing for part $partNumber")
                 etags[partNumber] = etag
                 start = end
             }
@@ -365,8 +388,13 @@ class S3Storage(
             val completeUrl = keyUrl(mpu.key).newBuilder().addQueryParameter("uploadId", mpu.uploadId).build()
             val result = client.newCall(
                 Request.Builder().url(completeUrl).post(completeXml.toRequestBody(XML_MEDIA_TYPE)).build(),
-            ).awaitResponse().requireSuccess("멀티파트 완료").use { it.body.string() }
-            S3Xml.errorCode(result)?.let { throw RemoteStorageException("멀티파트 완료 실패: $it") }
+            ).awaitResponse().requireSuccess(R.string.op_multipart_complete).use { it.body.string() }
+            S3Xml.errorCode(result)?.let {
+                throw RemoteStorageException(
+                    "complete multipart failed: $it",
+                    uiText = UiText(R.string.error_op_failed_plain, UiText(R.string.op_multipart_complete), it),
+                )
+            }
             Timber.d("uploaded %s -> s3://%s/%s (%d parts)", source.displayName, bucket, mpu.key, etags.size)
         }
 

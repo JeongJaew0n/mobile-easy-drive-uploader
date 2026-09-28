@@ -206,7 +206,7 @@ class SettingsViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "settings action failed")
-                events.send(SettingsEvent.Error(e.message ?: e.toString()))
+                events.send(SettingsEvent.Error(e))
             } finally {
                 isBusy.update { false }
             }
@@ -258,5 +258,5 @@ sealed interface SettingsEvent {
 
     data object SignedIn : SettingsEvent
     data object SignInCancelled : SettingsEvent
-    data class Error(val message: String) : SettingsEvent
+    data class Error(val error: Throwable) : SettingsEvent
 }

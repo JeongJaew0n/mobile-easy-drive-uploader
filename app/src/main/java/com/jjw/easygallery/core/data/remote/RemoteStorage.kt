@@ -1,5 +1,7 @@
 package com.jjw.easygallery.core.data.remote
 
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
@@ -48,11 +50,11 @@ interface RemoteStorage {
      * 워커(`DownloadWorker`)가 MediaStore 로 복사한다
      */
     suspend fun openDownload(entryId: String): InputStream =
-        throw UnsupportedOperationException("이 저장소는 다운로드를 지원하지 않습니다")
+        throw UnsupportedOperationException(UiText(R.string.error_download_unsupported))
 
     /** [Capability.SEARCH] 가 있을 때만. 저장소 전체에서 이름 부분 일치 */
     suspend fun search(query: String, pageToken: String? = null): RemotePage =
-        throw UnsupportedOperationException("이 저장소는 검색을 지원하지 않습니다")
+        throw UnsupportedOperationException(UiText(R.string.error_search_unsupported))
 
     suspend fun move(entryId: String, fromParentId: String, toParentId: String): RemoteEntry
 

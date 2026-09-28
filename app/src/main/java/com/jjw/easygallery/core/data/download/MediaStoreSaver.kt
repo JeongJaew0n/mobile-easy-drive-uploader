@@ -31,9 +31,9 @@ class MediaStoreSaver @Inject constructor(@param:ApplicationContext private val 
             put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: throw IOException("MediaStore insert 실패: $displayName")
+        val uri = resolver.insert(collection, values) ?: throw IOException("MediaStore insert failed: $displayName")
         val result = runCatching {
-            val out = requireNotNull(resolver.openOutputStream(uri)) { "MediaStore 출력 스트림을 열 수 없습니다" }
+            val out = requireNotNull(resolver.openOutputStream(uri)) { "could not open MediaStore output stream" }
             out.use { copy(input, it, onProgress) }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
         }

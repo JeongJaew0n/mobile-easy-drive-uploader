@@ -76,7 +76,7 @@ private val KINDS_WITHOUT_CONTAINER = setOf(RemoteAccountKind.WEBDAV, RemoteAcco
 
 sealed interface AddRemoteAccountEvent {
     data object Saved : AddRemoteAccountEvent
-    data class Error(val message: String) : AddRemoteAccountEvent
+    data class Error(val error: Throwable) : AddRemoteAccountEvent
 }
 
 @HiltViewModel
@@ -258,7 +258,7 @@ class AddRemoteAccountViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "save account failed")
-                _events.value = AddRemoteAccountEvent.Error(e.message ?: e.toString())
+                _events.value = AddRemoteAccountEvent.Error(e)
             } finally {
                 _uiState.update { it.copy(isBusy = false) }
             }

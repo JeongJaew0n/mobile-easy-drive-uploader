@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Easy Gallery</string>
+    <string name="app_name" translatable="false">Easy Gallery</string>
 
     <!-- 갤러리 -->
     <string name="gallery_title">갤러리</string>
@@ -667,4 +667,55 @@
     <string name="drive_view_folder_removed">%1$s 을(를) 목록에서 뺐습니다</string>
     <string name="drive_view_folder_exists">%1$s 은(는) 이미 목록에 있습니다</string>
     <string name="drive_view_scope_denied">폴더를 보려면 Drive 읽기 권한이 필요합니다</string>
+
+    <!-- 오류 문장(docs/plans/i18n/spec.md). 데이터 계층은 문장 대신 이 ID 를 싣고, 화면이 지금 언어로 만든다 -->
+    <string name="error_not_signed_in">Google 계정에 로그인되어 있지 않습니다</string>
+    <string name="error_authorization_required">Google Drive 접근 권한을 다시 허용해야 합니다</string>
+    <string name="error_sign_in_cancelled">로그인이 취소되었습니다</string>
+    <string name="error_auth_failed">Google 인증 실패 (%1$d)</string>
+    <string name="error_auth_failed_detail">Google 인증 실패 (%1$d): %2$s</string>
+    <string name="error_op_failed">%1$s 실패 (%2$d)</string>
+    <string name="error_op_failed_detail">%1$s 실패 (%2$d): %3$s</string>
+    <string name="error_op_failed_plain">%1$s 실패: %2$s</string>
+    <string name="error_remote_io">%1$s 오류: %2$s</string>
+    <string name="error_no_trash">%1$s 에는 휴지통이 없습니다</string>
+    <string name="error_folder_into_self">폴더를 자기 자신 안으로 옮길 수 없습니다</string>
+    <string name="error_folder_exists">이미 같은 이름의 폴더가 있습니다</string>
+    <string name="error_upload_size_mismatch">업로드한 크기가 다릅니다: %1$d / %2$d</string>
+    <string name="error_upload_session_expired">업로드 세션이 만료되었습니다</string>
+    <string name="error_download_unsupported">이 저장소는 다운로드를 지원하지 않습니다</string>
+    <string name="error_search_unsupported">이 저장소는 검색을 지원하지 않습니다</string>
+    <string name="error_guest_upload_only">다른 계정 업로드는 올리기만 합니다</string>
+    <string name="error_guest_is_primary">이미 연결된 계정입니다. 다른 계정을 고르세요</string>
+    <string name="error_trash_favorites_unsupported">휴지통·즐겨찾기는 Android 11 이상에서만 지원됩니다</string>
+    <string name="error_tls_no_certificate">서버 인증서가 없습니다</string>
+    <string name="error_tls_fingerprint_mismatch">인증서 지문이 저장된 값과 다릅니다</string>
+    <string name="error_tls_read_failed">서버 인증서를 읽지 못했습니다</string>
+    <string name="error_compression_failed">영상 압축 실패: %1$s</string>
+    <string name="error_compression_save_failed">압축 결과 저장 실패</string>
+    <string name="error_model_preparing">이미지 인식 모델을 준비하는 중입니다</string>
+    <string name="error_unknown_account">저장소 계정을 찾을 수 없습니다</string>
+    <string name="error_account_secret_missing">저장소 비밀번호를 읽지 못했습니다. 설정에서 계정을 다시 저장하세요</string>
+    <!-- 원격 작업 이름 — "%1$s 실패 (403)" 의 %1$s -->
+    <string name="op_list">목록 조회</string>
+    <string name="op_create_folder">폴더 생성</string>
+    <string name="op_download">다운로드</string>
+    <string name="op_copy">복사</string>
+    <string name="op_delete">삭제</string>
+    <string name="op_upload">업로드</string>
+    <string name="op_move">이동</string>
+    <string name="op_multipart_start">멀티파트 시작</string>
+    <string name="op_part_list">파트 조회</string>
+    <string name="op_part_upload">파트 업로드</string>
+    <string name="op_multipart_complete">멀티파트 완료</string>
+    <string name="op_session_create">업로드 세션 생성</string>
+    <string name="op_session_status">세션 상태 조회</string>
+    <!-- 앱 언어(설정) -->
+    <string name="settings_language">언어</string>
+    <string name="settings_language_system">시스템 기본값</string>
+    <string name="settings_language_title">앱 언어</string>
+    <!-- 언어 이름은 그 언어로 쓴다 — 어느 언어로 바뀌어도 돌아올 자리를 찾을 수 있게. 번역하지 않는다 -->
+    <string name="language_korean" translatable="false">한국어</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_japanese" translatable="false">日本語</string>
 </resources>

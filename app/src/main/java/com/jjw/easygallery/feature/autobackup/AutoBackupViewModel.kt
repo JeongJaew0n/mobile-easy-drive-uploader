@@ -106,7 +106,7 @@ class AutoBackupViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "auto-backup action failed")
-                events.send(AutoBackupEvent.Error(e.message ?: e.toString()))
+                events.send(AutoBackupEvent.Error(e))
             } finally {
                 isBusy.value = false
             }
@@ -139,5 +139,5 @@ data class AutoBackupUiState(
 sealed interface AutoBackupEvent {
     data class ScanFinished(val enqueued: Int, val skipped: Int) : AutoBackupEvent
     data class ConfirmBackfill(val count: Int) : AutoBackupEvent
-    data class Error(val message: String) : AutoBackupEvent
+    data class Error(val error: Throwable) : AutoBackupEvent
 }

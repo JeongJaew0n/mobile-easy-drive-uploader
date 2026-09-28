@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.remote.smb.DiscoveredHost
 import com.jjw.easygallery.core.data.remote.toFingerprintDisplay
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
@@ -74,7 +75,7 @@ fun AddRemoteAccountRoute(
                 onBackClick()
             }
             is AddRemoteAccountEvent.Error -> {
-                snackbarHostState.showSnackbar(e.message)
+                snackbarHostState.showSnackbar(e.error.displayMessage(resources))
                 viewModel.consumeEvent()
             }
             null -> Unit
@@ -85,7 +86,7 @@ fun AddRemoteAccountRoute(
             snackbarHostState.showSnackbar(
                 result.fold(
                     onSuccess = { resources.getString(R.string.remote_test_ok) },
-                    onFailure = { resources.getString(R.string.remote_test_failed, it.message ?: it.toString()) },
+                    onFailure = { resources.getString(R.string.remote_test_failed, it.displayMessage(resources)) },
                 ),
             )
         }

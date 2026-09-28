@@ -44,7 +44,7 @@ class TrashViewModel @Inject constructor(
             isMutating = mutating,
         )
     }
-        .catch { emit(TrashUiState(isLoading = false, error = it.message ?: it.toString())) }
+        .catch { emit(TrashUiState(isLoading = false, error = it)) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TrashUiState())
 
     fun toggleSelection(id: Long) = selectedIds.update { if (id in it) it - id else it + id }
@@ -80,7 +80,7 @@ data class TrashUiState(
     val selectedIds: Set<Long> = emptySet(),
     val isLoading: Boolean = true,
     val isMutating: Boolean = false,
-    val error: String? = null,
+    val error: Throwable? = null,
 ) {
     val isSelectionMode: Boolean get() = selectedIds.isNotEmpty()
 }

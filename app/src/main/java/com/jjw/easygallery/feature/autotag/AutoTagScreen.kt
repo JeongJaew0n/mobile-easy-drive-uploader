@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.autotag.AutoTagScheduler
 import java.text.DateFormat
 import java.util.Date
@@ -67,7 +68,7 @@ fun AutoTagRoute(
             val message = when (event) {
                 is AutoTagEvent.CategoryCreated ->
                     resources.getString(R.string.auto_tag_to_category_done, event.name, event.count)
-                is AutoTagEvent.Error -> event.message
+                is AutoTagEvent.Error -> event.error.displayMessage(resources)
             }
             snackbarHostState.showSnackbar(message)
         }

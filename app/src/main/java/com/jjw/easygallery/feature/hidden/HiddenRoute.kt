@@ -18,6 +18,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.hidden.VerifyResult
 import com.jjw.easygallery.core.domain.model.MediaItem
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ fun HiddenRoute(
                 is HiddenEvent.Unhidden -> snackbarHostState.showSnackbar(
                     resources.getQuantityString(R.plurals.hidden_unhidden_done, event.count, event.count),
                 )
-                is HiddenEvent.Error -> snackbarHostState.showSnackbar(event.message)
+                is HiddenEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
             }
         }
     }

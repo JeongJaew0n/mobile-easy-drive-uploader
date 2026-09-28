@@ -1,6 +1,8 @@
 package com.jjw.easygallery.core.data.remote.sftp
 
 import android.content.Context
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
 import com.jjw.easygallery.core.data.remote.RemoteNames
@@ -10,6 +12,7 @@ import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
+import com.jjw.easygallery.core.data.remote.UploadSizeMismatchException
 import com.jjw.easygallery.core.data.remote.smb.skipExactly
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
@@ -32,7 +35,6 @@ import net.schmizz.sshj.transport.TransportException
 import net.schmizz.sshj.userauth.UserAuthException
 import timber.log.Timber
 import java.io.FileNotFoundException
-import java.io.IOException
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.EnumSet
@@ -90,7 +92,9 @@ class SftpStorage(
         if (entryId.endsWith("/")) deleteTree(sftp, entryId) else sftp.rm(absolute(entryId))
     }
 
-    override suspend fun restore(entryId: String) = throw UnsupportedOperationException("SFTP 에는 휴지통이 없습니다")
+    override suspend fun restore(entryId: String) = throw UnsupportedOperationException(
+        UiText(R.string.error_no_trash, "SFTP"),
+    )
 
     override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
         val ssh = connect()
@@ -176,10 +180,12 @@ class SftpStorage(
      */
     private fun asStorageException(e: Exception): RemoteStorageException {
         val permanent = e is UserAuthException || e is TransportException
+        val detail = e.message ?: e.javaClass.simpleName
         return RemoteStorageException(
-            "SFTP 오류: ${e.message ?: e.javaClass.simpleName}",
+            "SFTP error: $detail",
             httpCode = if (permanent) HTTP_UNAUTHORIZED else null,
             cause = e,
+            uiText = UiText(R.string.error_remote_io, "SFTP", detail),
         )
     }
 
@@ -255,7 +261,7 @@ class SftpStorage(
                     }
                     // 원본이 예상보다 짧으면 잘린 파일이 "완료" 로 기록된다 — 그 전에 막는다
                     if (written != length) {
-                        throw IOException("업로드한 크기가 다릅니다: $written / $length")
+                        throw UploadSizeMismatchException(written, length)
                     }
                 }
                 Timber.d("uploaded %s -> sftp://%s/%s", source.displayName, account.endpoint, sessionUri)

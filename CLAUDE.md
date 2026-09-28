@@ -41,6 +41,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - 업로드 완료는 `UploadLedgerRepository`(uploaded_media) 에 남는다. "이미 업로드됨" 판단은 큐가 아니라 원장으로.
 - Drive API 는 Retrofit 으로 REST v3 직접 호출. 공식 Java 클라이언트(`google-api-services-drive`) 추가 금지.
 - 문자열은 `res/values/strings.xml` (한국어 기본). 하드코딩 금지. Composable 밖(LaunchedEffect 등)에서 문자열이 필요하면 `LocalResources.current` 를 캡처해 쓴다 — `LocalContext.current.getString` 은 lint 에러.
+- 다국어: 한국어(`values/`)·영어(`values-en/`)·일본어(`values-ja/`). **새 문자열은 세 파일에 함께** 넣는다(Lint `MissingTranslation`·`StringResourcesParityTest` 가 막는다). 사용자에게 보일 수 있는 예외는 `LocalizedError`(`UiText`)를 구현하고, 화면은 `e.message` 가 아니라 `displayMessage(resources)` 로 띄운다. ViewModel 이벤트에는 문장이 아니라 예외를 싣는다. 근거 `docs/plans/i18n/spec.md`.
 - Google 인증은 `AuthorizationClient` 만 사용(Credential Manager/GoogleSignIn 금지). Drive 는 `drive.file` scope 유지.
 - Robolectric 테스트는 `robolectric.properties` 의 sdk=35 유지 (36+ 는 Java 21 필요, 테스트 JVM 은 17).
 - 벡터 아이콘은 `res/drawable/ic_*.xml` 에 직접 추가 (`material-icons-extended` 미사용, `?attr/colorControlNormal` 같은 AppCompat 속성 금지).

@@ -270,7 +270,7 @@ class GalleryViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "assign categories failed")
-                events.send(GalleryEvent.Error(e.message ?: e.toString()))
+                events.send(GalleryEvent.Error(e))
             }
         }
     }
@@ -360,7 +360,7 @@ class GalleryViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "enqueue failed")
-                events.send(GalleryEvent.Error(e.message ?: e.toString()))
+                events.send(GalleryEvent.Error(e))
             }
         }
     }
@@ -439,7 +439,7 @@ class GalleryViewModel @Inject constructor(
             throw e
         } catch (e: Exception) {
             Timber.e(e, "guest upload failed")
-            events.send(GalleryEvent.Error(e.message ?: e.toString()))
+            events.send(GalleryEvent.Error(e))
         }
     }
 
@@ -714,5 +714,5 @@ sealed interface GalleryEvent {
 
     /** 고른 사진에 [count] 개를 넣었다([added]) 또는 뺐다 */
     data class Chosen(val count: Int, val added: Boolean) : GalleryEvent
-    data class Error(val message: String) : GalleryEvent
+    data class Error(val error: Throwable) : GalleryEvent
 }

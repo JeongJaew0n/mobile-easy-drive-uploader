@@ -6,6 +6,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.auth.AuthException
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
@@ -225,7 +226,7 @@ class UploadWorker @AssistedInject constructor(
             }
         }
         val t3 = SystemClock.elapsedRealtime()
-        val fileId = requireNotNull(driveFileId) { "업로드가 파일 ID 없이 끝났습니다" }
+        val fileId = requireNotNull(driveFileId) { "upload finished without a file id" }
         markUploaded(task, fileId)
         compressor.cleanup(source)
         val t4 = SystemClock.elapsedRealtime()
@@ -301,7 +302,7 @@ class UploadWorker @AssistedInject constructor(
         // 없다 — 그 항목만 접는다. 여기서 SignInRequired 를 내면 "A 로 다시 로그인하라" 는 엉뚱한 알림이 뜬다
         is AuthException if RemoteAccount.guestEmailOf(task.accountId) != null -> {
             Timber.w(e, "guest account unavailable")
-            queue.fail(task.id, e.message, REASON_GUEST_UNAVAILABLE)
+            queue.fail(task.id, e.displayMessage(applicationContext.resources), REASON_GUEST_UNAVAILABLE)
             Outcome.Failed
         }
         is AuthException -> {
@@ -338,7 +339,7 @@ class UploadWorker @AssistedInject constructor(
             runCatching { storages.storage(task.accountId).uploader().abort(session) }
                 .onFailure { Timber.w(it, "abort session failed") }
         }
-        queue.fail(task.id, e.message ?: e.toString(), (e as? RemoteStorageException)?.reason)
+        queue.fail(task.id, e.displayMessage(applicationContext.resources), (e as? RemoteStorageException)?.reason)
         compressor.cleanup(task.toSource())
         if (e !is RemoteStorageException || !e.isHopeless) return Outcome.Failed
         hopelessError = e
@@ -356,7 +357,7 @@ class UploadWorker @AssistedInject constructor(
         val attempts = task.attemptCount + 1
         if (attempts >= MAX_ATTEMPTS) {
             Timber.e(e, "upload gave up after %d attempts: %s", attempts, task.displayName)
-            queue.fail(task.id, e.message ?: e.toString(), (e as? RemoteStorageException)?.reason)
+            queue.fail(task.id, e.displayMessage(applicationContext.resources), (e as? RemoteStorageException)?.reason)
             return Outcome.Failed
         }
         Timber.w(e, "upload transient failure (%d/%d): %s", attempts, MAX_ATTEMPTS, task.displayName)

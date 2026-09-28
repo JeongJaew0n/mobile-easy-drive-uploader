@@ -53,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.domain.model.VideoCompression
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 
@@ -115,7 +116,7 @@ fun SettingsRoute(
                 is SettingsEvent.SignInFailed -> snackbarHostState.showSnackbar(
                     resources.getString(signInFailureMessage(event.statusCode), event.statusCode),
                 )
-                is SettingsEvent.Error -> snackbarHostState.showSnackbar(event.message)
+                is SettingsEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
             }
         }
     }
@@ -303,6 +304,7 @@ internal fun SettingsScreen(
                 title = stringResource(R.string.auto_tag_settings_entry),
                 onClick = onAutoTagClick,
             )
+            LanguageRow()
             SwitchRow(
                 title = stringResource(R.string.settings_category_badges),
                 description = stringResource(R.string.settings_category_badges_description),

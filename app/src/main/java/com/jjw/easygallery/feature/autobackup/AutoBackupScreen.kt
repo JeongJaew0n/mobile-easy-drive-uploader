@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.domain.model.Album
 
 @Composable
@@ -68,7 +69,7 @@ fun AutoBackupRoute(
                     },
                 )
                 is AutoBackupEvent.ConfirmBackfill -> backfillCount = event.count
-                is AutoBackupEvent.Error -> snackbarHostState.showSnackbar(event.message)
+                is AutoBackupEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
             }
         }
     }

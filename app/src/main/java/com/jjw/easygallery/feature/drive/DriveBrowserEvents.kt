@@ -5,6 +5,7 @@ import android.content.res.Resources
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.domain.model.DriveFolder
 
 /** ViewModel 이벤트 → 스낵바(실행 취소 포함). Route 에서 분리해 복잡도를 낮춘다 */
@@ -42,7 +43,7 @@ internal suspend fun showBrowserEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
         is DriveBrowserEvent.DownloadStarted ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_download_started, event.count))
-        is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.message)
+        is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
         // 위에서 이미 처리했다. else 로 뭉뚱그리지 않는 것은, 새 이벤트를 더했을 때
         // 컴파일러가 "여기도 보라" 고 말해주게 하기 위해서다
         is DriveBrowserEvent.NeedsViewScopeConsent,

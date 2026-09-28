@@ -1,5 +1,8 @@
 package com.jjw.easygallery.core.data.remote
 
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.domain.model.RemoteAccount
 import com.jjw.easygallery.core.domain.model.RemoteAccountKind
 import kotlinx.coroutines.sync.Mutex
@@ -39,8 +42,8 @@ class StorageRegistry @Inject constructor(
 
     private suspend fun build(accountId: String): RemoteStorage {
         val account = accounts.get(accountId) ?: throw UnknownAccountException(accountId)
-        val factory = requireNotNull(factories[account.kind]) { "지원하지 않는 저장소 종류: ${account.kind}" }
-        val secret = requireNotNull(accounts.secretOf(account)) { "저장소 비밀 정보가 없습니다: $accountId" }
+        val factory = requireNotNull(factories[account.kind]) { "unsupported storage kind: ${account.kind}" }
+        val secret = accounts.secretOf(account) ?: throw MissingSecretException(accountId)
         return factory.create(account, secret)
     }
 
@@ -62,4 +65,13 @@ fun interface RemoteStorageFactory {
     fun create(account: RemoteAccount, secret: String): RemoteStorage
 }
 
-class UnknownAccountException(id: String) : IllegalStateException("저장소 계정을 찾을 수 없습니다: $id")
+class UnknownAccountException(id: String) :
+    IllegalStateException("storage account not found: $id"), LocalizedError {
+    override val uiText = UiText(R.string.error_unknown_account)
+}
+
+/** 계정의 비밀번호·키를 기기 키 저장소에서 읽지 못했다(앱 데이터 복원 뒤 흔하다). 계정을 다시 저장해야 한다 */
+class MissingSecretException(id: String) :
+    IllegalStateException("storage secret missing: $id"), LocalizedError {
+    override val uiText = UiText(R.string.error_account_secret_missing)
+}

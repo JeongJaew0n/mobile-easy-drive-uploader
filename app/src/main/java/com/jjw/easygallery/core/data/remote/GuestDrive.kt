@@ -1,8 +1,10 @@
 package com.jjw.easygallery.core.data.remote
 
 import android.content.Context
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.auth.GuestTokenProvider
 import com.jjw.easygallery.core.data.drive.AuthInterceptor
 import com.jjw.easygallery.core.data.drive.DriveApi
@@ -124,5 +126,5 @@ internal class GuestDriveStorage(
 
     override fun uploader(): RemoteUploader = uploader
 
-    private fun unsupported(): Nothing = throw UnsupportedOperationException("다른 계정 업로드는 올리기만 합니다")
+    private fun unsupported(): Nothing = throw UnsupportedOperationException(UiText(R.string.error_guest_upload_only))
 }

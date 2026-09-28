@@ -1,5 +1,9 @@
 package com.jjw.easygallery.core.data.remote
 
+import androidx.annotation.StringRes
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.security.MessageDigest
@@ -21,8 +25,11 @@ fun OkHttpClient.Builder.pinCertificate(sha256Hex: String): OkHttpClient.Builder
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
 
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
-            val leaf = chain.firstOrNull() ?: throw CertificateException("서버 인증서가 없습니다")
-            if (leaf.sha256Hex() != expected) throw CertificateException("인증서 지문이 저장된 값과 다릅니다")
+            val leaf = chain.firstOrNull()
+                ?: throw LocalizedCertificateException("no server certificate", R.string.error_tls_no_certificate)
+            if (leaf.sha256Hex() != expected) {
+                throw LocalizedCertificateException("fingerprint mismatch", R.string.error_tls_fingerprint_mismatch)
+            }
         }
 
         override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
@@ -49,7 +56,8 @@ fun fetchServerCertificateSha256(baseClient: OkHttpClient, url: String): String 
         .hostnameVerifier { _, _ -> true }
         .build()
     probe.newCall(Request.Builder().url(url).head().build()).execute().close()
-    return seen?.sha256Hex() ?: throw SSLException("서버 인증서를 읽지 못했습니다")
+    return seen?.sha256Hex()
+        ?: throw LocalizedSslException("could not read server certificate", R.string.error_tls_read_failed)
 }
 
 fun X509Certificate.sha256Hex(): String =
@@ -73,4 +81,14 @@ fun Throwable.isTlsFailure(): Boolean {
         t.suppressedExceptions.forEach(stack::add)
     }
     return false
+}
+
+/** 화면에 뜰 수 있는 인증서 오류. 형(CertificateException)을 지켜 TLS 판정([isTlsFailure])이 그대로 동작하게 한다 */
+class LocalizedCertificateException(message: String, @StringRes res: Int) :
+    CertificateException(message), LocalizedError {
+    override val uiText = UiText(res)
+}
+
+class LocalizedSslException(message: String, @StringRes res: Int) : SSLException(message), LocalizedError {
+    override val uiText = UiText(res)
 }

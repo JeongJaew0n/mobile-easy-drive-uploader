@@ -155,7 +155,10 @@ class DriveBrowserViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Album", "a.jpg", "b.jpg"), viewModel.uiState.value.entries.map { it.name })
-        viewModel.eventFlow.test { assertEquals(DriveBrowserEvent.Error("offline"), awaitItem()) }
+        viewModel.eventFlow.test {
+            // 문장은 화면이 만든다 — 이벤트는 예외 자체를 싣는다
+            assertEquals("offline", (awaitItem() as DriveBrowserEvent.Error).error.message)
+        }
     }
 
     @Test

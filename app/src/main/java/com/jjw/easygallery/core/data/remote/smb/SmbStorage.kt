@@ -14,6 +14,8 @@ import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
 import com.hierynomus.smbj.share.DiskShare
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
 import com.jjw.easygallery.core.data.remote.RemoteNames
@@ -22,6 +24,7 @@ import com.jjw.easygallery.core.data.remote.RemoteStorage
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
+import com.jjw.easygallery.core.data.remote.UploadSizeMismatchException
 import com.jjw.easygallery.core.data.upload.SessionStatus
 import com.jjw.easygallery.core.data.upload.UploadEvent
 import com.jjw.easygallery.core.data.upload.UploadSource
@@ -38,7 +41,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.FilterInputStream
-import java.io.IOException
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.EnumSet
@@ -57,7 +59,7 @@ class SmbStorage(
     private val ioDispatcher: CoroutineDispatcher,
 ) : RemoteStorage {
 
-    private val shareName = requireNotNull(account.bucketOrRoot) { "SMB 계정에 공유 이름이 없습니다" }
+    private val shareName = requireNotNull(account.bucketOrRoot) { "SMB account has no share name" }
     private val client = SMBClient(
         SmbConfig.builder()
             .withTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -106,7 +108,9 @@ class SmbStorage(
         if (entryId.endsWith("/")) share.rmdir(path, true) else share.rm(path)
     }
 
-    override suspend fun restore(entryId: String) = throw UnsupportedOperationException("SMB 에는 휴지통이 없습니다")
+    override suspend fun restore(entryId: String) = throw UnsupportedOperationException(
+        UiText(R.string.error_no_trash, "SMB"),
+    )
 
     override fun uploader(): RemoteUploader = SmbUploader()
 
@@ -195,7 +199,7 @@ class SmbStorage(
      * 나머지(연결 끊김·타임아웃)는 코드 없이 감싸 재시도 대상으로 남긴다.
      */
     private fun Exception.toStorageException(): RemoteStorageException {
-        val message = "SMB 오류: ${message ?: javaClass.simpleName}"
+        val detail = message ?: javaClass.simpleName
         val httpCode = (this as? SMBApiException)?.status?.let { status ->
             when (status) {
                 NtStatus.STATUS_LOGON_FAILURE,
@@ -214,7 +218,12 @@ class SmbStorage(
                 else -> null
             }
         }
-        return RemoteStorageException(message, httpCode = httpCode, cause = this)
+        return RemoteStorageException(
+            "SMB error: $detail",
+            httpCode = httpCode,
+            cause = this,
+            uiText = UiText(R.string.error_remote_io, "SMB", detail),
+        )
     }
 
     private fun FileIdBothDirectoryInformation.isDirectory(): Boolean =
@@ -295,7 +304,7 @@ class SmbStorage(
                     // 원본이 예상 길이와 다르면(잘림·바뀜) 완료로 기록하지 않는다
                     val written = share.getFileInformation(path).standardInformation.endOfFile
                     if (written != length) {
-                        throw IOException("업로드한 크기가 다릅니다: $written / $length")
+                        throw UploadSizeMismatchException(written, length)
                     }
                 }
                 Timber.d("uploaded %s -> smb://%s/%s/%s", source.displayName, account.endpoint, shareName, sessionUri)

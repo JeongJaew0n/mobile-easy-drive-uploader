@@ -5,6 +5,7 @@ import android.content.res.Resources
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 
 /** ViewModel 이벤트 → 스낵바·화면 이동. Route 에서 떼어내 복잡도를 낮춘다(Drive 화면의 DriveBrowserEvents 와 같다) */
 internal suspend fun showGalleryEvent(
@@ -39,7 +40,7 @@ internal suspend fun showGalleryEvent(
                 event.count,
             ),
         )
-        is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.message)
+        is GalleryEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
         is GalleryEvent.GuestChooser -> onGuestChooser(event.pendingIntent)
         is GalleryEvent.GuestStarted, GalleryEvent.GuestIsPrimary ->
             guestEventMessage(event, resources)?.let { snackbarHostState.showSnackbar(it) }

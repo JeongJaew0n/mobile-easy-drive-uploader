@@ -171,7 +171,7 @@ class MediaViewerViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "enqueue failed")
-                events.send(MediaViewerEvent.Error(e.message ?: e.toString()))
+                events.send(MediaViewerEvent.Error(e))
             }
         }
     }
@@ -317,5 +317,5 @@ sealed interface MediaViewerEvent {
     data class Enqueued(val added: Int) : MediaViewerEvent
     data object SignInRequired : MediaViewerEvent
     data object Hidden : MediaViewerEvent
-    data class Error(val message: String) : MediaViewerEvent
+    data class Error(val error: Throwable) : MediaViewerEvent
 }

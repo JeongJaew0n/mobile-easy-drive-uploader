@@ -18,7 +18,7 @@ sealed interface MediaActionEvent {
     data class LaunchConsent(val intentSender: IntentSender) : MediaActionEvent
     data class Done(val action: MediaAction, val affected: Int) : MediaActionEvent
     data object Cancelled : MediaActionEvent
-    data class Failed(val message: String) : MediaActionEvent
+    data class Failed(val error: Throwable) : MediaActionEvent
 }
 
 /**
@@ -69,7 +69,7 @@ class MediaActionController @Inject constructor(
             throw e
         } catch (e: Exception) {
             Timber.e(e, "media action failed")
-            _events.send(MediaActionEvent.Failed(e.message ?: e.toString()))
+            _events.send(MediaActionEvent.Failed(e))
         }
         _isMutating.value = false
     }

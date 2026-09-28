@@ -68,7 +68,7 @@ internal fun GalleryScreen(
     onAlbumFilterChange: (String?) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
-        Result.failure(IllegalStateException("카테고리 생성이 연결되지 않았습니다"))
+        Result.failure(IllegalStateException("createCategory not wired"))
     },
     onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit = { _, _ -> },
     onTrashClick: () -> Unit = {},

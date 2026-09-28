@@ -2,8 +2,11 @@ package com.jjw.easygallery.core.data.upload
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.common.di.AppDispatcher
 import com.jjw.easygallery.core.common.di.Dispatcher
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.drive.DriveApi
 import com.jjw.easygallery.core.data.drive.DriveFileDto
 import com.jjw.easygallery.core.data.drive.DriveFileMetadata
@@ -12,6 +15,7 @@ import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.parseRemoteErrorBody
+import com.jjw.easygallery.core.data.remote.remoteFailureText
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -62,11 +66,16 @@ sealed interface SessionStatus {
     data object Expired : SessionStatus
 }
 
-open class DriveUploadException(message: String, httpCode: Int? = null, reason: String? = null) :
-    RemoteStorageException(message, httpCode, reason = reason)
+open class DriveUploadException(
+    message: String,
+    httpCode: Int? = null,
+    reason: String? = null,
+    uiText: UiText? = null,
+) : RemoteStorageException(message, httpCode, reason = reason, uiText = uiText)
 
 /** 세션 URI 가 만료/삭제됨(404·410). 새 세션을 만들어 처음부터 올려야 한다. */
-class SessionExpiredException(httpCode: Int) : DriveUploadException("업로드 세션이 만료되었습니다", httpCode)
+class SessionExpiredException(httpCode: Int) :
+    DriveUploadException("upload session expired", httpCode, uiText = UiText(R.string.error_upload_session_expired))
 
 /**
  * Drive resumable upload 프로토콜.
@@ -106,12 +115,13 @@ class DriveUploader @Inject constructor(
             val parsed = parseRemoteErrorBody(runCatching { response.errorBody()?.string() }.getOrNull())
             Timber.w("start session failed %d reason=%s", response.code(), parsed.reason)
             throw DriveUploadException(
-                message = "업로드 세션 생성 실패 (${response.code()})${parsed.message?.let { ": $it" }.orEmpty()}",
+                message = "start session failed (${response.code()})${parsed.message?.let { ": $it" }.orEmpty()}",
                 httpCode = response.code(),
                 reason = parsed.reason,
+                uiText = remoteFailureText(R.string.op_session_create, response.code(), parsed.message),
             )
         }
-        return response.headers()["Location"] ?: throw DriveUploadException("업로드 세션 URI 가 없습니다")
+        return response.headers()["Location"] ?: throw DriveUploadException("upload session URI missing")
     }
 
     /**
@@ -148,7 +158,7 @@ class DriveUploader @Inject constructor(
                 HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED ->
                     SessionStatus.Complete(parseFile(response).id)
                 HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> SessionStatus.Expired
-                else -> throw failureOf("세션 상태 조회", response)
+                else -> throw failureOf(R.string.op_session_status, response)
             }
         }
     }
@@ -189,7 +199,7 @@ class DriveUploader @Inject constructor(
         return client.newCall(request).await().use { response ->
             when (response.code) {
                 HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response).id
-                else -> throw failureOf("업로드", response)
+                else -> throw failureOf(R.string.op_upload, response)
             }
         }
     }
@@ -225,7 +235,7 @@ class DriveUploader @Inject constructor(
                 when (response.code) {
                     HttpURLConnection.HTTP_OK, HttpURLConnection.HTTP_CREATED -> parseFile(response)
                     HttpURLConnection.HTTP_NOT_FOUND, HTTP_GONE -> throw SessionExpiredException(response.code)
-                    else -> throw failureOf("업로드", response)
+                    else -> throw failureOf(R.string.op_upload, response)
                 }
             }
             Timber.d("uploaded %s -> %s", source.displayName, file.id)
@@ -240,14 +250,21 @@ class DriveUploader @Inject constructor(
      * 자리에 `업로드 실패 (403): {  "error": {…` 로 잘렸다. 기계용 코드는 [RemoteStorageException.reason]
      * 으로 넘겨 화면이 제대로 된 문장을 고르게 하고, 원본은 로그에만 남긴다.
      */
-    private fun failureOf(what: String, response: Response): DriveUploadException {
+    private fun failureOf(@StringRes what: Int, response: Response): DriveUploadException {
         val raw = runCatching { response.peekBody(ERROR_BODY_LIMIT).string() }.getOrNull()
         val parsed = parseRemoteErrorBody(raw)
-        Timber.w("%s failed %d reason=%s body=%s", what, response.code, parsed.reason, raw)
+        Timber.w(
+            "%s failed %d reason=%s body=%s",
+            context.resources.getResourceEntryName(what),
+            response.code,
+            parsed.reason,
+            raw,
+        )
         return DriveUploadException(
-            message = "$what 실패 (${response.code})${parsed.message?.let { ": $it" }.orEmpty()}",
+            message = "drive request failed (${response.code})${parsed.message?.let { ": $it" }.orEmpty()}",
             httpCode = response.code,
             reason = parsed.reason,
+            uiText = remoteFailureText(what, response.code, parsed.message),
         )
     }
 

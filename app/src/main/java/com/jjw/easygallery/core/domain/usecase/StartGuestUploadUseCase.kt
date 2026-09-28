@@ -1,5 +1,8 @@
 package com.jjw.easygallery.core.domain.usecase
 
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.LocalizedError
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.GuestDriveFactory
 import com.jjw.easygallery.core.data.remote.StorageRegistry
@@ -12,7 +15,10 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /** 고른 계정이 이미 연결된 주 계정이다. 그건 "다른 계정" 업로드가 아니다 */
-class GuestIsPrimaryException : IllegalArgumentException("이미 연결된 계정입니다. 다른 계정을 고르세요")
+class GuestIsPrimaryException :
+    IllegalArgumentException("picked the primary account"), LocalizedError {
+    override val uiText = UiText(R.string.error_guest_is_primary)
+}
 
 /** 누구로 올릴지 정해졌고, 이제 폴더를 고를 차례. [defaultFolder] 는 B 의 "Easy Gallery" */
 data class GuestSession(val email: String, val defaultFolder: DriveFolder)

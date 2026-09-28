@@ -1,6 +1,9 @@
 package com.jjw.easygallery.core.data.remote.webdav
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.remote.RemoteEntry
 import com.jjw.easygallery.core.data.remote.RemoteFolder
 import com.jjw.easygallery.core.data.remote.RemoteNames
@@ -11,6 +14,7 @@ import com.jjw.easygallery.core.data.remote.RemoteUploader
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
 import com.jjw.easygallery.core.data.remote.awaitResponse
 import com.jjw.easygallery.core.data.remote.pinCertificate
+import com.jjw.easygallery.core.data.remote.remoteFailureText
 import com.jjw.easygallery.core.data.remote.requireSuccess
 import com.jjw.easygallery.core.data.upload.ContentUriRequestBody
 import com.jjw.easygallery.core.data.upload.SessionStatus
@@ -85,7 +89,7 @@ class WebDavStorage(
 
     override suspend fun createFolder(name: String, parentId: String): RemoteFolder {
         val path = normalizeFolder(parentId) + name.trim().trim('/') + "/"
-        execute(Request.Builder().url(url(path)).method("MKCOL", null).build(), "폴더 생성")
+        execute(Request.Builder().url(url(path)).method("MKCOL", null).build(), R.string.op_create_folder)
         return RemoteFolder(path, name.trim())
     }
 
@@ -106,14 +110,16 @@ class WebDavStorage(
     }
 
     override suspend fun delete(entryId: String) {
-        execute(Request.Builder().url(url(entryId)).delete().build(), "삭제")
+        execute(Request.Builder().url(url(entryId)).delete().build(), R.string.op_delete)
     }
 
-    override suspend fun restore(entryId: String) = throw UnsupportedOperationException("WebDAV 에는 휴지통이 없습니다")
+    override suspend fun restore(entryId: String) = throw UnsupportedOperationException(
+        UiText(R.string.error_no_trash, "WebDAV"),
+    )
 
     override suspend fun openDownload(entryId: String): InputStream = withContext(ioDispatcher) {
         client.newCall(Request.Builder().url(url(entryId)).get().build())
-            .awaitResponse().requireSuccess("다운로드").body.byteStream()
+            .awaitResponse().requireSuccess(R.string.op_download).body.byteStream()
     }
 
     override fun uploader(): RemoteUploader = WebDavUploader()
@@ -125,7 +131,7 @@ class WebDavStorage(
             .header("Destination", url(to).toString())
             .header("Overwrite", "F")
             .build()
-        execute(request, "이동")
+        execute(request, R.string.op_move)
     }
 
     private suspend fun propfind(path: String, depth: Int): List<DavResource> = withContext(ioDispatcher) {
@@ -136,13 +142,17 @@ class WebDavStorage(
             .build()
         client.newCall(request).awaitResponse().use { response ->
             if (response.code != HTTP_MULTI_STATUS && !response.isSuccessful) {
-                throw RemoteStorageException("목록 조회 실패 (${response.code})", response.code)
+                throw RemoteStorageException(
+                    "list failed (${response.code})",
+                    response.code,
+                    uiText = remoteFailureText(R.string.op_list, response.code),
+                )
             }
             WebDavXml.parseMultiStatus(response.body.string(), baseUrl)
         }
     }
 
-    private suspend fun execute(request: Request, what: String) = withContext(ioDispatcher) {
+    private suspend fun execute(request: Request, @StringRes what: Int) = withContext(ioDispatcher) {
         client.newCall(request).awaitResponse().requireSuccess(what).close()
     }
 
@@ -219,7 +229,7 @@ class WebDavStorage(
                 ) { sent -> trySend(UploadEvent.Progress(sent, length)) }
                 client.newCall(Request.Builder().url(url(sessionUri)).put(body).build())
                     .awaitResponse()
-                    .requireSuccess("업로드")
+                    .requireSuccess(R.string.op_upload)
                     .close()
                 Timber.d("uploaded %s -> dav:%s", source.displayName, sessionUri)
                 send(UploadEvent.Completed(sessionUri))

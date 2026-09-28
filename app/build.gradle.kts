@@ -30,6 +30,13 @@ android {
         testInstrumentationRunner = "com.jjw.easygallery.HiltTestRunner"
     }
 
+    // 다국어(docs/plans/i18n/spec.md): 한국어(기본)·영어·일본어. 시스템 "앱 언어" 목록을 values-* 에서 만들고,
+    // 라이브러리의 다른 언어 리소스는 뺀다 — 앱은 세 언어뿐인데 라이브러리 대화상자만 프랑스어로 뜨면 어색하다
+    androidResources {
+        generateLocaleConfig = true
+        localeFilters += listOf("ko", "en", "ja")
+    }
+
     signingConfigs {
         create("release") {
             if (keystoreProperties != null) {

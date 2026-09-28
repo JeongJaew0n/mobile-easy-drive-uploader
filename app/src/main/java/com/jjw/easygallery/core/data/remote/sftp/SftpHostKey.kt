@@ -58,7 +58,7 @@ fun fetchSshHostKeySha256(endpoint: String): String {
         )
         runCatching { ssh.connect(host, port) }
     }
-    return requireNotNull(verifier.presentedSha256) { "호스트 키를 읽지 못했습니다" }
+    return requireNotNull(verifier.presentedSha256) { "host key not presented" }
 }
 
 private const val SSH_DEFAULT_PORT = 22

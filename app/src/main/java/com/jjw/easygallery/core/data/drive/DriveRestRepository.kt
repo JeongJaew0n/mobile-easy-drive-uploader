@@ -1,6 +1,8 @@
 package com.jjw.easygallery.core.data.drive
 
+import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
+import com.jjw.easygallery.core.data.remote.remoteFailureText
 import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
@@ -52,7 +54,12 @@ class DriveRestRepository @Inject constructor(
     override suspend fun download(fileId: String): InputStream = try {
         api.download(fileId).byteStream()
     } catch (e: HttpException) {
-        throw RemoteStorageException("다운로드 실패 (${e.code()})", httpCode = e.code(), cause = e)
+        throw RemoteStorageException(
+            "download failed (${e.code()})",
+            httpCode = e.code(),
+            cause = e,
+            uiText = remoteFailureText(R.string.op_download, e.code()),
+        )
     }
 
     override suspend fun search(query: String, pageToken: String?): DrivePage {

@@ -60,6 +60,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import com.jjw.easygallery.R
+import com.jjw.easygallery.core.common.text.displayMessage
 import com.jjw.easygallery.core.data.remote.MutationProgress
 import com.jjw.easygallery.core.domain.model.Capability
 import com.jjw.easygallery.core.domain.model.DriveEntry
@@ -277,7 +278,7 @@ internal fun DriveBrowserScreen(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(uiState.error, color = MaterialTheme.colorScheme.error)
+                    Text(uiState.error.displayMessage(LocalResources.current), color = MaterialTheme.colorScheme.error)
                     // 권한이 끊긴 것이면 새로고침은 같은 오류만 반복한다 — 재동의를 띄워야 빠져나간다(SS-11)
                     val recovery = uiState.authRecovery
                     if (recovery != null) {

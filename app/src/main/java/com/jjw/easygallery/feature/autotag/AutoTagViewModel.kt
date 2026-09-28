@@ -39,7 +39,7 @@ data class AutoTagUiState(
 
 sealed interface AutoTagEvent {
     data class CategoryCreated(val name: String, val count: Int) : AutoTagEvent
-    data class Error(val message: String) : AutoTagEvent
+    data class Error(val error: Throwable) : AutoTagEvent
 }
 
 @HiltViewModel
@@ -116,7 +116,7 @@ class AutoTagViewModel @Inject constructor(
             .firstOrNull { it.name.equals(displayName, ignoreCase = true) }
         // 이름이 겹치면 만들기가 실패하므로, 있으면 그 카테고리에 넣는다
         val category = existing ?: categories.create(displayName, nextColorIndex()).getOrElse { error ->
-            events.send(AutoTagEvent.Error(error.message ?: error.toString()))
+            events.send(AutoTagEvent.Error(error))
             return@runBusy
         }
         assignCategories(mediaIds, add = setOf(category.id), remove = emptySet())
@@ -139,7 +139,7 @@ class AutoTagViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "자동 태그 동작 실패")
-                events.send(AutoTagEvent.Error(e.message ?: e.toString()))
+                events.send(AutoTagEvent.Error(e))
             } finally {
                 isBusy.value = false
             }

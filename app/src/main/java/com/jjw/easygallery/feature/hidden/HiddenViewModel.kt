@@ -50,7 +50,7 @@ sealed interface HiddenUiState {
 
 sealed interface HiddenEvent {
     data class Unhidden(val count: Int) : HiddenEvent
-    data class Error(val message: String) : HiddenEvent
+    data class Error(val error: Throwable) : HiddenEvent
 }
 
 @HiltViewModel
