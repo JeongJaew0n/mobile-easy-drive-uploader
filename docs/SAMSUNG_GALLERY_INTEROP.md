@@ -8,7 +8,7 @@
 |---|---|---|
 | **앨범** | **이미 된다** | 안드로이드에서 앨범은 곧 폴더고, 우리는 실제 폴더를 옮긴다 |
 | **즐겨찾기** | **된다 (양방향, 측정 완료)** | 삼성도 플랫폼 `IS_FAVORITE` 를 쓴다 |
-| **그룹** | **안 된다** | 삼성 내부 DB. 공개 API 가 없다 |
+| **그룹** | **안 된다 (2026-09-27 재확인)** | 삼성 내부 DB. 읽기 권한이 `signature\|privileged` 라 삼성·Google 시스템 앱만 읽는다(§4.1) |
 
 ## 1. 먼저 — "연동 API" 는 없다
 
@@ -88,6 +88,75 @@ adb shell dumpsys package com.sec.android.gallery3d | grep -i -A3 provider
 삼성 갤러리에 내보내려면 **카테고리 이름의 폴더를 만들어 파일을 옮기는 것**이 유일한 길인데,
 그건 "공유" 가 아니라 **파일을 실제로 이동시키는 것**이라 성격이 다르다(되돌리기도 어렵다).
 원하면 별도로 검토한다.
+
+## 4.1 다시 확인 (2026-09-27) — 다른 앱에선 그룹이 보인다는데?
+
+사용자 질문: "다른 앱에서 보니까 삼성 갤러리에서 만든 그룹이 보이더라. 우리 앱도 되지 않나?"
+9-23 에는 삼성 갤러리 패키지의 provider 만 봤다. 이번엔 **그룹이 실제로 어디에 있고, 누가 읽을 수 있는지** 를
+S23+(One UI, Android 16, 삼성 갤러리 15.8.00.84, SecMediaProvider 16.1.30.0)에서 끝까지 따라갔다.
+
+### 결론
+
+**우리 앱은 못 읽는다. 그룹을 보여 주는 "다른 앱" 은 삼성(또는 Google)이 서명한 시스템 앱이다.**
+그 앱들은 일반 앱이 받을 수 없는 권한을 갖고 있다. Play 스토어로 설치하는 앱은 같은 길이 없다.
+
+### 그룹은 어디에 있나
+
+| 무엇 | 주소 | 읽기 권한 | 보호 수준 |
+|---|---|---|---|
+| **앨범 그룹**(앨범 여러 개를 묶은 것) | `content://com.sec.android.gallery3d.provider2/album_group` | `com.sec.android.gallery3d.provider2.READ` | **signature\|privileged** |
+| 삼성 미디어 DB(얼굴 그룹 `faces_group`, 연속 촬영·비슷한 사진 `group_contents`·`burst_group_id`, `cluster_*`) | `content://secmedia/...` (`com.samsung.android.providers.media`) | `com.samsung.android.providers.media.READ` | **signature\|privileged** |
+
+`signature|privileged` 는 **삼성과 같은 키로 서명했거나, 시스템 파티션에 미리 깔린 허용 목록 앱** 만 받는다.
+사용자가 허용하는 런타임 권한이 아니라서 우리 앱이 요청해도 설치 시점에 조용히 거절된다.
+
+앨범 그룹 주소는 삼성 갤러리 APK 안의 문자열(`content://com.sec.android.gallery3d.provider2/album_group`,
+`AlbumGroupView`, `getAlbumGroupList`)에서, 보호 수준은 두 APK 의 매니페스트와 `dumpsys package permission` 에서 확인했다.
+
+### 직접 읽어 봤다
+
+일반 앱과 같은 비시스템 사용자(shell, uid 2000)로 조회하면 둘 다 막힌다.
+
+```text
+content://com.sec.android.gallery3d.provider2/album_group
+  → SecurityException: Permission Denial ... requires com.sec.android.gallery3d.provider2.READ
+content://secmedia/gallery
+  → SecurityException: Permission Denial ... requires com.samsung.android.providers.media.READ
+```
+
+권한 없이 열려 있는 `com.sec.android.gallery3d.provider`(LocalProvider)도 있지만, 기기에 **등록돼 있지 않다**
+("Could not find provider"). 공유용 `ShareProvider`(READ_EXTERNAL_STORAGE)는 공유할 파일을 넘기는 용도라 그룹과 무관하다.
+
+### 그럼 "다른 앱" 은 누구인가
+
+이 기기에서 두 권한 중 하나라도 가진 앱은 30개이고, **전부 삼성·Google 시스템 앱**이다.
+그룹을 화면에 보여 줄 만한 것은 이쪽이다.
+
+- 사진 액자 위젯(`com.samsung.android.widget.pictureframe`) — 둘 다 보유
+- 내 파일(`com.sec.android.app.myfiles`) — 둘 다 보유
+- 보안 폴더(`com.samsung.knox.securefolder`) — 둘 다 보유
+- 홈 화면(`com.sec.android.app.launcher`), 카메라(`com.sec.android.app.camera`), 사진 편집(`com.samsung.app.newtrim`)
+
+Galaxy Store 로 업데이트돼 "사용자 앱" 으로 분류되는 것(SmartThings·시계·음성 녹음)도 삼성 서명이다.
+Google 포토(`com.google.android.apps.photos`)는 목록에 **없다** — Google 포토도 삼성 그룹은 못 읽는다.
+
+**사용자가 본 앱이 위 목록에 없다면** 그 앱 이름으로 다시 확인한다. 권한 목록은 이렇게 뽑는다.
+
+```bash
+adb shell dumpsys package | awk '/^  Package \[/{pkg=$2}
+  /com.sec.android.gallery3d.provider2.READ: granted=true/{print pkg}' | sort -u
+```
+
+### 우리 쪽에서 할 수 있는 것
+
+| 방법 | 무엇이 되나 | 한계 |
+|---|---|---|
+| **삼성 그룹 읽기** | — | 길이 없다(위) |
+| **우리 앱 안의 앨범 그룹** | 폴더(앨범) 여러 개를 이름 하나로 묶어 보기. 카테고리가 사진 단위라면 이건 폴더 단위다 | 삼성 그룹과 **따로** 만든다. 두 앱이 서로의 그룹을 모른다 |
+| **카테고리로 대신** | 이미 있다 — 사진을 직접 묶는다 | 폴더 단위로 묶는 게 아니라 사진마다 붙인다 |
+
+앨범 그룹을 우리 앱에 만들지는 사용자가 정한다. 만든다면 `hidden_media`·`chosen_media` 처럼 앱 DB 에
+`(그룹, relativePath)` 표 하나로 충분하고, 파일은 건드리지 않는다.
 
 ## 5. 권장
 
