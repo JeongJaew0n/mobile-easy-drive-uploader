@@ -17,3 +17,5 @@
 | SS-07 | 삼성에서 숨긴 앨범 | 우리 앱에서 어떻게 보이는지 기록 | ⬜ | 삼성 숨김과 우리 숨김은 별개다 |
 | SS-12 | 일반 앱 권한으로 삼성 앨범 그룹 조회(`content://com.sec.android.gallery3d.provider2/album_group`) | 읽을 수 있는지 | ✅ 2026-09-27 | **못 읽는다.** shell(uid 2000)로 `Permission Denial`. 읽기 권한이 `signature\|privileged` 다. `secmedia`(얼굴·연속 촬영 그룹)도 같다 — `docs/SAMSUNG_GALLERY_INTEROP.md` §4.1 |
 | SS-13 | 삼성 그룹 읽기 권한을 가진 앱 | 누가 그룹을 보여 줄 수 있나 | ✅ 2026-09-27 | S23+ 에서 30개, 전부 삼성·Google 시스템 앱(사진 액자 위젯·내 파일·보안 폴더·홈·카메라 등). Google 포토는 없다 |
+| SS-14 | 카카오톡 사진 선택에 보이는 "삼성에서 만든 것" 의 정체 | 폴더인지 그룹인지 | ✅ 2026-09-28 | S23+. 삼성에서 만든 앨범(중국 연태·행복이·임시참조·Trip)은 모두 `DCIM/<이름>/` 실제 폴더다. 카톡은 `READ_MEDIA_IMAGES` 만 있어 MediaStore 폴더만 볼 수 있다. 이 기기엔 앨범 그룹이 없다 — `docs/SAMSUNG_GALLERY_INTEROP.md` §4.2 |
+| SS-15 | 삼성에서 앨범 그룹을 만든 기기의 카톡 사진 선택 | 그룹 이름이 보이나, 그룹 안 앨범이 따로 보이나 | ⬜ | 따로 보이면 §4.2 결론 그대로. 그룹 이름이 보이면 다시 조사 |
