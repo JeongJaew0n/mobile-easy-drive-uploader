@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -516,12 +517,15 @@ private fun BrowserTopBar(
 @Composable
 private fun BrowserTitle(folderName: String?, accountName: String?, foreignOwner: String? = null) {
     val storageName = accountName ?: stringResource(R.string.drive_title)
+    // 한 줄씩 — 긴 이메일("…@gmail.com 의 폴더")이 꺾이면 상단바가 두 배로 높아진다
     Column {
-        Text(folderName ?: storageName)
+        Text(folderName ?: storageName, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             text = foreignOwner?.let { stringResource(R.string.drive_folder_of, it) } ?: storageName,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
