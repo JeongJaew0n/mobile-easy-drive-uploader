@@ -11,7 +11,10 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
+import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
+import com.jjw.easygallery.core.data.upload.BackupDestinations
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
+import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.CategoryAssignments
@@ -23,7 +26,10 @@ import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
+import com.jjw.easygallery.feature.gallery.BackupInputs
+import com.jjw.easygallery.feature.gallery.BackupView
 import com.jjw.easygallery.feature.gallery.GalleryTab
+import com.jjw.easygallery.feature.gallery.backupSections
 import com.jjw.easygallery.feature.gallery.normalizeDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -35,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -46,12 +53,17 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-@Suppress("TooManyFunctions") // 화면이 호출하는 API 표면(넘기기·편집 7·카테고리·업로드·휴지통 되돌리기). 로직은 컨트롤러·유스케이스에 있다
+@Suppress(
+    "TooManyFunctions", // 화면이 호출하는 API 표면(넘기기·편집 7·카테고리·업로드·휴지통 되돌리기). 로직은 컨트롤러·유스케이스에 있다
+    "LongParameterList", // Hilt 생성자 주입의 조합 지점
+)
 class MediaViewerViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val actionController: MediaActionController,
     private val enqueueUploads: EnqueueUploadsUseCase,
-    uploadLedger: UploadLedgerRepository,
+    private val uploadLedger: UploadLedgerRepository,
+    private val uploadQueue: UploadQueueRepository,
+    remoteAccounts: RemoteAccountRepository,
     private val categoryRepository: CategoryRepository,
     private val assignCategories: AssignCategoriesUseCase,
     private val hiddenMedia: HiddenMediaRepository,
@@ -70,9 +82,39 @@ class MediaViewerViewModel @Inject constructor(
     private var hiddenOnly = false
     private var tab = GalleryTab.ALL
     private var albumPath: String? = null
+    private var backupView: BackupView? = null
     private val currentId = MutableStateFlow<Long?>(null)
     private val details = MutableStateFlow<Map<Long, MediaDetails>>(emptyMap())
     private val showInfo = MutableStateFlow(false)
+
+    /**
+     * 지금 사진이 올라간 곳들 — 정보 패널의 "백업" 줄(`docs/plans/backed-up-photos/spec.md` §2.3).
+     * 주인 미정 옛 기록은 연결 계정의 Drive 로 본다.
+     */
+    val currentBackups: StateFlow<List<BackupLine>> = currentId.filterNotNull()
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            combine(
+                uploadLedger.observeRecordsFor(id),
+                remoteAccounts.observeAccounts(),
+                prefs.preferences.map { it.accountEmail }.distinctUntilChanged(),
+            ) { records, accounts, email ->
+                records.map { record ->
+                    val destination = BackupDestinations.describe(
+                        BackupDestinations.canonical(record.destination, email),
+                        accounts,
+                        email,
+                    )
+                    BackupLine(
+                        destination = destination,
+                        uploadedAt = record.uploadedAt,
+                        remoteId = record.remoteId,
+                        openAs = destination.driveEmail?.takeIf { it.isNotEmpty() } ?: email,
+                    )
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     private val events = Channel<MediaViewerEvent>(Channel.BUFFERED)
     val eventFlow: Flow<MediaViewerEvent> = events.receiveAsFlow()
@@ -96,8 +138,10 @@ class MediaViewerViewModel @Inject constructor(
         hiddenOnly: Boolean = false,
         tab: GalleryTab = GalleryTab.ALL,
         albumPath: String? = null,
+        backup: BackupView? = null,
     ) {
         if (filter.value != null) return
+        backupView = backup
         currentId.value = mediaId
         dateRange = range
         categoryFilter = category
@@ -276,9 +320,25 @@ class MediaViewerViewModel @Inject constructor(
             }
             albumPath?.let { path -> inTab.filter { it.relativePath == path } } ?: inTab
         }
-        val category = categoryFilter ?: return visible.map { it.filterByDate(dateRange) }
-        return combine(visible, categoryRepository.observeAssignments()) { list, assignments ->
-            list.filter { category.matches(assignments[it.id]) }.filterByDate(dateRange)
+        val category = categoryFilter
+        val filtered = if (category == null) {
+            visible.map { it.filterByDate(dateRange) }
+        } else {
+            combine(visible, categoryRepository.observeAssignments()) { list, assignments ->
+                list.filter { category.matches(assignments[it.id]) }.filterByDate(dateRange)
+            }
+        }
+        val backup = backupView ?: return filtered
+        // 백업된 사진 화면과 같은 함수로 같은 순서를 만든다(올린 날짜순·까닭별)
+        return combine(
+            filtered,
+            uploadLedger.observeRecords(),
+            uploadQueue.observeTasks(),
+            uploadedIds,
+            prefs.preferences.map { it.accountEmail }.distinctUntilChanged(),
+        ) { list, records, tasks, uploaded, email ->
+            val inputs = BackupInputs(backup, records, tasks, email, accounts = emptyList())
+            backupSections(inputs, list, uploaded).flatMap { it.items }
         }
     }
 

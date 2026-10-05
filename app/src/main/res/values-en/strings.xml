@@ -753,4 +753,30 @@
     <string name="drive_photos_trash">Move to Drive trash</string>
     <string name="drive_photos_not_connected">Connect a Google account in Settings to see your Drive photos</string>
     <string name="drive_photos_undated">No date</string>
+
+    <!-- 백업된 사진 (docs/plans/backed-up-photos/spec.md) -->
+    <string name="backed_up_title">Backed-up photos</string>
+    <string name="backed_up_section_uploaded">Uploaded %1$s</string>
+    <string name="backed_up_section_pending">Waiting or uploading</string>
+    <string name="backed_up_status_done">Backed up</string>
+    <string name="backed_up_status_none">Not yet</string>
+    <string name="backed_up_status_queue">Queued</string>
+    <string name="backed_up_all_destinations">All storage</string>
+    <string name="backed_up_destination_drive_other">Google Drive · %1$s</string>
+    <string name="backed_up_empty_done">Nothing uploaded yet</string>
+    <string name="backed_up_empty_none">Every photo is backed up</string>
+    <string name="backed_up_empty_queue">No waiting or failed uploads</string>
+    <string name="gallery_group_select_all">Select this group</string>
+    <string name="gallery_group_deselect_all">Deselect this group</string>
+    <string name="backed_up_summary_count">%1$d backed up · %2$d%%</string>
+    <string name="backed_up_destination_count">%1$d</string>
+    <string name="backed_up_failed_count">%1$d failed</string>
+    <string name="backed_up_target_note">The ✓ on thumbnails and \"Delete uploaded photos from device\" count only the current upload destination</string>
+    <string name="backed_up_recent">Recent backups</string>
+    <string name="viewer_info_backup">Backup</string>
+    <string name="viewer_open_in_drive">Open in Drive</string>
+    <plurals name="backed_up_summary_of">
+        <item quantity="one">Of %1$d photo on this phone</item>
+        <item quantity="other">Of %1$d photos on this phone</item>
+    </plurals>
 </resources>

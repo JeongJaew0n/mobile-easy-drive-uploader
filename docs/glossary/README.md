@@ -45,6 +45,7 @@
 | 고른 사진 (chosen) | 사용자가 갤러리 첫 탭에 두려고 **직접 모은** 사진(`chosen_media`). 앱 DB 에만 있고 파일·MediaStore 는 건드리지 않는다. 앱을 켜면 이 탭부터 보인다 | 즐겨찾기와 다름 — 그쪽은 MediaStore `IS_FAVORITE` 라 삼성 갤러리에도 보인다. 선택(선택 모드의 체크)과도 다름 — 그건 잠깐의 작업 대상이다(`docs/plans/chosen-photos-tab/spec.md`) |
 | Drive 사진 (DrivePhotos) | Drive 에 있는 사진·영상을 **폴더를 가로질러** 올린 날짜순으로 보는 화면. 기본 범위는 "앱으로 올린 것" | Drive 폴더 화면(`DriveBrowser`)과 다름 — 그쪽은 폴더 하나씩 들어가는 탐색기다(`docs/plans/drive-photos/spec.md`) |
 | 기기에 없음 (not on device) | Drive 파일 중 **원장으로 이어진 기기 사진이 지금 기기에 없는 것**. 원장에 없는 파일(다른 기기·재설치 전 업로드)도 여기에 든다 | "백업 안 됨" 과 정반대 축이다 — 그쪽은 기기에 있는데 Drive 에 없는 것 |
+| 백업된 사진 (Backup scope) | 백업 칸에서 여는 갤러리 화면. **이 기기의** 사진을 백업됨·안 됨·대기·실패로 가르고 저장소별로 본다. 백업됨은 올린 날짜로 묶는다 | Drive 사진과 반대 축 — 그쪽은 Drive 에 있는 것, 이쪽은 기기에 있는 것(`docs/plans/backed-up-photos/spec.md`). 썸네일 ✓ 는 지금 업로드 대상 한 곳 기준이고, 이 화면은 모든 저장소를 본다 |
 
 ## 규칙
 

@@ -28,6 +28,14 @@ interface UploadedMediaDao {
     @Query("SELECT DISTINCT mediaId FROM uploaded_media")
     fun observeUploadedIds(): Flow<List<Long>>
 
+    /** 원장 전부 — 백업된 사진 화면·백업 칸 요약(`docs/plans/backed-up-photos/spec.md` §3) */
+    @Query("SELECT * FROM uploaded_media")
+    fun observeAll(): Flow<List<UploadedMediaEntity>>
+
+    /** 사진 하나의 기록들 — 상세보기 정보의 "백업" 줄 */
+    @Query("SELECT * FROM uploaded_media WHERE mediaId = :mediaId ORDER BY uploadedAt DESC")
+    fun observeFor(mediaId: Long): Flow<List<UploadedMediaEntity>>
+
     @Query("SELECT mediaId FROM uploaded_media WHERE destination = :destination")
     fun observeUploadedIdsAt(destination: String): Flow<List<Long>>
 

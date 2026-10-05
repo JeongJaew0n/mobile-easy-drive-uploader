@@ -76,6 +76,8 @@ internal fun GalleryScreen(
     onBackClick: () -> Unit = {},
     /** 하단 칸 막대. 고르는 동안에는 같은 자리를 선택 하단바가 쓴다 */
     navigationBar: @Composable () -> Unit = {},
+    /** 백업된 사진 화면의 세그먼트·저장소 칩 */
+    onBackupViewChange: (BackupView) -> Unit = {},
 ) {
     val content = uiState as? GalleryUiState.Content
     val selectionMode = content?.isSelectionMode == true
@@ -116,6 +118,9 @@ internal fun GalleryScreen(
                         )
                         // 앨범 하나를 보는 화면에는 출처 탭이 없다 — 이미 범위가 정해져 있다
                         if (scope == null) GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
+                        content?.backupView?.let { view ->
+                            BackupScopeBar(view, content.backupDestinations, onChange = onBackupViewChange)
+                        }
                     }
                 }
             }
@@ -275,10 +280,12 @@ data class ViewerFilters(
     val tab: GalleryTab = GalleryTab.ALL,
     /** 앨범 필터(`relativePath`) */
     val albumPath: String? = null,
+    /** 백업된 사진 화면이면 그 세그먼트·저장소 — 좌우로 넘길 때도 그 목록 안에서 */
+    val backup: BackupView? = null,
 )
 
 internal fun GalleryUiState.Content.viewerFilters() =
-    ViewerFilters(favoritesOnly, dateRange, categoryFilter, tab, albumFilter?.relativePath)
+    ViewerFilters(favoritesOnly, dateRange, categoryFilter, tab, albumFilter?.relativePath, backupView)
 
 /** 카테고리 필터가 켜져 있을 때의 상단 제목. 하나면 그 이름, 여럿이면 개수, 미분류면 전용 문구 */
 @Composable

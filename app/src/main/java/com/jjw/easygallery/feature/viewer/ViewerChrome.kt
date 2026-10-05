@@ -194,6 +194,8 @@ internal fun ViewerBottomBar(
     onTrash: () -> Unit,
     onDelete: () -> Unit,
     onToggleInfo: () -> Unit,
+    backups: List<BackupLine> = emptyList(),
+    onOpenInDrive: (BackupLine) -> Unit = {},
 ) {
     Column(
         Modifier
@@ -205,7 +207,7 @@ internal fun ViewerBottomBar(
             ),
     ) {
         if (showInfo) {
-            InfoPanel(item = item, details = details, categories = categories)
+            InfoPanel(item = item, details = details, categories = categories, backups, onOpenInDrive)
         }
         Row(
             modifier = Modifier
@@ -235,6 +237,8 @@ private fun InfoPanel(
     item: MediaItem,
     details: MediaDetails?,
     categories: List<Category>,
+    backups: List<BackupLine>,
+    onOpenInDrive: (BackupLine) -> Unit,
 ) {
     val context = LocalContext.current
     Column(
@@ -257,6 +261,7 @@ private fun InfoPanel(
         InfoRow(stringResource(R.string.viewer_info_path), item.relativePath.ifBlank { item.bucketName })
         InfoRow(stringResource(R.string.viewer_info_mime), item.mimeType)
         CategoryInfoRow(categories)
+        BackupInfoRows(backups, onOpenInDrive)
         if (details?.hasCameraInfo == true) {
             val camera = listOfNotNull(details.cameraMake, details.cameraModel).joinToString(" ")
             if (camera.isNotBlank()) InfoRow(stringResource(R.string.viewer_info_camera), camera)

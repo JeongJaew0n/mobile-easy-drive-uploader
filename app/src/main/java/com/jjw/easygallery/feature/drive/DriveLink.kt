@@ -18,4 +18,7 @@ internal fun driveLinkForAccount(link: String, accountEmail: String?): String {
     }.getOrDefault(link)
 }
 
+/** 파일 ID 로 Drive 의 보기 링크. 원장에는 `webViewLink` 가 없어 ID 로 만든다(상세보기의 "Drive 에서 열기") */
+internal fun driveFileLink(fileId: String): String = "https://drive.google.com/file/d/$fileId/view"
+
 private const val AUTH_USER = "authuser"

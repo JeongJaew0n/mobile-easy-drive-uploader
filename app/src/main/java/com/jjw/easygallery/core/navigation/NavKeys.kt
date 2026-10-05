@@ -88,8 +88,16 @@ data class MediaViewerKey(
     val tab: String? = null,
     /** 앨범 필터(`relativePath`). 앨범에서 열면 그 앨범 안에서만 넘긴다(`docs/plans/album-view/spec.md`) */
     val albumPath: String? = null,
+    /** 백업된 사진 화면의 세그먼트(`BackupStatusFilter.name`). 그 목록 안에서, 같은 순서로 넘긴다 */
+    val backupStatus: String? = null,
+    /** 백업된 사진 화면의 저장소 칩(원장의 목적지). null 이면 모든 저장소 */
+    val backupDestination: String? = null,
     val hero: HeroOrigin? = null,
 ) : AppNavKey
+
+/** 백업 칸에서 연 "백업된 사진"(`docs/plans/backed-up-photos/spec.md`) — 갤러리 화면을 백업 범위로 */
+@Serializable
+data object BackedUpKey : AppNavKey
 
 /**
  * 원격 저장소 탐색. [accountId] null 은 Google Drive. [folderId] null 이면 그 저장소의 루트.

@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.data.upload.db.UploadedMediaDao
 import com.jjw.easygallery.core.data.upload.db.UploadedMediaEntity
 import com.jjw.easygallery.core.data.upload.db.destinationFor
 import com.jjw.easygallery.core.domain.model.RemoteAccount
+import com.jjw.easygallery.core.domain.model.UploadRecord
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -73,6 +74,22 @@ class UploadLedgerRepository @Inject constructor(
         destinationFlow(accountId).flatMapLatest { destination ->
             if (destination == null) flowOf(emptySet()) else dao.observeRemoteIdsAt(destination).map { it.toSet() }
         }
+
+    /** 원장 전부. 주인 미정 옛 기록은 그대로 내보낸다 — 이름 붙이기에서 주 Drive 로 합친다(`BackupDestinations`) */
+    fun observeRecords(): Flow<List<UploadRecord>> = dao.observeAll().map { rows -> rows.map { it.toRecord() } }
+
+    /** 사진 하나의 기록들, 최근에 올린 것부터 */
+    fun observeRecordsFor(mediaId: Long): Flow<List<UploadRecord>> =
+        dao.observeFor(mediaId).map { rows -> rows.map { it.toRecord() } }
+
+    private fun UploadedMediaEntity.toRecord() = UploadRecord(
+        mediaId = mediaId,
+        destination = destination,
+        remoteId = driveFileId,
+        folderId = folderId,
+        uploadedAt = uploadedAt,
+        accountId = accountId,
+    )
 
     /** 그곳의 원격 파일 ID → 이 기기의 사진 ID(`docs/plans/drive-photos/spec.md` §4) */
     fun observeRemoteToMedia(accountId: String?): Flow<Map<String, Long>> =

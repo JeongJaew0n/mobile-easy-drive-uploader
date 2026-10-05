@@ -35,6 +35,7 @@
 | `14-samsung-interop.md` | 삼성 갤러리 연동(즐겨찾기·앨범)과 Drive `drive.file` scope 측정 |
 | `15-app-icon.md` | 런처 아이콘 |
 | `19-drive-photos.md` | Drive 사진: 백업 칸 카드·폴더를 가로지른 격자·거르기·찍은 날짜순·넘겨 보기·폴더 화면 격자 기본 |
+| `20-backed-up-photos.md` | 백업된 사진: 백업 칸 요약·최근 백업·백업됨/안 됨/대기·실패·저장소 칩·상세 정보의 백업 줄 |
 
 ## 실기기 연결
 

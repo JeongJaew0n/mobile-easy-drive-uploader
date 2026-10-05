@@ -164,6 +164,7 @@ fun GalleryRoute(
         scope = scope,
         onBackClick = onBackClick,
         navigationBar = navigationBar,
+        onBackupViewChange = viewModel::setBackupView,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,
             onDelete = viewModel::deleteSelected,

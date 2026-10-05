@@ -186,8 +186,10 @@ private fun GalleryDateScroller(
         labelOf = { index ->
             when (val header = headers[index]) {
                 is SectionHeader.ByDate -> yearMonth.format(header.date)
+                is SectionHeader.ByUploadDate -> yearMonth.format(header.date)
                 is SectionHeader.ByApp ->
                     AppFolders.displayNameRes(header.folder)?.let { resources.getString(it) } ?: header.folder
+                is SectionHeader.ByUploadStatus -> resources.getString(header.labelRes())
                 null -> ""
             }
         },
@@ -221,11 +223,16 @@ private fun SectionHeaderRow(
                 text = when (header) {
                     is SectionHeader.ByDate -> remember(header, formatter) { formatter.format(header.date) }
                     is SectionHeader.ByApp -> appName(header.folder)
+                    is SectionHeader.ByUploadDate -> stringResource(
+                        R.string.backed_up_section_uploaded,
+                        remember(header, formatter) { formatter.format(header.date) },
+                    )
+                    is SectionHeader.ByUploadStatus -> stringResource(header.labelRes())
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
-            // 앱별 묶음은 개수가 바로 보여야 한다 — 어느 앱이 목록을 채우고 있는지가 이 탭의 핵심이다
-            if (header is SectionHeader.ByApp) {
+            // 앱별·까닭별 묶음은 개수가 바로 보여야 한다 — 무엇이 목록을 채우고 있는지가 그 화면의 핵심이다
+            if (header is SectionHeader.ByApp || header is SectionHeader.ByUploadStatus) {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.gallery_app_section_count, count),
@@ -236,7 +243,11 @@ private fun SectionHeaderRow(
         }
         Spacer(Modifier.width(8.dp))
         SectionSelectButton(
-            byApp = header is SectionHeader.ByApp,
+            kind = when (header) {
+                is SectionHeader.ByDate, is SectionHeader.ByUploadDate -> SectionKind.DATE
+                is SectionHeader.ByApp -> SectionKind.APP
+                is SectionHeader.ByUploadStatus -> SectionKind.GROUP
+            },
             allSelected = allSelected,
             anySelected = anySelected,
             onClick = onToggleSection,
@@ -252,7 +263,7 @@ private fun appName(folder: String): String =
 /** 묶음 전체 선택 토글. 일부만 선택된 상태는 테두리를 굵게 해서 구분한다. */
 @Composable
 private fun SectionSelectButton(
-    byApp: Boolean,
+    kind: SectionKind,
     allSelected: Boolean,
     anySelected: Boolean,
     onClick: () -> Unit,
@@ -260,14 +271,22 @@ private fun SectionSelectButton(
 ) {
     // 앱 묶음에 "이 날짜 전체 선택" 이라고 읽어주면 안 된다
     val selectAllLabel = stringResource(
-        if (byApp) R.string.gallery_app_section_select_all else R.string.gallery_section_select_all,
+        when (kind) {
+            SectionKind.DATE -> R.string.gallery_section_select_all
+            SectionKind.APP -> R.string.gallery_app_section_select_all
+            SectionKind.GROUP -> R.string.gallery_group_select_all
+        },
     )
     IconButton(onClick = onClick, modifier = modifier) {
         if (allSelected) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
                 contentDescription = stringResource(
-                    if (byApp) R.string.gallery_app_section_deselect_all else R.string.gallery_section_deselect_all,
+                    when (kind) {
+                        SectionKind.DATE -> R.string.gallery_section_deselect_all
+                        SectionKind.APP -> R.string.gallery_app_section_deselect_all
+                        SectionKind.GROUP -> R.string.gallery_group_deselect_all
+                    },
                 ),
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -290,6 +309,13 @@ private fun SectionSelectButton(
         }
     }
 }
+
+/** 묶음 전체 선택 단추가 읽어 줄 말 — 날짜 묶음·앱 묶음·그 밖의 묶음(백업 까닭) */
+private enum class SectionKind { DATE, APP, GROUP }
+
+/** 대기·실패 묶음의 이름 */
+internal fun SectionHeader.ByUploadStatus.labelRes(): Int =
+    if (pending) R.string.backed_up_section_pending else failureRes
 
 private const val MIN_CELL_SIZE_DP = 100
 private const val CELL_SPACING_DP = 2

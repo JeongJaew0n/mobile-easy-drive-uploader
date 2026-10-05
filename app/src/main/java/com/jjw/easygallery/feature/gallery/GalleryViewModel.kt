@@ -20,9 +20,11 @@ import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.GALLERY_CELL_STEP_DEFAULT
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
+import com.jjw.easygallery.core.data.upload.BackupDestinations
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
+import com.jjw.easygallery.core.domain.model.BackupDestination
 import com.jjw.easygallery.core.domain.model.Category
 import com.jjw.easygallery.core.domain.model.CategoryAssignments
 import com.jjw.easygallery.core.domain.model.CategoryFilter
@@ -134,6 +136,23 @@ class GalleryViewModel @Inject constructor(
 
     /** 앨범 필터 — 앨범(폴더)의 `relativePath`. null 이면 없음(`docs/plans/album-view/spec.md`) */
     private val albumFilter = MutableStateFlow<String?>(null)
+
+    /** 백업된 사진 화면이면 세그먼트·저장소 칩(`docs/plans/backed-up-photos/spec.md`). 아니면 null */
+    private val backupView = MutableStateFlow<BackupView?>(null)
+
+    /** 백업 범위일 때만 원장 전부와 큐를 모은다 — 사진 칸에서는 읽지 않는다 */
+    private val backupInputs: Flow<BackupInputs?> = backupView.flatMapLatest { view ->
+        if (view == null) {
+            flowOf(null)
+        } else {
+            combine(
+                uploadLedger.observeRecords(),
+                uploadQueue.observeTasks(),
+                prefs.preferences.map { it.accountEmail }.distinctUntilChanged(),
+                remoteAccounts.observeAccounts(),
+            ) { records, tasks, email, accounts -> BackupInputs(view, records, tasks, email, accounts) }
+        }
+    }
 
     // 배지·"백업 안 됨" 필터는 현재 업로드 대상 계정 기준(다른 계정에 올린 건 그 계정을 골랐을 때 보인다)
     private val uploadedIds: Flow<Set<Long>> = prefs.preferences
@@ -274,7 +293,20 @@ class GalleryViewModel @Inject constructor(
                 setTab(GalleryTab.ALL)
                 setFavoritesOnly(true)
             }
+            GalleryScope.Backup -> {
+                setTab(GalleryTab.ALL)
+                setBackupView(BackupView())
+            }
         }
+    }
+
+    /** 백업된 사진 화면의 세그먼트·저장소 칩. 대기·실패에는 칩이 없다(큐는 지금 대상 하나로 돈다) */
+    fun setBackupView(view: BackupView) {
+        val next = if (view.status == BackupStatusFilter.PENDING_OR_FAILED) view.copy(destination = null) else view
+        if (backupView.value == next) return
+        clearSelection()
+        filterVersion++
+        backupView.value = next
     }
 
     // ---------- 카테고리 ----------
@@ -526,6 +558,8 @@ class GalleryViewModel @Inject constructor(
         val sections: List<GallerySection>,
         val albums: List<Album>,
         val byId: Map<Long, MediaItem>,
+        val backupView: BackupView?,
+        val backupDestinations: List<BackupDestination>,
         val range: DateRange?,
         val uploadedIds: Set<Long>,
         val uploadedCount: Int,
@@ -579,6 +613,55 @@ class GalleryViewModel @Inject constructor(
         return Triple(visible, categorized, categorized.filterByDate(range))
     }
 
+    /** 목록 → 묶음·파생값. 백업 범위면 묶음이 곧 목록이다 */
+    @Suppress("LongParameterList") // contentFlow 의 combine 이 주는 값 그대로
+    private fun buildCatalog(
+        all: List<MediaItem>,
+        f: MemoryFilters,
+        uploaded: Set<Long>,
+        backup: BackupInputs?,
+        categories: List<Category>,
+        assignments: CategoryAssignments,
+    ): Catalog {
+        val (visible, categorized, filtered) = f.applyTo(all, uploaded, assignments)
+        val sections = when {
+            backup != null -> backupSections(backup, filtered, uploaded)
+            // '다른 앱' 탭은 날짜 대신 앱으로 묶는다 — 카카오톡 사진 1000여 장이
+            // 날짜순으로 흩어져 있으면 어느 앱 것인지 알아볼 수 없다
+            f.tab == GalleryTab.OTHER -> groupByApp(filtered)
+            else -> groupByDate(filtered)
+        }
+        // 백업 범위는 묶음이 곧 목록이다(올린 날짜순·까닭별) — 선택·넘기기가 화면 순서를 따른다
+        val items = if (backup != null) sections.flatMap { it.items } else filtered
+        latestItems = items
+        latestChosenIds = f.chosen
+        return Catalog(
+            items = items,
+            sections = sections,
+            // 탭 적용 전 목록에서 뽑는다. 이동 대상 폴더까지 탭으로 걸리면
+            // 카메라 탭에서 다른 폴더로 옮길 수 없다. 숨김은 제외한다 —
+            // 숨긴 사진만 있는 폴더가 목록에 뜨면 있다는 사실이 새어 나간다
+            albums = albumsFrom(visible),
+            byId = items.associateBy { it.id },
+            backupView = backup?.view,
+            backupDestinations = backup?.let { b ->
+                BackupDestinations.ordered(b.records.map { it.destination }, b.accounts, b.primaryEmail)
+            }.orEmpty(),
+            range = f.range,
+            uploadedIds = uploaded,
+            uploadedCount = items.count { it.id in uploaded },
+            notBackedUpOnly = f.notBackedUpOnly,
+            dayCounts = countByDay(categorized),
+            categories = categories,
+            assignments = assignments,
+            categoryFilter = f.category,
+            tab = f.tab,
+            chosenIds = f.chosen,
+            albumFilter = f.album,
+            version = filterVersion,
+        )
+    }
+
     private fun contentFlow(status: MediaPermissionStatus, filter: MediaFilter): Flow<GalleryUiState> {
         // 기간·백업 필터는 메모리에서 걸러 MediaStore 를 다시 조회하지 않는다.
         // 원장(uploadedIds)은 업로드가 끝날 때만 바뀌므로 여기서 결합해도 선택 토글과 무관하다.
@@ -594,36 +677,11 @@ class GalleryViewModel @Inject constructor(
         val catalog = combine(
             mediaRepository.observeMedia(filter),
             filters,
-            uploadedIds,
+            combine(uploadedIds, backupInputs, ::Pair),
             categoryRepository.observeCategories(),
             categoryRepository.observeAssignments(),
-        ) { all, f, uploaded, categories, assignments ->
-            val (visible, categorized, items) = f.applyTo(all, uploaded, assignments)
-            latestItems = items
-            latestChosenIds = f.chosen
-            Catalog(
-                items = items,
-                // '다른 앱' 탭은 날짜 대신 앱으로 묶는다 — 카카오톡 사진 1000여 장이
-                // 날짜순으로 흩어져 있으면 어느 앱 것인지 알아볼 수 없다
-                sections = if (f.tab == GalleryTab.OTHER) groupByApp(items) else groupByDate(items),
-                // 탭 적용 전 목록에서 뽑는다. 이동 대상 폴더까지 탭으로 걸리면
-                // 카메라 탭에서 다른 폴더로 옮길 수 없다. 숨김은 제외한다 —
-                // 숨긴 사진만 있는 폴더가 목록에 뜨면 있다는 사실이 새어 나간다
-                albums = albumsFrom(visible),
-                byId = items.associateBy { it.id },
-                range = f.range,
-                uploadedIds = uploaded,
-                uploadedCount = items.count { it.id in uploaded },
-                notBackedUpOnly = f.notBackedUpOnly,
-                dayCounts = countByDay(categorized),
-                categories = categories,
-                assignments = assignments,
-                categoryFilter = f.category,
-                tab = f.tab,
-                chosenIds = f.chosen,
-                albumFilter = f.album,
-                version = filterVersion,
-            )
+        ) { all, f, (uploaded, backup), categories, assignments ->
+            buildCatalog(all, f, uploaded, backup, categories, assignments)
         }
 
         return combine(catalog, selectedIds, uploadSummary, actionController.isMutating, thumbnailDecorations) {
@@ -657,6 +715,8 @@ class GalleryViewModel @Inject constructor(
                 failedIds = decorations.queue.failed,
                 cellSizeStep = decorations.cellSizeStep,
                 albums = c.albums,
+                backupView = c.backupView,
+                backupDestinations = c.backupDestinations,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
                 selectedAllChosen = selected.isNotEmpty() && selected.all { it in c.chosenIds },
@@ -717,6 +777,10 @@ sealed interface GalleryUiState {
         /** 칸 크기 단계(`CELL_SIZE_STEPS_DP`) */
         val cellSizeStep: Int = GALLERY_CELL_STEP_DEFAULT,
         val albums: List<Album> = emptyList(),
+        /** 백업된 사진 화면이면 지금 세그먼트·저장소. 아니면 null */
+        val backupView: BackupView? = null,
+        /** 백업된 사진 화면의 저장소 칩(원장에 나오는 곳들) */
+        val backupDestinations: List<BackupDestination> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
         /** 선택이 전부 고른 사진이면 하단바 버튼이 "빼기" 가 된다 */

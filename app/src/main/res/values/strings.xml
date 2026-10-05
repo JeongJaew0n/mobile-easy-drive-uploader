@@ -767,4 +767,29 @@
     <string name="drive_photos_trash">Drive 휴지통으로</string>
     <string name="drive_photos_not_connected">Google 계정을 연결하면 Drive 사진을 볼 수 있습니다. 설정에서 연결하세요</string>
     <string name="drive_photos_undated">날짜 없음</string>
+
+    <!-- 백업된 사진 (docs/plans/backed-up-photos/spec.md) -->
+    <string name="backed_up_title">백업된 사진</string>
+    <string name="backed_up_section_uploaded">%1$s 올림</string>
+    <string name="backed_up_section_pending">대기·올리는 중</string>
+    <string name="backed_up_status_done">백업됨</string>
+    <string name="backed_up_status_none">안 됨</string>
+    <string name="backed_up_status_queue">대기·실패</string>
+    <string name="backed_up_all_destinations">모든 저장소</string>
+    <string name="backed_up_destination_drive_other">Google Drive · %1$s</string>
+    <string name="backed_up_empty_done">아직 올린 사진이 없습니다</string>
+    <string name="backed_up_empty_none">모든 사진이 백업됐습니다</string>
+    <string name="backed_up_empty_queue">대기 중이거나 실패한 업로드가 없습니다</string>
+    <string name="gallery_group_select_all">이 묶음 전체 선택</string>
+    <string name="gallery_group_deselect_all">이 묶음 선택 해제</string>
+    <string name="backed_up_summary_count">%1$d장 백업됨 · %2$d%%</string>
+    <string name="backed_up_destination_count">%1$d장</string>
+    <string name="backed_up_failed_count">실패 %1$d개</string>
+    <string name="backed_up_target_note">썸네일의 ✓ 와 \"올린 사진 기기에서 삭제\" 는 지금 업로드 대상 한 곳만 셉니다</string>
+    <string name="backed_up_recent">최근 백업</string>
+    <string name="viewer_info_backup">백업</string>
+    <string name="viewer_open_in_drive">Drive 에서 열기</string>
+    <plurals name="backed_up_summary_of">
+        <item quantity="other">이 기기의 사진 %1$d장 중</item>
+    </plurals>
 </resources>

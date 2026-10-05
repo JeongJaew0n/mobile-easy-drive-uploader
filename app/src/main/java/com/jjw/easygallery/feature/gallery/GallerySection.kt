@@ -14,6 +14,12 @@ sealed interface SectionHeader {
      * 화면에 보일 때만 [AppFolders.displayNameRes] 로 한국어를 찾는다 — 표에 없으면 원문 그대로다.
      */
     data class ByApp(val folder: String) : SectionHeader
+
+    /** 백업된 사진 — 올린 날짜(`docs/plans/backed-up-photos/spec.md` §2.2) */
+    data class ByUploadDate(val date: LocalDate) : SectionHeader
+
+    /** 백업된 사진의 대기·실패 — [pending] 이면 대기·올리는 중, 아니면 [failureRes] 까닭으로 실패 */
+    data class ByUploadStatus(val pending: Boolean, val failureRes: Int = 0) : SectionHeader
 }
 
 /** 머리글 하나와 그 아래 항목들. 항목 순서는 입력(최신순)을 그대로 따른다 */

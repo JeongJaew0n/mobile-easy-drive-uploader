@@ -58,6 +58,8 @@ fun AppNavigation() {
                 uncategorizedOnly = filters.category is CategoryFilter.Uncategorized,
                 tab = filters.tab.takeUnless { it == GalleryTab.ALL }?.name,
                 albumPath = filters.albumPath,
+                backupStatus = filters.backup?.status?.name,
+                backupDestination = filters.backup?.destination,
                 hero = hero,
             ),
         )
@@ -118,11 +120,23 @@ fun AppNavigation() {
                     onBackClick = { backStack.removeLastOrNull() },
                 )
             }
+            entry<BackedUpKey> {
+                // 백업된 사진 = 갤러리 화면을 백업 범위로. 하위 화면이라 하단 칸 막대는 없다
+                GalleryRoute(
+                    onSettingsClick = { backStack.add(SettingsKey) },
+                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
+                    onOpenItem = openViewer,
+                    onManageCategories = { backStack.add(CategoriesKey) },
+                    scope = GalleryScope.Backup,
+                    onBackClick = { backStack.removeLastOrNull() },
+                )
+            }
             entry<BackupKey> {
                 BackupRoute(
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
                     onDrivePhotosClick = { fileId -> backStack.add(DrivePhotosKey(openFileId = fileId)) },
+                    onBackedUpClick = { backStack.add(BackedUpKey) },
                     onSettingsClick = { backStack.add(SettingsKey) },
                     navigationBar = { navigationBar(TopLevelDestination.BACKUP) },
                 )

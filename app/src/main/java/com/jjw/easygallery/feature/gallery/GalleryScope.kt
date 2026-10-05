@@ -9,4 +9,7 @@ sealed interface GalleryScope {
     data class Album(val relativePath: String) : GalleryScope
 
     data object Favorites : GalleryScope
+
+    /** 백업 칸에서 연 "백업된 사진" — 백업됨·안 됨·대기·실패를 세그먼트로(`docs/plans/backed-up-photos/spec.md`) */
+    data object Backup : GalleryScope
 }

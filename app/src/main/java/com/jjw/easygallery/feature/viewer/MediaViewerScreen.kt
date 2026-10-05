@@ -58,6 +58,9 @@ internal fun MediaViewerScreen(
     /** 히어로 오버레이가 진행 중이면 페이저·스피너를 숨겨 두 이미지가 겹쳐 보이지 않게 한다 */
     contentHidden: Boolean = false,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    /** 정보 패널의 "백업" 줄 — 지금 사진이 올라간 곳들 */
+    backups: List<BackupLine> = emptyList(),
+    onOpenInDrive: (BackupLine) -> Unit = {},
 ) {
     if (uiState.isLoading) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -147,6 +150,8 @@ internal fun MediaViewerScreen(
                     onTrash = onTrash,
                     onDelete = onDelete,
                     onToggleInfo = onToggleInfo,
+                    backups = backups,
+                    onOpenInDrive = onOpenInDrive,
                 )
             }
         },

@@ -232,6 +232,8 @@ class MediaViewerViewModelTest {
         actionController = MediaActionController(mockk<MediaActionRunner>()),
         enqueueUploads = enqueueUploads,
         uploadLedger = uploadLedger,
+        uploadQueue = mockk { every { observeTasks() } returns MutableStateFlow(emptyList()) },
+        remoteAccounts = mockk { every { observeAccounts() } returns MutableStateFlow(emptyList()) },
         categoryRepository = categoryRepository,
         assignCategories = AssignCategoriesUseCase(categoryRepository),
         hiddenMedia = mockk { every { observeHiddenIds() } returns MutableStateFlow(emptySet()) },

@@ -60,6 +60,7 @@ fun BackupRoute(
     onUploadQueueClick: () -> Unit,
     onAutoBackupClick: () -> Unit,
     onDrivePhotosClick: (openFileId: String?) -> Unit,
+    onBackedUpClick: () -> Unit,
     onSettingsClick: () -> Unit,
     navigationBar: @Composable () -> Unit,
     viewModel: BackupViewModel = hiltViewModel(),
@@ -79,6 +80,7 @@ fun BackupRoute(
             onUploadQueueClick = onUploadQueueClick,
             onAutoBackupClick = onAutoBackupClick,
             onDrivePhotosClick = onDrivePhotosClick,
+            onBackedUpClick = onBackedUpClick,
             onSettingsClick = onSettingsClick,
             onCancelUploads = viewModel::cancelUploads,
             onTrashUploaded = viewModel::trashUploadedOnDevice,
@@ -93,13 +95,16 @@ internal data class BackupActions(
     val onAutoBackupClick: () -> Unit = {},
     /** null 이면 Drive 사진 화면, 아니면 그 사진의 넘겨 보기까지 */
     val onDrivePhotosClick: (openFileId: String?) -> Unit = {},
+    /** 요약 카드·최근 백업 → 백업된 사진 화면 */
+    val onBackedUpClick: () -> Unit = {},
     val onSettingsClick: () -> Unit = {},
     val onCancelUploads: () -> Unit = {},
     val onTrashUploaded: () -> Unit = {},
 )
 
 /**
- * 하단 "백업" 칸(`docs/plans/bottom-navigation/spec.md`). 위에서부터: 어디로 올리는지 → 지금 무슨 일이 있는지(진행·실패) →
+ * 하단 "백업" 칸(`docs/plans/bottom-navigation/spec.md`). 위에서부터: 얼마나·어디에 올라갔나(요약 카드) → 어디로 올리는지 →
+ * 지금 무슨 일이 있는지(진행·실패) →
  * Drive 에 무엇이 있는지(Google Drive 사진 카드) → 할 수 있는 일(업로드 목록·자동 백업·올린 사진 정리).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -131,6 +136,9 @@ internal fun BackupScreen(
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (uiState.isMutating) LinearProgressIndicator(Modifier.fillMaxWidth())
+                uiState.overview?.let { overview ->
+                    BackupSummaryCard(overview, failed = uiState.summary.failed, onOpen = actions.onBackedUpClick)
+                }
                 TargetCard(uiState.target, onSettingsClick = actions.onSettingsClick)
                 BackupStatus(uiState.summary, actions)
                 uiState.drivePhotos?.let { photos ->

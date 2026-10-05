@@ -52,6 +52,11 @@ internal fun GalleryFilterBars(
 /** 목록이 비었을 때의 문구. 가장 좁은 조건부터 — 그게 비게 만든 이유일 가능성이 가장 크다 */
 @StringRes
 internal fun GalleryUiState.Content.emptyMessageRes(): Int = when {
+    backupView != null -> when (backupView.status) {
+        BackupStatusFilter.BACKED_UP -> R.string.backed_up_empty_done
+        BackupStatusFilter.NOT_BACKED_UP -> R.string.backed_up_empty_none
+        BackupStatusFilter.PENDING_OR_FAILED -> R.string.backed_up_empty_queue
+    }
     notBackedUpOnly -> R.string.gallery_not_backed_up_empty
     albumFilter != null -> R.string.gallery_album_empty
     categoryFilter != null -> R.string.gallery_category_empty

@@ -22,6 +22,7 @@ import com.jjw.easygallery.core.domain.model.DriveMediaScope
 import com.jjw.easygallery.core.domain.model.DrivePage
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
+import com.jjw.easygallery.core.domain.model.UploadRecord
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
 import com.jjw.easygallery.core.domain.usecase.ObserveUploadSummaryUseCase
@@ -59,6 +60,13 @@ class BackupViewModelTest {
     private val hidden: HiddenMediaRepository = mockk { every { observeHiddenIds() } returns flowOf(setOf(3L)) }
     private val ledger: UploadLedgerRepository = mockk {
         every { observeUploadedIds(any()) } returns flowOf(setOf(1L, 3L))
+        every { observeRecords() } returns flowOf(
+            listOf(
+                UploadRecord(1, "drive:a@example.com", "r1", null, uploadedAt = 10, accountId = null),
+                UploadRecord(3, "drive:a@example.com", "r3", null, uploadedAt = 20, accountId = null),
+                UploadRecord(9, "remote:nas", "r9", null, uploadedAt = 30, accountId = "nas"),
+            ),
+        )
     }
     private val queue: UploadQueueRepository = mockk { every { observeSummary() } returns flowOf(UploadSummary()) }
     private val conditions: DeviceConditionsMonitor = mockk {
@@ -99,6 +107,25 @@ class BackupViewModelTest {
         remoteAccounts = mockk<RemoteAccountRepository> { every { observeAccounts() } returns flowOf(emptyList()) },
         recentDrivePhotos = RecentDrivePhotos(drive, prefs, mockk<ImageLoader>()),
     )
+
+    @Test
+    fun `요약 카드는 숨기지 않은 기기 사진만 센다`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            awaitItem()
+            advanceUntilIdle()
+            val overview = (expectMostRecentItem() as BackupUiState.Content).overview!!
+            // 기기 사진은 1·2(3 은 숨김), 원장의 9 는 기기에 없다
+            assertEquals(2, overview.deviceCount)
+            assertEquals(1, overview.backedUpCount)
+            assertEquals(50, overview.percent)
+            assertEquals(listOf(1L), overview.recent.map { it.id })
+            assertEquals(
+                listOf("drive:a@example.com" to 1),
+                overview.perDestination.map { it.destination.destination to it.count },
+            )
+        }
+    }
 
     @Test
     fun `Google 계정이 있으면 Drive 최근 사진을 싣는다`() = runTest(testDispatcher) {

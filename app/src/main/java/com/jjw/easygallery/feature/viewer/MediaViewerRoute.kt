@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,6 +25,10 @@ import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.media.TrashFollowUp
+import com.jjw.easygallery.feature.drive.driveFileLink
+import com.jjw.easygallery.feature.drive.openDriveLink
+import com.jjw.easygallery.feature.gallery.BackupStatusFilter
+import com.jjw.easygallery.feature.gallery.BackupView
 import com.jjw.easygallery.feature.gallery.GalleryTab
 
 @Composable
@@ -34,6 +39,8 @@ fun MediaViewerRoute(
     viewModel: MediaViewerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val backups by viewModel.currentBackups.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
 
@@ -46,6 +53,7 @@ fun MediaViewerRoute(
             hiddenOnly = key.hiddenOnly,
             tab = key.galleryTab(),
             albumPath = key.albumPath,
+            backup = key.backupView(),
         )
     }
 
@@ -106,6 +114,8 @@ fun MediaViewerRoute(
             onToggleInfo = viewModel::toggleInfo,
             onCreateCategory = viewModel::createCategory,
             onAssignCategories = viewModel::assignCategoriesToCurrent,
+            backups = backups,
+            onOpenInDrive = { line -> context.openDriveLink(driveFileLink(line.remoteId), line.openAs) },
         )
         val hero = key.hero
         if (!heroDone && hero != null) {
@@ -122,6 +132,11 @@ private fun MediaViewerKey.categoryFilter(): CategoryFilter? = when {
     !categoryIds.isNullOrEmpty() -> CategoryFilter.Any(categoryIds.toSet())
     else -> null
 }
+
+/** 백업된 사진 화면에서 열었으면 그 세그먼트·저장소. 모르는 이름이면 백업 범위가 아닌 것으로 본다 */
+private fun MediaViewerKey.backupView(): BackupView? =
+    backupStatus?.let { name -> BackupStatusFilter.entries.find { it.name == name } }
+        ?.let { BackupView(it, backupDestination) }
 
 /** 모르는 이름(앱을 올리며 탭이 바뀐 뒤 복원된 키)이면 전체로 본다 */
 private fun MediaViewerKey.galleryTab(): GalleryTab =

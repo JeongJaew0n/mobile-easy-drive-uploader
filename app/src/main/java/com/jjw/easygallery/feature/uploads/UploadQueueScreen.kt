@@ -271,15 +271,7 @@ private fun UploadTaskRow(
  */
 @Composable
 private fun failureText(task: UploadTask): String {
-    val known = when (task.errorReason) {
-        "storageQuotaExceeded" -> R.string.upload_error_storage_full
-        "rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded" -> R.string.upload_error_rate_limited
-        "insufficientFilePermissions", "forbidden" -> R.string.upload_error_no_permission
-        "notFound" -> R.string.upload_error_folder_missing
-        "authError", "unauthorized" -> R.string.upload_error_sign_in
-        "guestAccountUnavailable" -> R.string.upload_error_guest_unavailable
-        else -> null
-    }
+    val known = uploadFailureRes(task.errorReason)
     if (known != null) return stringResource(known)
     return task.errorMessage ?: stringResource(R.string.upload_state_failed)
 }

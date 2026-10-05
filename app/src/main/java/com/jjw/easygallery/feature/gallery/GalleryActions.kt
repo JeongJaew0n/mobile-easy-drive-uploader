@@ -54,6 +54,7 @@ internal fun GalleryOverflowMenu(
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
     onPickCategory: () -> Unit,
+    showNotBackedUpToggle: Boolean = true,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
@@ -77,24 +78,26 @@ internal fun GalleryOverflowMenu(
                 },
             )
         }
-        DropdownMenuItem(
-            text = {
-                Text(
-                    stringResource(
-                        if (notBackedUpOnly) {
-                            R.string.gallery_menu_show_all
-                        } else {
-                            R.string.gallery_menu_not_backed_up_only
-                        },
-                    ),
-                )
-            },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_cloud_done), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onNotBackedUpOnlyChange(!notBackedUpOnly)
-            },
-        )
+        if (showNotBackedUpToggle) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (notBackedUpOnly) {
+                                R.string.gallery_menu_show_all
+                            } else {
+                                R.string.gallery_menu_not_backed_up_only
+                            },
+                        ),
+                    )
+                },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_cloud_done), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onNotBackedUpOnlyChange(!notBackedUpOnly)
+                },
+            )
+        }
         DropdownMenuItem(
             text = { Text(stringResource(R.string.gallery_menu_category)) },
             leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },

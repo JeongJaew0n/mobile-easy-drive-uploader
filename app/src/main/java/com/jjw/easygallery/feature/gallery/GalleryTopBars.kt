@@ -66,7 +66,8 @@ internal fun GalleryTopBar(
                 )
                 if (itemCount != null) {
                     Text(
-                        text = if (uploadedCount > 0 && !notBackedUpOnly) {
+                        // 백업된 사진 화면은 세그먼트가 이미 "백업됨/안 됨" 을 말한다 — 개수만
+                        text = if (uploadedCount > 0 && !notBackedUpOnly && scope != GalleryScope.Backup) {
                             stringResource(R.string.gallery_media_count_with_backup, itemCount, uploadedCount)
                         } else {
                             pluralStringResource(R.plurals.gallery_media_count, itemCount, itemCount)
@@ -89,6 +90,8 @@ internal fun GalleryTopBar(
                 favoritesOnly = favoritesOnly,
                 notBackedUpOnly = notBackedUpOnly,
                 showFavoritesToggle = content?.supportsTrashAndFavorites == true && scope != GalleryScope.Favorites,
+                // 백업된 사진 화면은 세그먼트가 같은 일을 한다
+                showNotBackedUpToggle = scope != GalleryScope.Backup,
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
                 onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
                 onPickCategory = onPickCategory,
@@ -102,6 +105,7 @@ internal fun GalleryTopBar(
 private fun scopeTitle(scope: GalleryScope?, content: GalleryUiState.Content?): String? = when (scope) {
     null -> null
     GalleryScope.Favorites -> stringResource(R.string.gallery_title_favorites)
+    GalleryScope.Backup -> stringResource(R.string.backed_up_title)
     is GalleryScope.Album -> {
         albumLabel(content?.albumFilter?.name ?: scope.relativePath.trimEnd('/').substringAfterLast('/'))
     }

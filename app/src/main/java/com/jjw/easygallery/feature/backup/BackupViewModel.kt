@@ -94,8 +94,26 @@ class BackupViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<BackupUiState> = combine(baseState, recentDrivePhotos.observe()) { content, photos ->
-        content.copy(drivePhotos = photos) as BackupUiState
+    /** 요약 카드 — 어디든 올라간 기기 사진과 저장소별 수. 사진 권한이 없으면 null(셀 수 없다) */
+    private val overview: Flow<BackupOverview?> = combine(
+        mediaRepository.observeMedia(MediaFilter.All),
+        hiddenMedia.observeHiddenIds(),
+        uploadLedger.observeRecords(),
+        remoteAccounts.observeAccounts(),
+        prefs.preferences.map { it.accountEmail }.distinctUntilChanged(),
+    ) { items, hidden, records, accounts, email ->
+        backupOverview(items.filterNot { it.id in hidden }, records, accounts, email) as BackupOverview?
+    }.catch { e ->
+        Timber.w(e, "backup overview unavailable")
+        emit(null)
+    }
+
+    val uiState: StateFlow<BackupUiState> = combine(
+        baseState,
+        recentDrivePhotos.observe(),
+        overview,
+    ) { content, photos, summary ->
+        content.copy(drivePhotos = photos, overview = summary) as BackupUiState
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupUiState.Loading)
 
     fun cancelUploads() {
@@ -132,6 +150,8 @@ sealed interface BackupUiState {
         val isMutating: Boolean = false,
         /** null 이면 Google 계정이 없다 — "Google Drive 사진" 카드를 두지 않는다 */
         val drivePhotos: DrivePhotosPreview? = null,
+        /** 요약 카드. null 이면 셀 수 없다(사진 권한 없음) — 카드를 두지 않는다 */
+        val overview: BackupOverview? = null,
     ) : BackupUiState
 }
 

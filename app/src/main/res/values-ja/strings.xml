@@ -731,4 +731,29 @@
     <string name="drive_photos_trash">ドライブのゴミ箱へ</string>
     <string name="drive_photos_not_connected">設定で Google アカウントを接続すると、ドライブの写真を見られます</string>
     <string name="drive_photos_undated">日付なし</string>
+
+    <!-- 백업된 사진 (docs/plans/backed-up-photos/spec.md) -->
+    <string name="backed_up_title">バックアップ済みの写真</string>
+    <string name="backed_up_section_uploaded">%1$s にアップ</string>
+    <string name="backed_up_section_pending">待機中・アップ中</string>
+    <string name="backed_up_status_done">完了</string>
+    <string name="backed_up_status_none">未完了</string>
+    <string name="backed_up_status_queue">待機・失敗</string>
+    <string name="backed_up_all_destinations">すべての保存先</string>
+    <string name="backed_up_destination_drive_other">Google ドライブ · %1$s</string>
+    <string name="backed_up_empty_done">まだアップした写真はありません</string>
+    <string name="backed_up_empty_none">すべての写真がバックアップ済みです</string>
+    <string name="backed_up_empty_queue">待機中・失敗したアップロードはありません</string>
+    <string name="gallery_group_select_all">このグループをすべて選択</string>
+    <string name="gallery_group_deselect_all">このグループの選択を解除</string>
+    <string name="backed_up_summary_count">%1$d枚をバックアップ済み · %2$d%%</string>
+    <string name="backed_up_destination_count">%1$d枚</string>
+    <string name="backed_up_failed_count">失敗 %1$d件</string>
+    <string name="backed_up_target_note">サムネイルの ✓ と「アップロード済みの写真を端末から削除」は、いまのアップロード先 1 か所だけを数えます</string>
+    <string name="backed_up_recent">最近のバックアップ</string>
+    <string name="viewer_info_backup">バックアップ</string>
+    <string name="viewer_open_in_drive">ドライブで開く</string>
+    <plurals name="backed_up_summary_of">
+        <item quantity="other">この端末の写真 %1$d枚のうち</item>
+    </plurals>
 </resources>
