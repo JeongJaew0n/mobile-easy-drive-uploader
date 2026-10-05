@@ -25,8 +25,6 @@ internal suspend fun showGalleryEvent(
         }
         // 하나도 안 들어갔으면 "0개 추가" 라고 말하지 않는다 — 왜 아무 일도 없는지를 알려준다
         is GalleryEvent.Enqueued -> snackbarHostState.showSnackbar(enqueuedMessage(event, resources))
-        GalleryEvent.NoUploadedToTrash ->
-            snackbarHostState.showSnackbar(resources.getString(R.string.gallery_no_uploaded_to_trash))
         is GalleryEvent.CategoriesAssigned -> snackbarHostState.showSnackbar(
             resources.getQuantityString(R.plurals.category_assigned, event.count, event.count),
         )

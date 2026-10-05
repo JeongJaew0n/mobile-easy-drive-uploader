@@ -12,15 +12,9 @@
     <string name="gallery_favorites_empty">お気に入りはまだありません</string>
     <string name="gallery_menu_favorites_only">お気に入りだけ表示</string>
     <string name="gallery_menu_show_all">すべて表示</string>
-    <string name="gallery_menu_trash">ゴミ箱</string>
-    <string name="gallery_menu_drive">Google Drive</string>
     <string name="gallery_menu_date_range">期間を選択</string>
     <string name="gallery_menu_category">カテゴリ</string>
-    <string name="gallery_menu_album">アルバム</string>
-    <string name="album_picker_title">アルバム</string>
     <string name="album_picker_empty">アルバムがありません</string>
-    <string name="album_filter_label">%1$s · %2$s</string>
-    <string name="album_filter_clear">アルバムの絞り込みを解除</string>
     <string name="gallery_album_empty">このアルバムに写真はありません</string>
     <string name="gallery_title_category_count">カテゴリ %1$d件</string>
     <string name="gallery_title_uncategorized">未分類</string>
@@ -73,7 +67,6 @@
     <string name="gallery_date_preset_30days">過去30日間</string>
     <string name="gallery_date_preset_year">今年</string>
     <string name="hidden_title">非表示の写真</string>
-    <string name="hidden_menu_open">非表示の写真を見る</string>
     <string name="action_hide">非表示</string>
     <string name="action_unhide">非表示を解除</string>
     <string name="hidden_empty">非表示の写真はありません</string>
@@ -189,7 +182,6 @@
     <string name="gallery_section_select_all">この日をすべて選択</string>
     <string name="gallery_select_all_visible">すべて選択</string>
     <string name="gallery_menu_trash_uploaded">アップロード済みの写真を端末から削除</string>
-    <string name="gallery_no_uploaded_to_trash">ここにはアップロード済みの写真がありません</string>
     <string name="gallery_select_none">選択を解除</string>
     <string name="gallery_app_section_select_all">このアプリをすべて選択</string>
     <string name="action_select_all">すべて選択</string>
@@ -684,4 +676,24 @@
     <string name="settings_language">言語</string>
     <string name="settings_language_system">システムの既定</string>
     <string name="settings_language_title">アプリの言語</string>
+    <string name="nav_photos">写真</string>
+    <string name="nav_albums">アルバム</string>
+    <string name="nav_backup">バックアップ</string>
+    <string name="nav_menu">メニュー</string>
+    <string name="backup_target_label">アップロード先</string>
+    <string name="backup_target_none">接続先がありません</string>
+    <string name="backup_target_none_action">設定でGoogleアカウントかストレージを接続してください</string>
+    <string name="backup_idle">進行中のアップロードはありません</string>
+    <string name="backup_auto_on">オン</string>
+    <string name="backup_auto_off">オフ</string>
+    <string name="backup_uploaded_on_device">アップロード済みの写真 %1$d枚 · %2$s</string>
+    <string name="backup_uploaded_on_device_none">端末に残っているアップロード済みの写真はありません</string>
+    <plurals name="backup_trash_uploaded_title">
+        <item quantity="other">アップロード済みの写真%1$d枚をゴミ箱に移動しますか？</item>
+    </plurals>
+    <string name="backup_trash_uploaded_message">現在のアップロード先にアップロードされた写真だけを移動します。非表示の写真はそのままです。ゴミ箱から30日以内なら元に戻せます。</string>
+    <string name="gallery_pending_badge">バックアップ待ち</string>
+    <string name="gallery_failed_badge">バックアップ失敗</string>
+    <string name="settings_backed_up_badge">バックアップ済みの写真に表示</string>
+    <string name="settings_backed_up_badge_description">アップロード済みの写真のサムネイルに雲 ✓ を付けます。待機中・失敗の表示は常に出ます</string>
 </resources>

@@ -22,10 +22,13 @@ import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
+import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
+import com.jjw.easygallery.core.domain.model.UploadTask
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
+import com.jjw.easygallery.core.domain.usecase.ObserveUploadSummaryUseCase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -50,8 +53,10 @@ class GalleryViewModelTest {
         every { supportsTrashAndFavorites } returns true
     }
     private val actionController = MediaActionController(mockk<MediaActionRunner>())
+    private val queueTasks = kotlinx.coroutines.flow.MutableStateFlow<List<UploadTask>>(emptyList())
     private val uploadQueue: UploadQueueRepository = mockk {
         every { observeSummary() } returns flowOf(UploadSummary())
+        every { observeTasks() } returns queueTasks
     }
     private val uploadedIds = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
     private val uploadLedger: UploadLedgerRepository = mockk {
@@ -120,7 +125,7 @@ class GalleryViewModelTest {
             prefs,
             hiddenMedia,
             chosenMedia,
-            conditions,
+            ObserveUploadSummaryUseCase(uploadQueue, conditions, prefs),
             remoteAccounts,
             auth = mockk(relaxed = true),
             startGuestUpload = mockk(relaxed = true),
@@ -603,4 +608,84 @@ class GalleryViewModelTest {
             assertEquals("DCIM/행복이/", filters.albumPath)
         }
     }
+
+    // ---------- 하단 칸·백업 배지 (docs/plans/bottom-navigation/spec.md) ----------
+
+    @Test
+    fun `앨범 범위를 열면 전체 탭에서 그 앨범만 보인다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(
+            listOf(sampleItem(1), sampleItem(2, relativePath = "DCIM/행복이/")),
+        )
+        val viewModel = createViewModel(startOnAll = false)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.openScope(GalleryScope.Album("DCIM/행복이/"))
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            advanceUntilIdle()
+            (expectMostRecentItem() as GalleryUiState.Content).let {
+                assertEquals(GalleryTab.ALL, it.tab)
+                assertEquals(1, it.itemCount)
+            }
+        }
+    }
+
+    @Test
+    fun `즐겨찾기 범위는 즐겨찾기만 걸러 조회한다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1)))
+        val viewModel = createViewModel(startOnAll = false)
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.openScope(GalleryScope.Favorites)
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            advanceUntilIdle()
+            (expectMostRecentItem() as GalleryUiState.Content).let {
+                assertEquals(GalleryTab.ALL, it.tab)
+                assertTrue(it.favoritesOnly)
+            }
+        }
+        verify { repository.observeMedia(com.jjw.easygallery.core.data.media.MediaFilter.Favorites) }
+    }
+
+    @Test
+    fun `배지 - 올라감이 실패보다 앞서고 대기와 실패는 따로 보인다`() = runTest(testDispatcher) {
+        every { repository.observeMedia(any()) } returns flowOf(listOf(sampleItem(1), sampleItem(2), sampleItem(3)))
+        uploadedIds.value = setOf(1L)
+        queueTasks.value = listOf(
+            task(1, UploadState.FAILED),
+            task(2, UploadState.PENDING),
+            task(3, UploadState.FAILED),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            viewModel.onPermissionStatusChanged(MediaPermissionStatus.Full)
+            advanceUntilIdle()
+            val content = expectMostRecentItem() as GalleryUiState.Content
+            assertEquals(BackupBadge.DONE, content.backupBadgeOf(1))
+            assertEquals(BackupBadge.PENDING, content.backupBadgeOf(2))
+            assertEquals(BackupBadge.FAILED, content.backupBadgeOf(3))
+            assertEquals(BackupBadge.NONE, content.copy(showBackedUpBadge = false).backupBadgeOf(1))
+        }
+    }
+
+    private fun task(mediaId: Long, state: UploadState) = UploadTask(
+        id = mediaId,
+        mediaId = mediaId,
+        uri = mockk(relaxed = true),
+        displayName = "IMG_$mediaId.jpg",
+        mimeType = "image/jpeg",
+        sizeBytes = 1,
+        folderId = null,
+        folderName = null,
+        state = state,
+        sessionUri = null,
+        bytesUploaded = 0,
+        driveFileId = null,
+        errorMessage = null,
+        attemptCount = 0,
+        createdAt = 0,
+    )
 }

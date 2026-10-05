@@ -32,14 +32,16 @@ import com.jjw.easygallery.core.ui.media.MediaActionEffect
 fun GalleryRoute(
     onSettingsClick: () -> Unit,
     onUploadQueueClick: () -> Unit,
-    onTrashClick: () -> Unit,
-    onDriveClick: () -> Unit,
-    onDuplicatesClick: () -> Unit,
-    onHiddenClick: () -> Unit,
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit,
     onManageCategories: () -> Unit = {},
+    /** 앨범 칸에서 열었으면 그 범위. null 이면 사진 칸(출처 탭) */
+    scope: GalleryScope? = null,
+    onBackClick: () -> Unit = {},
+    navigationBar: @Composable () -> Unit = {},
     viewModel: GalleryViewModel = hiltViewModel(),
 ) {
+    // 같은 ViewModel 에 한 번만 — 화면이 다시 그려져도 사용자가 바꾼 필터를 되돌리지 않는다
+    LaunchedEffect(scope) { if (scope != null) viewModel.openScope(scope) }
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -112,7 +114,6 @@ fun GalleryRoute(
     GalleryScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
-        onSettingsClick = onSettingsClick,
         onRequestPermission = { permissionLauncher.launch(MediaPermission.required()) },
         onOpenAppSettings = {
             val packageUri = Uri.fromParts("package", context.packageName, null)
@@ -134,18 +135,12 @@ fun GalleryRoute(
         onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,
         onSelectAllVisible = viewModel::toggleSelectAllVisible,
-        onTrashUploaded = viewModel::trashUploadedVisible,
         onCategoryFilterChange = viewModel::setCategoryFilter,
         onManageCategories = onManageCategories,
         onCreateCategory = viewModel::createCategory,
         onAssignCategories = viewModel::assignCategoriesToSelection,
-        onTrashClick = onTrashClick,
-        onDriveClick = onDriveClick,
-        onDuplicatesClick = onDuplicatesClick,
-        onHiddenClick = onHiddenClick,
         onHideSelected = viewModel::hideSelected,
         onToggleChosenSelected = viewModel::toggleChosenSelected,
-        onAlbumFilterChange = viewModel::setAlbumFilter,
         onOpenItem = onOpenItem,
         guest = GuestUploadUi(
             available = guestAvailable,
@@ -158,6 +153,9 @@ fun GalleryRoute(
             },
             onDismissCleanup = viewModel::dismissGuestCleanup,
         ),
+        scope = scope,
+        onBackClick = onBackClick,
+        navigationBar = navigationBar,
         actions = GalleryActionCallbacks(
             onTrash = viewModel::trashSelected,
             onDelete = viewModel::deleteSelected,

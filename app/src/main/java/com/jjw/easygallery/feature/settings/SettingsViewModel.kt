@@ -77,6 +77,7 @@ class SettingsViewModel @Inject constructor(
             uploadWifiOnly = p.uploadWifiOnly,
             uploadChargingOnly = p.uploadChargingOnly,
             showCategoryBadges = p.showCategoryBadges,
+            showBackedUpBadge = p.showBackedUpBadge,
             videoCompression = p.videoCompression,
             isBusy = busy,
         )
@@ -169,6 +170,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowCategoryBadges(enabled: Boolean) = viewModelScope.launch { prefs.setShowCategoryBadges(enabled) }
 
+    fun setShowBackedUpBadge(enabled: Boolean) = viewModelScope.launch { prefs.setShowBackedUpBadge(enabled) }
+
     /** 계정 연결 해제: 메타·비밀 삭제, 캐시된 제공자 제거, 업로드 대상이었으면 Drive 로 되돌림 */
     fun removeRemoteAccount(id: String) = runBusy {
         remoteAccounts.remove(id)
@@ -235,6 +238,7 @@ data class SettingsUiState(
     val uploadWifiOnly: Boolean = true,
     val uploadChargingOnly: Boolean = false,
     val showCategoryBadges: Boolean = true,
+    val showBackedUpBadge: Boolean = true,
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     val isBusy: Boolean = false,
 ) {

@@ -44,8 +44,17 @@ app/src/main/java/com/jjw/easygallery/
     │                          # 행 ⋮ 이름 변경·이동(DriveFolderPickerSheet)·휴지통(실행 취소) — 낙관적 갱신, DRIVE_FILE_CRUD.md
     ├── uploads/               # 업로드 목록: 상태·진행률, 실패 재시도, 완료 정리, 전체 취소
     ├── autobackup/            # 자동 백업 설정: 스위치, 앨범 선택, 영상 포함, 지금 검사, 기존 항목 백업
-    └── duplicates/            # 완전 중복: 검사 진행률, 그룹 카드, 유지/제거 선택, 휴지통 이동
+    ├── duplicates/            # 완전 중복: 검사 진행률, 그룹 카드, 유지/제거 선택, 휴지통 이동
+    ├── albums/                # 하단 "앨범" 칸: 즐겨찾기·휴지통 바로가기 + 앨범 격자. 앨범 하나는 갤러리를 범위(GalleryScope)로 연다
+    ├── backup/                # 하단 "백업" 칸: 올리는 곳, 진행·실패, 업로드 목록·자동 백업·Drive 보기·올린 사진 정리
+    └── menu/                  # 하단 "메뉴" 칸: 숨긴 사진·중복·카테고리·자동 태그·설정 (상태 없음)
 ```
+
+## 하단 칸 (core/navigation/TopLevelDestination)
+
+사진·앨범·백업·메뉴 네 칸. 칸을 바꾸면 백스택을 `[사진]` 또는 `[사진, 그 칸]` 으로 다시 놓는다(`selectTopLevel`) —
+사진 칸 ViewModel 이 맨 아래에 남아 탭·스크롤이 유지된다. 막대(`AppNavigationBar`)는 칸의 첫 화면이 자기 Scaffold 의
+bottomBar 로 받고, 사진 칸에서는 고르는 동안 선택 하단바가 같은 자리를 쓴다. 근거 `docs/plans/bottom-navigation/spec.md`.
 
 ## 갤러리 데이터 흐름
 

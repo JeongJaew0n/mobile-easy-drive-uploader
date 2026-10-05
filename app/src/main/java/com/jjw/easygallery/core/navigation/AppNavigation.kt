@@ -15,16 +15,23 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.jjw.easygallery.core.domain.model.CategoryFilter
+import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.motion.MotionSpecs
+import com.jjw.easygallery.feature.albums.AlbumsRoute
 import com.jjw.easygallery.feature.autobackup.AutoBackupRoute
 import com.jjw.easygallery.feature.autotag.AutoTagRoute
+import com.jjw.easygallery.feature.backup.BackupRoute
 import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
+import com.jjw.easygallery.feature.gallery.GalleryScope
 import com.jjw.easygallery.feature.gallery.GalleryTab
+import com.jjw.easygallery.feature.gallery.ViewerFilters
 import com.jjw.easygallery.feature.hidden.HiddenRoute
+import com.jjw.easygallery.feature.menu.MenuActions
+import com.jjw.easygallery.feature.menu.MenuScreen
 import com.jjw.easygallery.feature.remote.AddRemoteAccountRoute
 import com.jjw.easygallery.feature.settings.SettingsRoute
 import com.jjw.easygallery.feature.trash.TrashRoute
@@ -35,6 +42,25 @@ import com.jjw.easygallery.feature.viewer.MediaViewerRoute
 fun AppNavigation() {
     val backStack = rememberNavBackStack(GalleryKey)
     val motion = LocalMotion.current
+    // 칸의 첫 화면마다 같은 막대를 붙인다. 어느 칸이 켜졌는지는 그 화면이 안다
+    val navigationBar: @Composable (TopLevelDestination) -> Unit = { current ->
+        AppNavigationBar(current = current, onSelect = { backStack.selectTopLevel(it) })
+    }
+    val openViewer: (MediaItem, ViewerFilters, HeroOrigin?) -> Unit = { item, filters, hero ->
+        backStack.add(
+            MediaViewerKey(
+                mediaId = item.id,
+                favoritesOnly = filters.favoritesOnly,
+                startEpochDay = filters.range?.start?.toEpochDay(),
+                endEpochDay = filters.range?.endInclusive?.toEpochDay(),
+                categoryIds = (filters.category as? CategoryFilter.Any)?.ids?.toList(),
+                uncategorizedOnly = filters.category is CategoryFilter.Uncategorized,
+                tab = filters.tab.takeUnless { it == GalleryTab.ALL }?.name,
+                albumPath = filters.albumPath,
+                hero = hero,
+            ),
+        )
+    }
 
     NavDisplay(
         backStack = backStack,
@@ -67,26 +93,49 @@ fun AppNavigation() {
                 GalleryRoute(
                     onSettingsClick = { backStack.add(SettingsKey) },
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
-                    onTrashClick = { backStack.add(TrashKey) },
-                    onHiddenClick = { backStack.add(HiddenKey) },
-                    onDriveClick = { backStack.add(DriveBrowserKey()) },
-                    onDuplicatesClick = { backStack.add(DuplicatesKey) },
-                    onOpenItem = { item, filters, hero ->
-                        backStack.add(
-                            MediaViewerKey(
-                                mediaId = item.id,
-                                favoritesOnly = filters.favoritesOnly,
-                                startEpochDay = filters.range?.start?.toEpochDay(),
-                                endEpochDay = filters.range?.endInclusive?.toEpochDay(),
-                                categoryIds = (filters.category as? CategoryFilter.Any)?.ids?.toList(),
-                                uncategorizedOnly = filters.category is CategoryFilter.Uncategorized,
-                                tab = filters.tab.takeUnless { it == GalleryTab.ALL }?.name,
-                                albumPath = filters.albumPath,
-                                hero = hero,
-                            ),
-                        )
-                    },
+                    onOpenItem = openViewer,
                     onManageCategories = { backStack.add(CategoriesKey) },
+                    navigationBar = { navigationBar(TopLevelDestination.PHOTOS) },
+                )
+            }
+            entry<AlbumsKey> {
+                AlbumsRoute(
+                    onOpenAlbum = { album -> backStack.add(AlbumKey(relativePath = album.relativePath)) },
+                    onOpenFavorites = { backStack.add(AlbumKey(favorites = true)) },
+                    onOpenTrash = { backStack.add(TrashKey) },
+                    navigationBar = { navigationBar(TopLevelDestination.ALBUMS) },
+                )
+            }
+            entry<AlbumKey> { key ->
+                // 앨범 하나 = 갤러리 화면 그대로. 하위 화면이라 하단 칸 막대는 없다
+                GalleryRoute(
+                    onSettingsClick = { backStack.add(SettingsKey) },
+                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
+                    onOpenItem = openViewer,
+                    onManageCategories = { backStack.add(CategoriesKey) },
+                    scope = key.relativePath?.let { GalleryScope.Album(it) } ?: GalleryScope.Favorites,
+                    onBackClick = { backStack.removeLastOrNull() },
+                )
+            }
+            entry<BackupKey> {
+                BackupRoute(
+                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
+                    onAutoBackupClick = { backStack.add(AutoBackupKey) },
+                    onDriveClick = { backStack.add(DriveBrowserKey()) },
+                    onSettingsClick = { backStack.add(SettingsKey) },
+                    navigationBar = { navigationBar(TopLevelDestination.BACKUP) },
+                )
+            }
+            entry<MenuKey> {
+                MenuScreen(
+                    actions = MenuActions(
+                        onHiddenClick = { backStack.add(HiddenKey) },
+                        onDuplicatesClick = { backStack.add(DuplicatesKey) },
+                        onCategoriesClick = { backStack.add(CategoriesKey) },
+                        onAutoTagClick = { backStack.add(AutoTagKey) },
+                        onSettingsClick = { backStack.add(SettingsKey) },
+                    ),
+                    navigationBar = { navigationBar(TopLevelDestination.MENU) },
                 )
             }
             entry<CategoriesKey> {
@@ -96,12 +145,7 @@ fun AppNavigation() {
                 SettingsRoute(
                     onBackClick = { backStack.removeLastOrNull() },
                     onUploadFolderClick = { backStack.add(DriveBrowserKey()) },
-                    onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onDriveClick = { backStack.add(DriveBrowserKey()) },
-                    onAutoBackupClick = { backStack.add(AutoBackupKey) },
-                    onDuplicatesClick = { backStack.add(DuplicatesKey) },
-                    onAutoTagClick = { backStack.add(AutoTagKey) },
-                    onCategoriesClick = { backStack.add(CategoriesKey) },
                     onAddRemoteAccountClick = { backStack.add(AddRemoteAccountKey()) },
                     onEditRemoteAccount = { accountId -> backStack.add(AddRemoteAccountKey(accountId)) },
                     onOpenRemoteAccount = { accountId -> backStack.add(DriveBrowserKey(accountId = accountId)) },

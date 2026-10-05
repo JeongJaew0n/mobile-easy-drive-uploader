@@ -45,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -61,12 +60,8 @@ import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
 fun SettingsRoute(
     onBackClick: () -> Unit,
     onUploadFolderClick: () -> Unit,
-    onUploadQueueClick: () -> Unit,
-    onDriveClick: () -> Unit,
-    onAutoBackupClick: () -> Unit,
-    onDuplicatesClick: () -> Unit,
-    onAutoTagClick: () -> Unit,
-    onCategoriesClick: () -> Unit = {},
+    /** 연결된 저장소 목록의 Google Drive 줄 */
+    onDriveClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
     onEditRemoteAccount: (accountId: String) -> Unit = {},
@@ -140,12 +135,7 @@ fun SettingsRoute(
         onPickFoldersClick = viewModel::pickDriveFolders,
         onRemovePickedFolder = viewModel::removePickedFolder,
         onUploadFolderClick = onUploadFolderClick,
-        onUploadQueueClick = onUploadQueueClick,
         onDriveClick = onDriveClick,
-        onAutoBackupClick = onAutoBackupClick,
-        onDuplicatesClick = onDuplicatesClick,
-        onAutoTagClick = onAutoTagClick,
-        onCategoriesClick = onCategoriesClick,
         onAddRemoteAccountClick = onAddRemoteAccountClick,
         onOpenRemoteAccount = onOpenRemoteAccount,
         onEditRemoteAccount = onEditRemoteAccount,
@@ -153,6 +143,7 @@ fun SettingsRoute(
         onWifiOnlyChange = viewModel::setUploadWifiOnly,
         onChargingOnlyChange = viewModel::setUploadChargingOnly,
         onCategoryBadgesChange = viewModel::setShowCategoryBadges,
+        onBackedUpBadgeChange = viewModel::setShowBackedUpBadge,
         onVideoCompressionChange = viewModel::setVideoCompression,
         manageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) canManageMedia else null,
         onManageMediaClick = {
@@ -174,17 +165,13 @@ internal fun SettingsScreen(
     onPickFoldersClick: () -> Unit,
     onRemovePickedFolder: (String) -> Unit,
     onUploadFolderClick: () -> Unit,
-    onUploadQueueClick: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
     onChargingOnlyChange: (Boolean) -> Unit,
     onCategoryBadgesChange: (Boolean) -> Unit = {},
+    onBackedUpBadgeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onVideoCompressionChange: (VideoCompression) -> Unit = {},
     onDriveClick: () -> Unit = {},
-    onAutoBackupClick: () -> Unit = {},
-    onDuplicatesClick: () -> Unit = {},
-    onAutoTagClick: () -> Unit = {},
-    onCategoriesClick: () -> Unit = {},
     onAddRemoteAccountClick: () -> Unit = {},
     onOpenRemoteAccount: (accountId: String) -> Unit = {},
     onEditRemoteAccount: (accountId: String) -> Unit = {},
@@ -253,21 +240,7 @@ internal fun SettingsScreen(
                     },
                     onClick = onUploadFolderClick,
                 )
-                NavigationRow(
-                    icon = painterResource(R.drawable.ic_insert_drive_file),
-                    title = stringResource(R.string.settings_browse_drive),
-                    onClick = onDriveClick,
-                )
-                NavigationRow(
-                    icon = painterResource(R.drawable.ic_cloud_upload),
-                    title = stringResource(R.string.settings_auto_backup),
-                    onClick = onAutoBackupClick,
-                )
-                NavigationRow(
-                    icon = painterResource(R.drawable.ic_cloud_upload),
-                    title = stringResource(R.string.settings_upload_queue),
-                    onClick = onUploadQueueClick,
-                )
+                // Drive 보기·자동 백업·업로드 목록은 하단 "백업" 칸으로 옮겼다(docs/plans/bottom-navigation/spec.md)
                 SwitchRow(
                     title = stringResource(R.string.settings_upload_wifi_only),
                     description = stringResource(R.string.settings_upload_wifi_only_description),
@@ -289,22 +262,14 @@ internal fun SettingsScreen(
                 text = stringResource(R.string.settings_gallery_section),
                 style = MaterialTheme.typography.titleMedium,
             )
-            NavigationRow(
-                icon = painterResource(R.drawable.ic_content_copy),
-                title = stringResource(R.string.duplicates_title),
-                onClick = onDuplicatesClick,
-            )
-            NavigationRow(
-                icon = painterResource(R.drawable.ic_label),
-                title = stringResource(R.string.settings_categories),
-                onClick = onCategoriesClick,
-            )
-            NavigationRow(
-                icon = painterResource(R.drawable.ic_auto_tag),
-                title = stringResource(R.string.auto_tag_settings_entry),
-                onClick = onAutoTagClick,
-            )
+            // 중복 사진·카테고리 관리·자동 태그는 하단 "메뉴" 칸으로 옮겼다
             LanguageRow()
+            SwitchRow(
+                title = stringResource(R.string.settings_backed_up_badge),
+                description = stringResource(R.string.settings_backed_up_badge_description),
+                checked = uiState.showBackedUpBadge,
+                onCheckedChange = onBackedUpBadgeChange,
+            )
             SwitchRow(
                 title = stringResource(R.string.settings_category_badges),
                 description = stringResource(R.string.settings_category_badges_description),
@@ -418,30 +383,6 @@ private fun VideoCompression.labelRes(): Int = when (this) {
 }
 
 @Composable
-private fun NavigationRow(
-    icon: androidx.compose.ui.graphics.painter.Painter,
-    title: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null)
-            Spacer(Modifier.width(16.dp))
-            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-        }
-        HorizontalDivider()
-    }
-}
-
-@Composable
 private fun SwitchRow(
     title: String,
     description: String,
@@ -484,7 +425,6 @@ private fun SettingsScreenSignedOutPreview() {
             onPickFoldersClick = {},
             onRemovePickedFolder = {},
             onUploadFolderClick = {},
-            onUploadQueueClick = {},
             onWifiOnlyChange = {},
             onChargingOnlyChange = {},
         )
@@ -510,7 +450,6 @@ private fun SettingsScreenSignedInPreview() {
             onPickFoldersClick = {},
             onRemovePickedFolder = {},
             onUploadFolderClick = {},
-            onUploadQueueClick = {},
             onWifiOnlyChange = {},
             onChargingOnlyChange = {},
         )

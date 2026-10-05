@@ -19,7 +19,6 @@ import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
-import com.jjw.easygallery.core.data.upload.DeviceConditionsMonitor
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
 import com.jjw.easygallery.core.domain.model.Album
@@ -33,13 +32,13 @@ import com.jjw.easygallery.core.domain.model.UploadState
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.model.albumsFrom
 import com.jjw.easygallery.core.domain.model.filterByDate
-import com.jjw.easygallery.core.domain.model.uploadWaitReason
 import com.jjw.easygallery.core.domain.usecase.AssignCategoriesUseCase
 import com.jjw.easygallery.core.domain.usecase.EnqueueUploadsUseCase
 import com.jjw.easygallery.core.domain.usecase.GuestIsPrimaryException
 import com.jjw.easygallery.core.domain.usecase.GuestSession
 import com.jjw.easygallery.core.domain.usecase.GuestUploadStarted
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
+import com.jjw.easygallery.core.domain.usecase.ObserveUploadSummaryUseCase
 import com.jjw.easygallery.core.domain.usecase.StartGuestUploadUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -83,7 +82,7 @@ class GalleryViewModel @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val hiddenMedia: HiddenMediaRepository,
     private val chosenMedia: ChosenMediaRepository,
-    private val conditions: DeviceConditionsMonitor,
+    observeUploadSummary: ObserveUploadSummaryUseCase,
     remoteAccounts: RemoteAccountRepository,
     private val auth: AuthRepository,
     private val startGuestUpload: StartGuestUploadUseCase,
@@ -148,23 +147,30 @@ class GalleryViewModel @Inject constructor(
     private var animatedVersion = -1
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
 
-    /** 큐 요약에 "왜 멈췄는지" 를 얹는다 — WorkManager 가 보는 것과 같은 조건을 화면도 본다 */
-    private val uploadSummary: Flow<UploadSummary> = combine(
-        uploadQueue.observeSummary(),
-        conditions.observe(),
-        prefs.preferences,
-    ) { summary, device, p ->
-        summary.copy(
-            waitReason = uploadWaitReason(
-                isRunning = summary.current?.state == UploadState.RUNNING,
-                wifiOnly = p.uploadWifiOnly,
-                chargingOnly = p.uploadChargingOnly,
-                isUnmetered = device.isUnmetered,
-                isCharging = device.isCharging,
-                attemptCount = summary.current?.attemptCount ?: 0,
-            ),
-        )
-    }
+    /** 큐 요약 + 멈춘 까닭. 백업 칸과 같은 문장을 쓰도록 유스케이스가 만든다 */
+    private val uploadSummary: Flow<UploadSummary> = observeUploadSummary()
+
+    /**
+     * 썸네일 배지(`docs/plans/bottom-navigation/spec.md`): 큐에서 대기·진행 중인 것과 실패한 것.
+     * 올라간 것(원장)이 실패보다 앞선다 — 예전 배치의 실패 줄이 남아 있어도 원장에 있으면 올라간 것이다(화면이 가른다).
+     */
+    private val queueBadges: Flow<QueueBadges> = uploadQueue.observeTasks()
+        .map { tasks ->
+            QueueBadges(
+                pending = tasks.filter { it.state == UploadState.PENDING || it.state == UploadState.RUNNING }
+                    .mapTo(HashSet()) { it.mediaId },
+                failed = tasks.filter { it.state == UploadState.FAILED }.mapTo(HashSet()) { it.mediaId },
+            )
+        }
+        .distinctUntilChanged()
+
+    /** 썸네일에 무엇을 얹을지 — 설정 둘과 큐 상태를 한 묶음으로(combine 인자 수를 줄인다) */
+    private val thumbnailDecorations: Flow<ThumbnailDecorations> = combine(
+        showCategoryBadges,
+        prefs.preferences.map { it.showBackedUpBadge }.distinctUntilChanged(),
+        queueBadges,
+    ) { category, backedUp, queue -> ThumbnailDecorations(category, backedUp, queue) }
+
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
     val eventFlow: Flow<GalleryEvent> = events.receiveAsFlow()
 
@@ -172,9 +178,6 @@ class GalleryViewModel @Inject constructor(
     val actionEvents = actionController.events
 
     private var latestItems: List<MediaItem> = emptyList()
-
-    /** 원장 기준 "이미 올린" 미디어. 올린 것만 골라 지울 때 쓴다 */
-    private var latestUploadedIds: Set<Long> = emptySet()
 
     /** 하단바 토글이 넣을지 뺄지 정한다. 목록이 갱신될 때마다 바뀐다 */
     private var latestChosenIds: Set<Long> = emptySet()
@@ -251,6 +254,20 @@ class GalleryViewModel @Inject constructor(
         clearSelection()
         filterVersion++
         albumFilter.value = relativePath
+    }
+
+    /**
+     * 앨범 칸에서 연 화면의 범위를 건다(`docs/plans/bottom-navigation/spec.md`). 앨범이면 그 폴더만,
+     * 즐겨찾기면 즐겨찾기만 — 둘 다 탭은 '전체' 다(출처 탭은 이 화면에 없다).
+     */
+    fun openScope(scope: GalleryScope) {
+        when (scope) {
+            is GalleryScope.Album -> setAlbumFilter(scope.relativePath)
+            GalleryScope.Favorites -> {
+                setTab(GalleryTab.ALL)
+                setFavoritesOnly(true)
+            }
+        }
     }
 
     // ---------- 카테고리 ----------
@@ -454,15 +471,6 @@ class GalleryViewModel @Inject constructor(
      * 실제 쓰임이기 때문이다. 기기 휴지통으로 가므로 30일 안에는 되돌릴 수 있고,
      * 최종 확인은 시스템 동의 창이 받는다.
      */
-    fun trashUploadedVisible() {
-        val targets = latestItems.filter { it.id in latestUploadedIds }
-        if (targets.isEmpty()) {
-            viewModelScope.launch { events.send(GalleryEvent.NoUploadedToTrash) }
-            return
-        }
-        perform(MediaAction.Trash(targets, trashed = true))
-    }
-
     fun trashSelected() = perform(MediaAction.Trash(selectedItems(), trashed = true))
 
     /** 선택이 모두 즐겨찾기면 해제, 아니면 전부 즐겨찾기 */
@@ -574,7 +582,6 @@ class GalleryViewModel @Inject constructor(
         ) { all, f, uploaded, categories, assignments ->
             val (visible, categorized, items) = f.applyTo(all, uploaded, assignments)
             latestItems = items
-            latestUploadedIds = uploaded
             latestChosenIds = f.chosen
             Catalog(
                 items = items,
@@ -601,8 +608,8 @@ class GalleryViewModel @Inject constructor(
             )
         }
 
-        return combine(catalog, selectedIds, uploadSummary, actionController.isMutating, showCategoryBadges) {
-                c, selected, summary, mutating, badges ->
+        return combine(catalog, selectedIds, uploadSummary, actionController.isMutating, thumbnailDecorations) {
+                c, selected, summary, mutating, decorations ->
             // 필터 변경 후 첫 목록은 애니메이션 없이 교체, 그 뒤(삭제·이동 등)부터 animateItem
             val animate = c.version == animatedVersion
             animatedVersion = c.version
@@ -626,7 +633,10 @@ class GalleryViewModel @Inject constructor(
                 albumFilter = c.albumFilter?.let { path ->
                     c.albums.find { it.relativePath == path } ?: Album(path.trimEnd('/'), path, itemCount = 0)
                 },
-                showCategoryBadges = badges,
+                showCategoryBadges = decorations.categoryBadges,
+                showBackedUpBadge = decorations.backedUpBadge,
+                pendingIds = decorations.queue.pending,
+                failedIds = decorations.queue.failed,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -679,6 +689,12 @@ sealed interface GalleryUiState {
         /** 앨범 하나만 보고 있으면 그 앨범 */
         val albumFilter: Album? = null,
         val showCategoryBadges: Boolean = true,
+        /** 올라간 것에 구름 ✓ — 기본 켬(2026-10-05 사용자 결정), 설정에서 끈다 */
+        val showBackedUpBadge: Boolean = true,
+        /** 큐에서 대기·올리는 중(구름 ↑) */
+        val pendingIds: Set<Long> = emptySet(),
+        /** 큐에서 실패(구름 ✕). 원장에 있으면 올라간 것이 앞선다 */
+        val failedIds: Set<Long> = emptySet(),
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
@@ -692,6 +708,15 @@ sealed interface GalleryUiState {
     }
     data class Error(val throwable: Throwable) : GalleryUiState
 }
+
+/** 큐 상태로 정해지는 배지 대상 */
+private data class QueueBadges(val pending: Set<Long> = emptySet(), val failed: Set<Long> = emptySet())
+
+private data class ThumbnailDecorations(
+    val categoryBadges: Boolean,
+    val backedUpBadge: Boolean,
+    val queue: QueueBadges,
+)
 
 /** 업로드 대상 후보(accountId null = Google Drive) */
 data class UploadTargetOption(val accountId: String?, val name: String, val isDefault: Boolean)
@@ -707,8 +732,6 @@ sealed interface GalleryEvent {
     data object GuestIsPrimary : GalleryEvent
     data class Enqueued(val added: Int, val skipped: Int) : GalleryEvent
 
-    /** 지울 것이 없을 때. 버튼이 아무 일도 안 하면 고장으로 보인다 */
-    data object NoUploadedToTrash : GalleryEvent
     data class CategoriesAssigned(val count: Int) : GalleryEvent
     data class Hidden(val count: Int) : GalleryEvent
 

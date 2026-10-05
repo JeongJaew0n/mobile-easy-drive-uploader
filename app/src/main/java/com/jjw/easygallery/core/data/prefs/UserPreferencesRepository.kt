@@ -62,6 +62,8 @@ data class UserPreferences(
     val videoCompression: VideoCompression = VideoCompression.ORIGINAL,
     /** 썸네일 오른쪽 위 카테고리 색 점. 배지가 많으면 시끄러울 수 있어 끌 수 있다 */
     val showCategoryBadges: Boolean = true,
+    /** 올라간 사진에 구름 ✓ — 기본 켬(2026-10-05 사용자 결정). 대기·실패 배지는 이 값과 무관하게 늘 보인다 */
+    val showBackedUpBadge: Boolean = true,
     /** 새 사진을 매일 한 번 자동으로 분석한다(`docs/AUTO_TAGGING.md` §5.4) */
     val autoTagEnabled: Boolean = false,
     /** 자동 분석 시각(하루 중 분, 0~1439). 기본 04:00 */
@@ -123,6 +125,7 @@ class UserPreferencesRepository @Inject constructor(
             videoCompression = prefs[KEY_VIDEO_COMPRESSION]?.let { VideoCompression.fromStorageKey(it) }
                 ?: VideoCompression.ORIGINAL,
             showCategoryBadges = prefs[KEY_SHOW_CATEGORY_BADGES] ?: true,
+            showBackedUpBadge = prefs[KEY_SHOW_BACKED_UP_BADGE] ?: true,
         )
     }
 
@@ -323,6 +326,10 @@ class UserPreferencesRepository @Inject constructor(
         store.edit { it[KEY_SHOW_CATEGORY_BADGES] = enabled }
     }
 
+    suspend fun setShowBackedUpBadge(enabled: Boolean) {
+        store.edit { it[KEY_SHOW_BACKED_UP_BADGE] = enabled }
+    }
+
     private companion object {
         val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_TAG_ENABLED = booleanPreferencesKey("auto_tag_enabled")
@@ -336,6 +343,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_VIDEO_COMPRESSION = stringPreferencesKey("video_compression")
         val KEY_UPLOAD_ACCOUNT_ID = stringPreferencesKey("upload_account_id")
         val KEY_SHOW_CATEGORY_BADGES = booleanPreferencesKey("show_category_badges")
+        val KEY_SHOW_BACKED_UP_BADGE = booleanPreferencesKey("show_backed_up_badge")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")

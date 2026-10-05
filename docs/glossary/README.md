@@ -33,8 +33,9 @@
 | 원장 (UploadLedger) | 업로드 완료 기록(`uploaded_media`). "이미 백업됨" 판단의 근거. **올린 곳마다** 따로 남는다 — 키가 `(사진, 목적지)` | 큐(`upload_tasks`)와 다름 — 큐는 새 배치마다 비운다 |
 | 목적지 (destination) | 원장에서 "어디로 올렸나". Drive 는 `drive:<연결된 이메일>`, 다른 저장소는 `remote:<accountId>`. 같은 Drive 라도 Google 계정이 다르면 다른 목적지다 | `accountId` 와 다름 — 그쪽은 저장소 계정이라 Drive 는 모두 null 이다(`docs/plans/ledger-per-account/spec.md`) |
 | 업로드 대상 | 지금 기본으로 올릴 저장소 계정과 폴더. 갤러리에서 ⋮ 로 이번 배치만 다른 곳에 올릴 수도 있다 | `UserPreferences.uploadAccountId` (null = Google Drive) |
+| 칸 (TopLevelDestination) | 화면 아래 막대의 네 자리 — 사진·앨범·백업·메뉴. 칸의 첫 화면에서만 막대가 보이고, 사진이 시작 칸이다(`docs/plans/bottom-navigation/spec.md`) | 탭과 다름 — 탭은 사진 칸 위의 출처(고른 사진·전체·카메라·스크린샷·다른 앱)다 |
 | 출처 (MediaSource) | 사진이 **어디서 온 것인지**. `relativePath` 로만 판정한다 — `DCIM/` 아래는 카메라, 경로에 `Screenshots` 가 있으면 스크린샷, 나머지는 다른 앱 | 갤러리 상단 탭의 기준. 앨범(폴더)보다 거친 단위다 |
-| 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상이고, ⋮ → 앨범 으로 **앨범 하나만 골라 볼 수 있다**(앨범 필터). 삼성 갤러리에서 만든 앨범도 실제 폴더라 똑같이 보인다 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것 |
+| 앨범 (Album) | MediaStore 의 폴더 하나(`relativePath` 단위). 항목 이동의 대상이고, 하단 **앨범 칸**에서 앨범 하나를 열어 그 사진만 본다. 삼성 갤러리에서 만든 앨범도 실제 폴더라 똑같이 보인다 | 출처와 다름 — 출처는 앨범들을 세 갈래로 묶은 것
 | 숨김 (hidden) | 우리 앱 목록에서만 빼는 표시(`hidden_media`). 파일은 그대로고 다른 갤러리 앱에서는 보인다 | 휴지통과 다름 — 휴지통은 MediaStore 의 `IS_TRASHED` 라 기기 전체에 적용된다 |
 | PIN | 숨긴 사진을 보기 위한 4~6자리 숫자. PBKDF2 해시로만 저장한다 | 암호화 키가 아니다 — 파일 자체는 잠기지 않는다 |
 | 기본 폴더 (Easy Gallery) | 앱이 Drive 에 직접 만드는 폴더. 지정한 곳이 없으면 여기에 올린다 | 앱이 만들었으므로 이름도 알고 안을 볼 수도 있다 |

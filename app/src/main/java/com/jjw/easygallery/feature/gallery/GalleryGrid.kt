@@ -1,5 +1,7 @@
 package com.jjw.easygallery.feature.gallery
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -77,7 +79,8 @@ internal fun GalleryGrid(
     /** false 면 항목 이동·등장 애니메이션 생략(필터 전환처럼 목록이 통째로 바뀔 때) */
     animateChanges: Boolean = true,
     /** Drive 에 올라간 항목 — 썸네일에 클라우드 체크 배지 */
-    uploadedIds: Set<Long> = emptySet(),
+    /** 썸네일 왼쪽 아래 백업 배지(`docs/plans/bottom-navigation/spec.md`). 기본은 없음 */
+    backupBadgeOf: (Long) -> BackupBadge = { BackupBadge.NONE },
     /** 항목 ID → 카테고리 색 인덱스(최대 3). 빈 목록이면 배지 없음 */
     categoryColorsOf: (Long) -> List<Int> = { emptyList() },
 ) {
@@ -144,7 +147,7 @@ internal fun GalleryGrid(
                 MediaThumbnail(
                     item = item,
                     selected = item.id in selectedIds,
-                    uploaded = item.id in uploadedIds,
+                    backupBadge = backupBadgeOf(item.id),
                     categoryColors = categoryColorsOf(item.id),
                     selectionMode = selectionMode,
                     onToggleSelection = { onToggleSelection(item.id) },
@@ -261,7 +264,7 @@ private fun SectionSelectButton(
 private fun MediaThumbnail(
     item: MediaItem,
     selected: Boolean,
-    uploaded: Boolean,
+    backupBadge: BackupBadge,
     categoryColors: List<Int>,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
@@ -351,11 +354,11 @@ private fun MediaThumbnail(
                     .padding(4.dp),
             )
         }
-        if (uploaded) {
+        if (backupBadge != BackupBadge.NONE) {
             Icon(
-                painter = painterResource(R.drawable.ic_cloud_done),
-                contentDescription = stringResource(R.string.gallery_uploaded_badge),
-                tint = Color.White,
+                painter = painterResource(backupBadge.iconRes),
+                contentDescription = stringResource(backupBadge.labelRes),
+                tint = if (backupBadge == BackupBadge.FAILED) FAILED_TINT else Color.White,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(4.dp)
@@ -440,3 +443,28 @@ private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L
 
 private const val CATEGORY_DOT_DP = 10
+
+/**
+ * 썸네일 백업 배지(`docs/plans/bottom-navigation/spec.md`). 올라감 ✓ 은 설정으로 끌 수 있고, 대기·실패는 늘 보인다 —
+ * 백업 앱에서 할 일은 "아직 안 올라간 것" 이다.
+ */
+enum class BackupBadge(
+    @param:DrawableRes @get:DrawableRes val iconRes: Int,
+    @param:StringRes @get:StringRes val labelRes: Int,
+) {
+    NONE(0, 0),
+    DONE(R.drawable.ic_cloud_done, R.string.gallery_uploaded_badge),
+    PENDING(R.drawable.ic_cloud_upload, R.string.gallery_pending_badge),
+    FAILED(R.drawable.ic_cloud_off, R.string.gallery_failed_badge),
+}
+
+/** 올라간 것(원장)이 실패보다 앞선다 — 예전 배치의 실패 줄이 남아 있어도 원장에 있으면 올라간 것이다 */
+internal fun GalleryUiState.Content.backupBadgeOf(id: Long): BackupBadge = when {
+    id in uploadedIds -> if (showBackedUpBadge) BackupBadge.DONE else BackupBadge.NONE
+    id in pendingIds -> BackupBadge.PENDING
+    id in failedIds -> BackupBadge.FAILED
+    else -> BackupBadge.NONE
+}
+
+/** 실패 배지는 흰색 대신 눈에 띄는 주황 — 검은 반투명 동그라미 위에서 읽힌다 */
+private val FAILED_TINT = Color(0xFFFFB27A)

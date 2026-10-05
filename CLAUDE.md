@@ -30,7 +30,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - UI 는 Compose 만. 화면은 `XxxRoute`(ViewModel 연결) + `XxxScreen`(순수 UI, Preview·테스트 대상) 으로 나누고, 한 파일이 ~350줄을 넘으면 상단바·배너·페이지 같은 조각 단위로 파일을 나눈다(갤러리·상세보기가 예시). 파일 간 공유는 `internal`.
 - ViewModel 은 `@HiltViewModel`, 상태는 `StateFlow<UiState>` 단일 노출. UiState 는 sealed interface.
 - Compose 에서 ViewModel 은 `androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()` 사용 (`hilt-navigation-compose` 의 것은 deprecated, Nav2 전용).
-- 내비게이션은 Navigation 3. 화면 키는 `core/navigation/NavKeys.kt` 의 `AppNavKey` 에 `@Serializable` 로 추가.
+- 내비게이션은 Navigation 3. 화면 키는 `core/navigation/NavKeys.kt` 의 `AppNavKey` 에 `@Serializable` 로 추가. 하단 칸(사진·앨범·백업·메뉴)은 `TopLevelDestination` — 칸의 첫 화면만 `navigationBar` 를 받고, 하위 화면은 받지 않는다.
 - 의존성 버전은 `gradle/libs.versions.toml` 에서만 관리. 새 라이브러리는 카탈로그에 먼저 등록.
 - Kotlin 은 AGP 내장(built-in Kotlin). `org.jetbrains.kotlin.android` 플러그인을 추가하지 않는다. kapt 금지, KSP 사용.
 - 백그라운드 작업은 WorkManager + `@HiltWorker`. Application 이 `HiltWorkerFactory` 를 제공하므로 매니페스트의 기본 초기화 제거를 유지한다. 업로드는 UI 에서 직접 하지 않고 반드시 `EnqueueUploadsUseCase` 로 큐(Room)에 넣는다.

@@ -7,8 +7,28 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface AppNavKey : NavKey
 
+/** 하단 "사진" 칸. 앱의 시작 화면 — 백스택 맨 아래에 늘 있다(`docs/plans/bottom-navigation/spec.md`) */
 @Serializable
 data object GalleryKey : AppNavKey
+
+/** 하단 "앨범" 칸 */
+@Serializable
+data object AlbumsKey : AppNavKey
+
+/** 하단 "백업" 칸 */
+@Serializable
+data object BackupKey : AppNavKey
+
+/** 하단 "메뉴" 칸 */
+@Serializable
+data object MenuKey : AppNavKey
+
+/**
+ * 앨범 하나(또는 즐겨찾기)만 보는 갤러리. 앨범 칸에서 연다.
+ * [relativePath] 가 있으면 그 앨범, [favorites] 면 즐겨찾기 — 둘 중 하나만 쓴다.
+ */
+@Serializable
+data class AlbumKey(val relativePath: String? = null, val favorites: Boolean = false) : AppNavKey
 
 @Serializable
 data object SettingsKey : AppNavKey

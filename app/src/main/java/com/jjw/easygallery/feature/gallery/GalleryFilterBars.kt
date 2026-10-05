@@ -9,7 +9,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 
 /**
- * 걸어 둔 필터를 알려 주는 막대들(기간·카테고리·앨범). 그리드 위에 펴지며 붙고 ✕ 로 푼다.
+ * 걸어 둔 필터를 알려 주는 막대들(기간·카테고리). 앨범은 앨범 칸의 화면 제목이 대신한다. 그리드 위에 펴지며 붙고 ✕ 로 푼다.
  * 사라지는 동안에도 마지막 값을 보여 주려고 각 막대가 non-null 값을 기억한다.
  */
 @Composable
@@ -18,7 +18,6 @@ internal fun GalleryFilterBars(
     onClearDateRange: () -> Unit,
     onSelectAllVisible: () -> Unit,
     onClearCategoryFilter: () -> Unit,
-    onClearAlbumFilter: () -> Unit,
 ) {
     val motion = LocalMotion.current
     val lastRange = remember { mutableStateOf(uiState.dateRange) }
@@ -47,15 +46,6 @@ internal fun GalleryFilterBars(
         lastCategory.value?.let { filter ->
             CategoryFilterBar(filter = filter, categories = uiState.categories, onClear = onClearCategoryFilter)
         }
-    }
-    val lastAlbum = remember { mutableStateOf(uiState.albumFilter) }
-    if (uiState.albumFilter != null) lastAlbum.value = uiState.albumFilter
-    AnimatedVisibility(
-        visible = uiState.albumFilter != null,
-        enter = motion.enterExpand(),
-        exit = motion.exitShrink(),
-    ) {
-        lastAlbum.value?.let { album -> AlbumFilterBar(album = album, onClear = onClearAlbumFilter) }
     }
 }
 

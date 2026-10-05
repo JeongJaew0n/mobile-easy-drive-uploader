@@ -46,7 +46,6 @@ import com.jjw.easygallery.feature.categories.CategoryPickerSheet
 @Composable
 internal fun GalleryScreen(
     uiState: GalleryUiState,
-    onSettingsClick: () -> Unit,
     onRequestPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onToggleSelection: (Long) -> Unit,
@@ -63,24 +62,23 @@ internal fun GalleryScreen(
     onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
     onSelectAllVisible: () -> Unit = {},
-    onTrashUploaded: () -> Unit = {},
     onCategoryFilterChange: (CategoryFilter?) -> Unit = {},
-    onAlbumFilterChange: (String?) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onCreateCategory: suspend (String, Int) -> Result<Category> = { _, _ ->
         Result.failure(IllegalStateException("createCategory not wired"))
     },
     onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit = { _, _ -> },
-    onTrashClick: () -> Unit = {},
-    onDriveClick: () -> Unit = {},
-    onDuplicatesClick: () -> Unit = {},
-    onHiddenClick: () -> Unit = {},
     onHideSelected: () -> Unit = {},
     onToggleChosenSelected: () -> Unit = {},
     onOpenItem: (item: MediaItem, filters: ViewerFilters, hero: HeroOrigin?) -> Unit = { _, _, _ -> },
     actions: GalleryActionCallbacks = GalleryActionCallbacks(),
     guest: GuestUploadUi = GuestUploadUi(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    /** 앨범 칸에서 연 화면이면 그 범위 — 출처 탭 대신 ← 와 이름 */
+    scope: GalleryScope? = null,
+    onBackClick: () -> Unit = {},
+    /** 하단 칸 막대. 고르는 동안에는 같은 자리를 선택 하단바가 쓴다 */
+    navigationBar: @Composable () -> Unit = {},
 ) {
     val content = uiState as? GalleryUiState.Content
     val selectionMode = content?.isSelectionMode == true
@@ -89,7 +87,6 @@ internal fun GalleryScreen(
     var showMove by rememberSaveable { mutableStateOf(false) }
     var showDateRange by rememberSaveable { mutableStateOf(false) }
     var showCategoryFilter by rememberSaveable { mutableStateOf(false) }
-    var showAlbumPicker by rememberSaveable { mutableStateOf(false) }
     var showCategoryPicker by rememberSaveable { mutableStateOf(false) }
 
     // 선택 모드에서 뒤로가기는 선택 해제
@@ -121,48 +118,30 @@ internal fun GalleryScreen(
                     Column {
                         GalleryTopBar(
                             content = content,
-                            onSettingsClick = onSettingsClick,
                             onFavoritesOnlyChange = onFavoritesOnlyChange,
                             onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
-                            onTrashClick = onTrashClick,
-                            onDriveClick = onDriveClick,
-                            onDuplicatesClick = onDuplicatesClick,
-                            onHiddenClick = onHiddenClick,
                             onPickDateRange = { showDateRange = true },
                             onPickCategory = { showCategoryFilter = true },
-                            onPickAlbum = { showAlbumPicker = true },
-                            onTrashUploaded = onTrashUploaded,
+                            scope = scope,
+                            onBackClick = onBackClick,
                         )
-                        GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
+                        // 앨범 하나를 보는 화면에는 출처 탭이 없다 — 이미 범위가 정해져 있다
+                        if (scope == null) GallerySourceTabs(tab = content?.tab, onSelect = onTabChange)
                     }
                 }
             }
         },
         bottomBar = {
-            // 하단 액션 바는 아래에서 올라오고 내려간다. 사라지는 동안에도 마지막 내용을 유지
-            AnimatedVisibility(
-                visible = selectionMode,
-                enter = motion.enterFromBottom(),
-                exit = motion.exitToBottom(),
-            ) {
-                if (content != null) {
-                    SelectionBottomBar(
-                        selectedCount = content.selectedIds.size,
-                        allFavorite = content.selectedAllFavorite,
-                        allChosen = content.selectedAllChosen,
-                        supportsTrashAndFavorites = content.supportsTrashAndFavorites,
-                        enabled = !content.isMutating,
-                        onTrash = actions.onTrash,
-                        onDelete = actions.onDelete,
-                        onToggleFavorite = actions.onToggleFavorite,
-                        onRename = { showRename = true },
-                        onMove = { showMove = true },
-                        onCategories = { showCategoryPicker = true },
-                        onHide = onHideSelected,
-                        onToggleChosen = onToggleChosenSelected,
-                    )
-                }
-            }
+            GalleryBottomBar(
+                content = content.takeIf { selectionMode },
+                actions = actions,
+                navigationBar = navigationBar,
+                onRename = { showRename = true },
+                onMove = { showMove = true },
+                onCategories = { showCategoryPicker = true },
+                onHide = onHideSelected,
+                onToggleChosen = onToggleChosenSelected,
+            )
         },
     ) { innerPadding ->
         Box(
@@ -197,7 +176,6 @@ internal fun GalleryScreen(
                     onClearDateRange = { onDateRangeChange(null) },
                     onSelectAllVisible = onSelectAllVisible,
                     onClearCategoryFilter = { onCategoryFilterChange(null) },
-                    onClearAlbumFilter = { onAlbumFilterChange(null) },
                     onCancelUpload = onCancelUpload,
                     onUploadQueueClick = onUploadQueueClick,
                     onRequestPermission = onRequestPermission,
@@ -224,17 +202,6 @@ internal fun GalleryScreen(
             onManageCategories = onManageCategories,
             onCreateCategory = onCreateCategory,
             onAssignCategories = onAssignCategories,
-        )
-    }
-    if (content != null && showAlbumPicker) {
-        AlbumPickerSheet(
-            albums = content.albums,
-            current = content.albumFilter?.relativePath,
-            onPick = { album ->
-                showAlbumPicker = false
-                onAlbumFilterChange(album.relativePath)
-            },
-            onDismiss = { showAlbumPicker = false },
         )
     }
     if (content != null) {
@@ -350,7 +317,6 @@ private fun GalleryContent(
     onClearDateRange: () -> Unit,
     onSelectAllVisible: () -> Unit,
     onClearCategoryFilter: () -> Unit,
-    onClearAlbumFilter: () -> Unit,
     onCancelUpload: () -> Unit,
     onUploadQueueClick: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -401,7 +367,6 @@ private fun GalleryContent(
             onClearDateRange = onClearDateRange,
             onSelectAllVisible = onSelectAllVisible,
             onClearCategoryFilter = onClearCategoryFilter,
-            onClearAlbumFilter = onClearAlbumFilter,
         )
         if (uiState.sections.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -419,7 +384,7 @@ private fun GalleryContent(
                 onSelectionChange = onSelectionChange,
                 onOpenItem = onOpenItem,
                 animateChanges = uiState.animateItemChanges,
-                uploadedIds = uiState.uploadedIds,
+                backupBadgeOf = uiState::backupBadgeOf,
                 categoryColorsOf = categoryBadgeColors(uiState),
                 modifier = Modifier.fillMaxSize(),
             )
@@ -433,7 +398,6 @@ private fun GalleryScreenPermissionPreview() {
     EasyGalleryTheme {
         GalleryScreen(
             uiState = GalleryUiState.PermissionRequired,
-            onSettingsClick = {},
             onRequestPermission = {},
             onOpenAppSettings = {},
             onToggleSelection = {},
@@ -456,7 +420,6 @@ private fun GalleryScreenUploadingPreview() {
                 isPartialAccess = false,
                 upload = UploadSummary(total = 5, active = 3, completed = 2),
             ),
-            onSettingsClick = {},
             onRequestPermission = {},
             onOpenAppSettings = {},
             onToggleSelection = {},
@@ -522,3 +485,47 @@ private fun categoryBadgeColors(content: GalleryUiState.Content): (Long) -> List
 }
 
 private const val MAX_BADGE_DOTS = 3
+
+/**
+ * 선택 하단바와 하단 칸 막대가 같은 자리를 나눠 쓴다 — 아래에서 올라오고 내려가며 바뀐다.
+ * [content] 가 있으면(고르는 중) 선택 하단바, 없으면 칸 막대.
+ */
+@Composable
+private fun GalleryBottomBar(
+    content: GalleryUiState.Content?,
+    actions: GalleryActionCallbacks,
+    navigationBar: @Composable () -> Unit,
+    onRename: () -> Unit,
+    onMove: () -> Unit,
+    onCategories: () -> Unit,
+    onHide: () -> Unit,
+    onToggleChosen: () -> Unit,
+) {
+    val motion = LocalMotion.current
+    AnimatedContent(
+        targetState = content,
+        contentKey = { it != null },
+        transitionSpec = { motion.enterFromBottom() togetherWith motion.exitToBottom() },
+        label = "galleryBottomBar",
+    ) { selecting ->
+        if (selecting == null) {
+            navigationBar()
+        } else {
+            SelectionBottomBar(
+                selectedCount = selecting.selectedIds.size,
+                allFavorite = selecting.selectedAllFavorite,
+                allChosen = selecting.selectedAllChosen,
+                supportsTrashAndFavorites = selecting.supportsTrashAndFavorites,
+                enabled = !selecting.isMutating,
+                onTrash = actions.onTrash,
+                onDelete = actions.onDelete,
+                onToggleFavorite = actions.onToggleFavorite,
+                onRename = onRename,
+                onMove = onMove,
+                onCategories = onCategories,
+                onHide = onHide,
+                onToggleChosen = onToggleChosen,
+            )
+        }
+    }
+}

@@ -55,7 +55,6 @@ class GalleryScreenTest {
         EasyGalleryTheme {
             GalleryScreen(
                 uiState = uiState,
-                onSettingsClick = {},
                 onRequestPermission = onRequestPermission,
                 onOpenAppSettings = {},
                 onToggleSelection = {},

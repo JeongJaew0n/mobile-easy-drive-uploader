@@ -115,20 +115,19 @@ internal fun SelectionBottomBar(
 }
 
 /** 상단바 overflow: 즐겨찾기 필터, 휴지통 */
+/**
+ * 사진 칸의 ⋮ — **지금 보는 목록을 거르는 것만** 남았다(`docs/plans/bottom-navigation/spec.md`).
+ * 다른 화면으로 가는 것(앨범·숨긴 사진·중복·Drive·휴지통 등)은 하단 칸으로 옮겼다.
+ */
 @Composable
 internal fun GalleryOverflowMenu(
     favoritesOnly: Boolean,
     notBackedUpOnly: Boolean,
-    supportsTrashAndFavorites: Boolean,
+    /** 즐겨찾기 앨범을 보고 있으면 "즐겨찾기만 보기" 는 뜻이 없다 */
+    showFavoritesToggle: Boolean,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
-    onOpenTrash: () -> Unit,
-    onOpenDrive: () -> Unit,
-    onOpenDuplicates: () -> Unit,
-    onOpenHidden: () -> Unit,
     onPickCategory: () -> Unit,
-    onTrashUploaded: () -> Unit,
-    onPickAlbum: () -> Unit = {},
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
@@ -136,31 +135,22 @@ internal fun GalleryOverflowMenu(
     }
     // 기간 선택은 자주 쓰는 것이라 여기 두지 않고 상단바 아이콘으로 뺐다(GalleryTopBar)
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        // 맨 위 — 카톡처럼 앨범(폴더)으로 골라 보기(docs/plans/album-view/spec.md)
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.gallery_menu_album)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onPickAlbum()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.hidden_menu_open)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_visibility_off), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onOpenHidden()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.gallery_menu_category)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onPickCategory()
-            },
-        )
+        if (showFavoritesToggle) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (favoritesOnly) R.string.gallery_menu_show_all else R.string.gallery_menu_favorites_only,
+                        ),
+                    )
+                },
+                leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onFavoritesOnlyChange(!favoritesOnly)
+                },
+            )
+        }
         DropdownMenuItem(
             text = {
                 Text(
@@ -180,54 +170,13 @@ internal fun GalleryOverflowMenu(
             },
         )
         DropdownMenuItem(
-            text = { Text(stringResource(R.string.duplicates_title)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_content_copy), contentDescription = null) },
+            text = { Text(stringResource(R.string.gallery_menu_category)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_label), contentDescription = null) },
             onClick = {
                 expanded = false
-                onOpenDuplicates()
+                onPickCategory()
             },
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.gallery_menu_drive)) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_insert_drive_file), contentDescription = null) },
-            onClick = {
-                expanded = false
-                onOpenDrive()
-            },
-        )
-        if (supportsTrashAndFavorites) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (favoritesOnly) R.string.gallery_menu_show_all else R.string.gallery_menu_favorites_only,
-                        ),
-                    )
-                },
-                leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onFavoritesOnlyChange(!favoritesOnly)
-                },
-            )
-            // Drive 에 올린 것을 기기에서 정리하는 흐름. 기기 휴지통으로 가고 시스템이 한 번 더 묻는다
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.gallery_menu_trash_uploaded)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_cloud_done), contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onTrashUploaded()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.gallery_menu_trash)) },
-                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onOpenTrash()
-                },
-            )
-        }
     }
 }
 

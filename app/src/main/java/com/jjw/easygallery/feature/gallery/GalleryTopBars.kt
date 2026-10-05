@@ -1,14 +1,13 @@
 package com.jjw.easygallery.feature.gallery
 
-import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,36 +36,39 @@ import com.jjw.easygallery.R
 internal fun GalleryTopBar(
     /** 아직 목록이 없으면(로딩·권한 요청) null */
     content: GalleryUiState.Content?,
-    onSettingsClick: () -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onNotBackedUpOnlyChange: (Boolean) -> Unit,
-    onTrashClick: () -> Unit,
-    onDriveClick: () -> Unit,
-    onDuplicatesClick: () -> Unit,
-    onHiddenClick: () -> Unit,
     onPickDateRange: () -> Unit,
     onPickCategory: () -> Unit = {},
-    onTrashUploaded: () -> Unit = {},
-    onPickAlbum: () -> Unit = {},
+    /** 앨범 하나(또는 즐겨찾기)만 보는 화면이면 그 범위. ← 와 앨범 이름이 붙는다 */
+    scope: GalleryScope? = null,
+    onBackClick: () -> Unit = {},
 ) {
     val itemCount = content?.itemCount
     val uploadedCount = content?.uploadedCount ?: 0
     val favoritesOnly = content?.favoritesOnly == true
     val notBackedUpOnly = content?.notBackedUpOnly == true
-    val supportsTrashAndFavorites = content?.supportsTrashAndFavorites == true
-    // 앨범을 보고 있으면 앨범 이름이 제목이다 — 카테고리보다 앞(앨범이 더 좁은 범위라 먼저 눈에 들어와야 한다)
-    val categoryTitle = content?.albumFilter?.name ?: content?.let { categoryTitle(it.categoryFilter, it.categories) }
+    val title = scopeTitle(scope, content) ?: content?.let { categoryTitle(it.categoryFilter, it.categories) }
     TopAppBar(
+        navigationIcon = {
+            if (scope != null) {
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                }
+            }
+        },
         title = {
             Column {
                 Text(
-                    categoryTitle ?: stringResource(
+                    title ?: stringResource(
                         when {
                             notBackedUpOnly -> R.string.gallery_title_not_backed_up
                             favoritesOnly -> R.string.gallery_title_favorites
                             else -> R.string.gallery_title
                         },
                     ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (itemCount != null) {
                     Text(
@@ -88,25 +90,28 @@ internal fun GalleryTopBar(
                     contentDescription = stringResource(R.string.gallery_menu_date_range),
                 )
             }
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.action_settings))
-            }
+            // 설정 톱니는 하단 "메뉴" 칸으로 옮겼다
             GalleryOverflowMenu(
                 favoritesOnly = favoritesOnly,
                 notBackedUpOnly = notBackedUpOnly,
-                supportsTrashAndFavorites = supportsTrashAndFavorites,
+                showFavoritesToggle = content?.supportsTrashAndFavorites == true && scope != GalleryScope.Favorites,
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
                 onNotBackedUpOnlyChange = onNotBackedUpOnlyChange,
-                onOpenTrash = onTrashClick,
-                onOpenDrive = onDriveClick,
-                onOpenDuplicates = onDuplicatesClick,
-                onOpenHidden = onHiddenClick,
                 onPickCategory = onPickCategory,
-                onTrashUploaded = onTrashUploaded,
-                onPickAlbum = onPickAlbum,
             )
         },
     )
+}
+
+/** 앨범 하나를 보는 화면의 제목. 잘 알려진 폴더(카카오톡 등)는 지금 언어의 이름으로 */
+@Composable
+private fun scopeTitle(scope: GalleryScope?, content: GalleryUiState.Content?): String? = when (scope) {
+    null -> null
+    GalleryScope.Favorites -> stringResource(R.string.gallery_title_favorites)
+    is GalleryScope.Album -> {
+        val name = content?.albumFilter?.name ?: scope.relativePath.trimEnd('/').substringAfterLast('/')
+        AppFolders.displayNameRes(name)?.let { stringResource(it) } ?: name
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

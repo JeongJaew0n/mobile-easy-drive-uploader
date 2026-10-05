@@ -35,6 +35,11 @@
 - 단위 테스트: 앨범 필터, 앨범 고르면 탭이 전체로, 탭 바꾸면 앨범 해제, 상세보기가 탭·앨범 범위를 지킨다
 - 기기(지시가 있을 때): `docs/manual-tests/01-gallery-basics.md` ALB-*
 
+## 바뀜 (2026-10-05)
+
+⋮ → 앨범 시트와 앨범 막대는 **하단 앨범 칸**으로 대체했다 — 앨범 하나는 범위(`GalleryScope`)를 건 갤러리 화면이다.
+상세보기가 탭·앨범 범위를 잇는 부분은 그대로 쓴다. `docs/plans/bottom-navigation/spec.md`.
+
 ## 결과 (2026-09-28)
 
 - ⋮ → 앨범 시트(`AlbumSheet.kt`), 앨범 막대, 제목이 앨범 이름. 필터 막대 셋은 `GalleryFilterBars.kt` 로 옮겼다
