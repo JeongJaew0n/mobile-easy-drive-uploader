@@ -25,6 +25,27 @@ sealed interface MediaAction {
     ) : MediaAction
 }
 
+/**
+ * MediaStore 요청 하나에 담을 수 있는 URI 수. **API 36(BAKLAVA) 타깃부터** 2,000개를 넘기면
+ * `IllegalArgumentException` 이다(MediaStore.createDeleteRequest·createTrashRequest·createFavoriteRequest·
+ * createWriteRequest 문서). 그 전에는 제한이 없어 수천 장을 한 번에 넘겨도 됐다 — 타깃을 올리며 생긴 오류다.
+ * `docs/troubleshootings/reusable/mediastore-2000-uri-limit.md`
+ */
+const val MAX_URIS_PER_REQUEST = 2_000
+
+/** 같은 명령을 다른 항목들에 */
+fun MediaAction.withItems(items: List<MediaItem>): MediaAction = when (this) {
+    is MediaAction.Delete -> copy(items = items)
+    is MediaAction.Trash -> copy(items = items)
+    is MediaAction.Favorite -> copy(items = items)
+    is MediaAction.Move -> copy(items = items)
+    is MediaAction.Rename -> this
+}
+
+/** [MAX_URIS_PER_REQUEST] 를 넘으면 그 크기씩 나눈다. 이름 변경은 늘 하나다 */
+fun MediaAction.chunked(size: Int = MAX_URIS_PER_REQUEST): List<MediaAction> =
+    if (this is MediaAction.Rename || items.size <= size) listOf(this) else items.chunked(size).map { withItems(it) }
+
 sealed interface ActionOutcome {
     /** UI 가 [intentSender] 를 실행하고, 결과가 OK 면 [MediaActionRunner.afterConsent] 에 [action] 을 넘긴다 */
     data class NeedsConsent(val intentSender: IntentSender, val action: MediaAction) : ActionOutcome
