@@ -37,6 +37,7 @@ class GoogleDriveStorage @Inject constructor(
         Capability.RESUMABLE_UPLOAD,
         Capability.QUOTA,
         Capability.WEB_LINK,
+        Capability.THUMBNAILS,
     )
 
     override suspend fun about(): RemoteAccountInfo {

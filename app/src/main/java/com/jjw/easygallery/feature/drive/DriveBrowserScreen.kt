@@ -246,6 +246,8 @@ internal fun DriveBrowserScreen(
     var movingSelection by rememberSaveable { mutableStateOf(false) }
     var deletingSelection by rememberSaveable { mutableStateOf(false) }
     val hasTrash = Capability.TRASH in uiState.capabilities
+    // 설정은 하나지만 썸네일이 없는 저장소(S3·NAS)에서는 격자를 켜지 않는다 — 아이콘 칸만 늘어선다
+    val showGrid = gridView && imageLoader != null && Capability.THUMBNAILS in uiState.capabilities
     BrowserBackHandlers(uiState, entryActions)
 
     Scaffold(
@@ -254,7 +256,7 @@ internal fun DriveBrowserScreen(
         topBar = {
             BrowserTopBar(
                 uiState = uiState,
-                gridView = gridView,
+                gridView = showGrid,
                 onToggleGrid = onToggleGrid,
                 onBackClick = onBackClick,
                 onRefresh = onRefresh,
@@ -307,7 +309,7 @@ internal fun DriveBrowserScreen(
                 ) {
                     DriveEntries(
                         uiState = uiState,
-                        gridView = gridView && imageLoader != null,
+                        gridView = showGrid,
                         imageLoader = imageLoader,
                         onEntryClick = onEntryClick,
                         onLoadMore = onLoadMore,
@@ -487,11 +489,13 @@ private fun BrowserTopBar(
             IconButton(onClick = entryActions.onStartSearch, enabled = !uiState.isMutating && !uiState.isLoading) {
                 Icon(Icons.Filled.Search, contentDescription = stringResource(searchHintRes(uiState)))
             }
-            IconButton(onClick = onToggleGrid) {
-                if (gridView) {
-                    Icon(painterResource(R.drawable.ic_view_list), stringResource(R.string.drive_view_as_list))
-                } else {
-                    Icon(painterResource(R.drawable.ic_grid_view), stringResource(R.string.drive_view_as_grid))
+            if (Capability.THUMBNAILS in uiState.capabilities) {
+                IconButton(onClick = onToggleGrid) {
+                    if (gridView) {
+                        Icon(painterResource(R.drawable.ic_view_list), stringResource(R.string.drive_view_as_list))
+                    } else {
+                        Icon(painterResource(R.drawable.ic_grid_view), stringResource(R.string.drive_view_as_grid))
+                    }
                 }
             }
             IconButton(onClick = onRefresh, enabled = !uiState.isLoading) {

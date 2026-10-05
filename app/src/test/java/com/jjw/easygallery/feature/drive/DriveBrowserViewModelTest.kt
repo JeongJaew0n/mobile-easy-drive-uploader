@@ -115,6 +115,19 @@ class DriveBrowserViewModelTest {
         assertTrue(!viewModel.uiState.value.isReadOnlyHere)
     }
 
+    /** 구독 전 초깃값(false)이 아니라 저장된 값을 뒤집는다 — 켜 둔 채 열자마자 눌러도 꺼져야 한다 */
+    @Test
+    fun `grid toggle flips the saved value, not the initial state`() = runTest(testDispatcher) {
+        coEvery { prefs.current() } returns UserPreferences(driveGridView = true)
+        coEvery { prefs.setDriveGridView(any()) } returns Unit
+        val viewModel = loadedViewModel()
+
+        viewModel.toggleGridView()
+        advanceUntilIdle()
+
+        coVerify { prefs.setDriveGridView(false) }
+    }
+
     @Test
     fun `a read-only folder drops every mutating capability`() = runTest(testDispatcher) {
         val viewModel = loadedViewModel(readOnly = true)

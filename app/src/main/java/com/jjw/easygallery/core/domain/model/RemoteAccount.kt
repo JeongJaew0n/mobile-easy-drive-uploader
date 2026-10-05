@@ -82,6 +82,12 @@ enum class Capability {
 
     /** 파일을 브라우저/앱에서 열 수 있는 링크가 있다 */
     WEB_LINK,
+
+    /**
+     * 서버가 만든 썸네일 주소를 준다(Drive `thumbnailLink`). 이게 있어야 격자 보기가 뜻이 있다 —
+     * 없는 저장소(S3·WebDAV·SMB·SFTP)에서 격자를 켜면 아이콘 칸만 늘어선다(`docs/DRIVE_PHOTO_GRID.md`)
+     */
+    THUMBNAILS,
 }
 
 data class RemoteAccountInfo(

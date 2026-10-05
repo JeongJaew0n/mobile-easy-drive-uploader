@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,12 +21,19 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
@@ -102,7 +110,9 @@ private fun DriveGridCell(
         contentAlignment = Alignment.Center,
     ) {
         val link = entry.thumbnailLink
-        if (link != null) {
+        // 받다가 실패하면(만료·권한) 빈 칸으로 두지 않고 이름을 보인다
+        var failed by remember(entry.id, link) { mutableStateOf(false) }
+        if (link != null && !failed) {
             val context = LocalContext.current
             // 링크는 몇 시간 뒤 바뀐다. 캐시를 링크로 가르면 다시 열 때마다 새로 받는다 — ID 와 썸네일 버전으로 가른다
             val key = "drive-thumb:${entry.id}:${entry.thumbnailVersion}"
@@ -115,11 +125,11 @@ private fun DriveGridCell(
                 contentDescription = entry.name,
                 imageLoader = imageLoader,
                 contentScale = ContentScale.Crop,
+                onError = { failed = true },
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            // 막 올린 파일은 썸네일이 아직 없다 — 목록과 같은 아이콘
-            EntryIcon(entry)
+            NoThumbnail(entry)
         }
         if (entry.isVideo) {
             Icon(
@@ -148,6 +158,29 @@ private fun DriveGridCell(
 }
 
 /**
+ * 썸네일이 없는 칸 — 막 올린 파일, zip·문서처럼 Drive 가 그림을 만들지 않는 것, 받기에 실패한 것.
+ * 아이콘만 두면 무슨 파일인지 알 수 없어 이름을 함께 보인다.
+ */
+@Composable
+private fun NoThumbnail(entry: DriveEntry) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(8.dp),
+    ) {
+        EntryIcon(entry)
+        Text(
+            text = entry.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = NAME_MAX_LINES,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+/**
  * 썸네일 크기를 칸에 맞춘다. Drive 의 링크는 `…=s220` 처럼 끝에 긴 변의 픽셀 수를 단다 — 220 은 3열 칸에 흐릿하다.
  * 그 꼬리가 없으면 링크를 그대로 쓴다(크기 지정 방식이 다른 호스트일 수 있다).
  */
@@ -158,3 +191,4 @@ private val SIZE_SUFFIX = Regex("=s\\d+$")
 private const val CELL_MIN_DP = 110
 private const val THUMB_PX = 400
 private const val BADGE_ALPHA = 0.5f
+private const val NAME_MAX_LINES = 2

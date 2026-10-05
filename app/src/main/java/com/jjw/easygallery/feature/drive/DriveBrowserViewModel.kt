@@ -76,8 +76,9 @@ class DriveBrowserViewModel @Inject constructor(
     val gridView: StateFlow<Boolean> = prefs.preferences.map { it.driveGridView }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
+    /** 저장된 값을 읽어 뒤집는다 — [gridView] 는 구독 전 초깃값(false)일 수 있어, 켜진 채 열자마자 누르면 그대로 남는다 */
     fun toggleGridView() {
-        viewModelScope.launch { prefs.setDriveGridView(!gridView.value) }
+        viewModelScope.launch { prefs.setDriveGridView(!prefs.current().driveGridView) }
     }
 
     private val events = Channel<DriveBrowserEvent>(Channel.BUFFERED)
