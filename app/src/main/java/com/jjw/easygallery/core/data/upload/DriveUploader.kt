@@ -11,6 +11,7 @@ import com.jjw.easygallery.core.data.drive.DriveApi
 import com.jjw.easygallery.core.data.drive.DriveFileDto
 import com.jjw.easygallery.core.data.drive.DriveFileMetadata
 import com.jjw.easygallery.core.data.drive.DriveHttpClient
+import com.jjw.easygallery.core.data.drive.DriveMediaQuery
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.RemoteUploader
@@ -282,7 +283,7 @@ class DriveUploader @Inject constructor(
         const val PROP_MEDIA_STORE_ID = "mediaStoreId"
 
         /** 이 앱이 올렸다는 고정 표식 — 값이 고정이라야 Drive 쿼리로 찾을 수 있다 */
-        const val PROP_APP = "easyGallery"
+        const val PROP_APP = DriveMediaQuery.APP_MARKER_KEY
 
         /** 지정 폴더에 올린 경우 그 별칭. 폴더 이름을 읽을 수 없어 이것이 유일한 단서다 */
         const val PROP_TARGET_ALIAS = "egTarget"

@@ -109,6 +109,13 @@ data class DriveBrowserKey(
     val ownerEmail: String? = null,
 ) : AppNavKey
 
+/**
+ * Drive 사진 — 폴더를 가로지른 사진첩(`docs/plans/drive-photos/spec.md`). [openFileId] 가 있으면 그 사진의 넘겨 보기를
+ * 바로 띄운다(백업 칸의 썸네일 띠).
+ */
+@Serializable
+data class DrivePhotosKey(val openFileId: String? = null) : AppNavKey
+
 /** 저장소 계정 추가(S3 호환 / WebDAV / SMB). [accountId] 가 있으면 그 계정 수정 */
 @Serializable
 data class AddRemoteAccountKey(val accountId: String? = null) : AppNavKey

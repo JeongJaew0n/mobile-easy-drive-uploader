@@ -2,6 +2,8 @@ package com.jjw.easygallery.feature.backup
 
 import android.net.Uri
 import app.cash.turbine.test
+import coil3.ImageLoader
+import com.jjw.easygallery.core.data.drive.DriveRepository
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.ActionOutcome
 import com.jjw.easygallery.core.data.media.MediaAction
@@ -15,6 +17,9 @@ import com.jjw.easygallery.core.data.upload.DeviceConditions
 import com.jjw.easygallery.core.data.upload.DeviceConditionsMonitor
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.UploadQueueRepository
+import com.jjw.easygallery.core.domain.model.DriveEntry
+import com.jjw.easygallery.core.domain.model.DriveMediaScope
+import com.jjw.easygallery.core.domain.model.DrivePage
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.MediaType
 import com.jjw.easygallery.core.domain.model.UploadSummary
@@ -37,6 +42,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BackupViewModelTest {
@@ -59,6 +65,18 @@ class BackupViewModelTest {
         every { observe() } returns flowOf(DeviceConditions(isUnmetered = true, isCharging = true))
     }
     private val runner: MediaActionRunner = mockk()
+    private val recent = DriveEntry(
+        id = "d1",
+        name = "IMG_1.jpg",
+        mimeType = "image/jpeg",
+        sizeBytes = null,
+        modifiedTimeMillis = null,
+        webViewLink = null,
+    )
+    private val drive: DriveRepository = mockk {
+        coEvery { listMedia(DriveMediaScope.AppUploads, false, false, null, any()) } returns
+            DrivePage(listOf(recent), nextPageToken = "next")
+    }
 
     @Before
     fun setUp() {
@@ -79,7 +97,42 @@ class BackupViewModelTest {
         actionController = MediaActionController(runner),
         prefs = prefs,
         remoteAccounts = mockk<RemoteAccountRepository> { every { observeAccounts() } returns flowOf(emptyList()) },
+        recentDrivePhotos = RecentDrivePhotos(drive, prefs, mockk<ImageLoader>()),
     )
+
+    @Test
+    fun `Google 계정이 있으면 Drive 최근 사진을 싣는다`() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            awaitItem()
+            advanceUntilIdle()
+            val photos = (expectMostRecentItem() as BackupUiState.Content).drivePhotos
+            assertEquals(DrivePhotosPreview(entries = listOf(recent), isLoading = false), photos)
+        }
+    }
+
+    @Test
+    fun `Drive 를 못 읽어도 카드는 남고 띠만 빈다`() = runTest(testDispatcher) {
+        coEvery { drive.listMedia(any(), any(), any(), any(), any()) } throws IOException("offline")
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            awaitItem()
+            advanceUntilIdle()
+            val photos = (expectMostRecentItem() as BackupUiState.Content).drivePhotos
+            assertEquals(DrivePhotosPreview(entries = emptyList(), isLoading = false), photos)
+        }
+    }
+
+    @Test
+    fun `Google 계정이 없으면 Drive 카드가 없다`() = runTest(testDispatcher) {
+        prefsFlow.value = UserPreferences()
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            awaitItem()
+            advanceUntilIdle()
+            assertEquals(null, (expectMostRecentItem() as BackupUiState.Content).drivePhotos)
+        }
+    }
 
     @Test
     fun `올린 사진은 기기에 있고 숨기지 않은 것만 센다`() = runTest(testDispatcher) {

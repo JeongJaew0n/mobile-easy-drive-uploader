@@ -24,6 +24,7 @@ import com.jjw.easygallery.feature.autotag.AutoTagRoute
 import com.jjw.easygallery.feature.backup.BackupRoute
 import com.jjw.easygallery.feature.categories.CategoriesRoute
 import com.jjw.easygallery.feature.drive.DriveBrowserRoute
+import com.jjw.easygallery.feature.drive.DrivePhotosRoute
 import com.jjw.easygallery.feature.duplicates.DuplicatesRoute
 import com.jjw.easygallery.feature.gallery.GalleryRoute
 import com.jjw.easygallery.feature.gallery.GalleryScope
@@ -121,7 +122,7 @@ fun AppNavigation() {
                 BackupRoute(
                     onUploadQueueClick = { backStack.add(UploadQueueKey) },
                     onAutoBackupClick = { backStack.add(AutoBackupKey) },
-                    onDriveClick = { backStack.add(DriveBrowserKey()) },
+                    onDrivePhotosClick = { fileId -> backStack.add(DrivePhotosKey(openFileId = fileId)) },
                     onSettingsClick = { backStack.add(SettingsKey) },
                     navigationBar = { navigationBar(TopLevelDestination.BACKUP) },
                 )
@@ -180,6 +181,13 @@ fun AppNavigation() {
                     key = key,
                     onBackClick = { backStack.removeLastOrNull() },
                     onSettingsClick = { backStack.add(SettingsKey) },
+                )
+            }
+            entry<DrivePhotosKey> { key ->
+                DrivePhotosRoute(
+                    key = key,
+                    onBackClick = { backStack.removeLastOrNull() },
+                    onOpenFolders = { backStack.add(DriveBrowserKey()) },
                 )
             }
             entry<DriveBrowserKey> { key ->

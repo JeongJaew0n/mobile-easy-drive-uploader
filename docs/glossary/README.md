@@ -43,6 +43,8 @@
 | 보기 폴더 (view folder) | 사용자가 **보기만** 하려고 추가한 Drive 폴더. `drive.readonly` 를 옵트인해야 생기고, 안의 파일이 **전부** 보이는 대신 올리거나 고칠 수 없다 | 지정 폴더와 정확히 반대다 — 그쪽은 올릴 수 있고 안이 안 보인다(`docs/DRIVE_FILE_SCOPE.md` §10.3) |
 | 앱 폴더 (AppFolders.folderOf) | 표준 최상위 폴더 바로 아래 칸(`Documents/obsidian/pictures/` → `obsidian`). '다른 앱' 탭의 묶음 이름 | 앨범과 다름 — 앨범은 전체 경로, 앱 폴더는 그중 한 칸이다 |
 | 고른 사진 (chosen) | 사용자가 갤러리 첫 탭에 두려고 **직접 모은** 사진(`chosen_media`). 앱 DB 에만 있고 파일·MediaStore 는 건드리지 않는다. 앱을 켜면 이 탭부터 보인다 | 즐겨찾기와 다름 — 그쪽은 MediaStore `IS_FAVORITE` 라 삼성 갤러리에도 보인다. 선택(선택 모드의 체크)과도 다름 — 그건 잠깐의 작업 대상이다(`docs/plans/chosen-photos-tab/spec.md`) |
+| Drive 사진 (DrivePhotos) | Drive 에 있는 사진·영상을 **폴더를 가로질러** 올린 날짜순으로 보는 화면. 기본 범위는 "앱으로 올린 것" | Drive 폴더 화면(`DriveBrowser`)과 다름 — 그쪽은 폴더 하나씩 들어가는 탐색기다(`docs/plans/drive-photos/spec.md`) |
+| 기기에 없음 (not on device) | Drive 파일 중 **원장으로 이어진 기기 사진이 지금 기기에 없는 것**. 원장에 없는 파일(다른 기기·재설치 전 업로드)도 여기에 든다 | "백업 안 됨" 과 정반대 축이다 — 그쪽은 기기에 있는데 Drive 에 없는 것 |
 
 ## 규칙
 

@@ -22,6 +22,22 @@ data class DriveFileDto(
     val thumbnailLink: String? = null,
     /** 썸네일이 바뀌면 오른다. 링크 대신 이걸로 기기 캐시를 가른다. Drive 는 int64 를 문자열로 준다 */
     val thumbnailVersion: String? = null,
+    /** Drive 에 생긴 시각 = 이 앱에서는 올린 시각. Drive 사진의 기본 순서(`docs/plans/drive-photos/spec.md` §4) */
+    val createdTime: String? = null,
+    val imageMediaMetadata: DriveImageMetadataDto? = null,
+    val videoMediaMetadata: DriveVideoMetadataDto? = null,
+)
+
+/** 사진의 EXIF 에서 Drive 가 뽑은 값. [time] 은 `yyyy:MM:dd HH:mm:ss`(시간대 없음) */
+@Serializable
+data class DriveImageMetadataDto(
+    val time: String? = null,
+)
+
+/** 영상 정보. 올린 직후엔 아직 없을 수 있다. Drive 는 int64 를 문자열로 준다 */
+@Serializable
+data class DriveVideoMetadataDto(
+    val durationMillis: String? = null,
 )
 
 @Serializable

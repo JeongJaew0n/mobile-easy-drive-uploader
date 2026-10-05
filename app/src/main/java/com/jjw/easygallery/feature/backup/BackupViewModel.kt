@@ -2,6 +2,7 @@ package com.jjw.easygallery.feature.backup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.ImageLoader
 import com.jjw.easygallery.core.data.hidden.HiddenMediaRepository
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.data.media.MediaActionController
@@ -10,6 +11,7 @@ import com.jjw.easygallery.core.data.media.MediaRepository
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
+import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.domain.usecase.ManageUploadQueueUseCase
@@ -47,7 +49,11 @@ class BackupViewModel @Inject constructor(
     private val actionController: MediaActionController,
     prefs: UserPreferencesRepository,
     remoteAccounts: RemoteAccountRepository,
+    recentDrivePhotos: RecentDrivePhotos,
 ) : ViewModel() {
+
+    /** "Google Drive 사진" 띠의 썸네일 — 인증이 붙어 있다 */
+    val driveImageLoader: ImageLoader = recentDrivePhotos.imageLoader
 
     /** 편집 동의 흐름은 공용 컨트롤러가 맡는다 */
     val actionEvents = actionController.events
@@ -68,7 +74,7 @@ class BackupViewModel @Inject constructor(
         }
         .onEach { latestUploadedOnDevice = it }
 
-    val uiState: StateFlow<BackupUiState> = combine(
+    private val baseState: Flow<BackupUiState.Content> = combine(
         observeUploadSummary(),
         prefs.preferences,
         remoteAccounts.observeAccounts(),
@@ -85,7 +91,11 @@ class BackupViewModel @Inject constructor(
             uploadedOnDeviceCount = onDevice.size,
             uploadedOnDeviceBytes = onDevice.sumOf { it.sizeBytes },
             isMutating = mutating,
-        ) as BackupUiState
+        )
+    }
+
+    val uiState: StateFlow<BackupUiState> = combine(baseState, recentDrivePhotos.observe()) { content, photos ->
+        content.copy(drivePhotos = photos) as BackupUiState
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BackupUiState.Loading)
 
     fun cancelUploads() {
@@ -120,5 +130,13 @@ sealed interface BackupUiState {
         val uploadedOnDeviceCount: Int = 0,
         val uploadedOnDeviceBytes: Long = 0,
         val isMutating: Boolean = false,
+        /** null 이면 Google 계정이 없다 — "Google Drive 사진" 카드를 두지 않는다 */
+        val drivePhotos: DrivePhotosPreview? = null,
     ) : BackupUiState
 }
+
+/** 백업 칸의 Drive 최근 사진 띠 */
+data class DrivePhotosPreview(
+    val entries: List<DriveEntry> = emptyList(),
+    val isLoading: Boolean = false,
+)

@@ -47,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.ImageLoader
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
@@ -58,7 +59,7 @@ import com.jjw.easygallery.feature.gallery.UploadProgressBanner
 fun BackupRoute(
     onUploadQueueClick: () -> Unit,
     onAutoBackupClick: () -> Unit,
-    onDriveClick: () -> Unit,
+    onDrivePhotosClick: (openFileId: String?) -> Unit,
     onSettingsClick: () -> Unit,
     navigationBar: @Composable () -> Unit,
     viewModel: BackupViewModel = hiltViewModel(),
@@ -73,10 +74,11 @@ fun BackupRoute(
     BackupScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
+        imageLoader = viewModel.driveImageLoader,
         actions = BackupActions(
             onUploadQueueClick = onUploadQueueClick,
             onAutoBackupClick = onAutoBackupClick,
-            onDriveClick = onDriveClick,
+            onDrivePhotosClick = onDrivePhotosClick,
             onSettingsClick = onSettingsClick,
             onCancelUploads = viewModel::cancelUploads,
             onTrashUploaded = viewModel::trashUploadedOnDevice,
@@ -89,7 +91,8 @@ fun BackupRoute(
 internal data class BackupActions(
     val onUploadQueueClick: () -> Unit = {},
     val onAutoBackupClick: () -> Unit = {},
-    val onDriveClick: () -> Unit = {},
+    /** null 이면 Drive 사진 화면, 아니면 그 사진의 넘겨 보기까지 */
+    val onDrivePhotosClick: (openFileId: String?) -> Unit = {},
     val onSettingsClick: () -> Unit = {},
     val onCancelUploads: () -> Unit = {},
     val onTrashUploaded: () -> Unit = {},
@@ -97,7 +100,7 @@ internal data class BackupActions(
 
 /**
  * 하단 "백업" 칸(`docs/plans/bottom-navigation/spec.md`). 위에서부터: 어디로 올리는지 → 지금 무슨 일이 있는지(진행·실패) →
- * 할 수 있는 일(업로드 목록·자동 백업·Drive 보기·올린 사진 정리).
+ * Drive 에 무엇이 있는지(Google Drive 사진 카드) → 할 수 있는 일(업로드 목록·자동 백업·올린 사진 정리).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +109,7 @@ internal fun BackupScreen(
     actions: BackupActions,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     navigationBar: @Composable () -> Unit = {},
+    imageLoader: ImageLoader? = null,
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_backup)) }) },
@@ -129,6 +133,9 @@ internal fun BackupScreen(
                 if (uiState.isMutating) LinearProgressIndicator(Modifier.fillMaxWidth())
                 TargetCard(uiState.target, onSettingsClick = actions.onSettingsClick)
                 BackupStatus(uiState.summary, actions)
+                uiState.drivePhotos?.let { photos ->
+                    DrivePhotosCard(photos, imageLoader, onOpen = actions.onDrivePhotosClick)
+                }
                 BackupRows(uiState, actions)
             }
         }
@@ -213,11 +220,6 @@ private fun BackupRows(uiState: BackupUiState.Content, actions: BackupActions) {
                 if (uiState.autoBackupEnabled) R.string.backup_auto_on else R.string.backup_auto_off,
             ),
             onClick = actions.onAutoBackupClick,
-        )
-        BackupRow(
-            icon = painterResource(R.drawable.ic_insert_drive_file),
-            title = stringResource(R.string.settings_browse_drive),
-            onClick = actions.onDriveClick,
         )
         val count = uiState.uploadedOnDeviceCount
         BackupRow(

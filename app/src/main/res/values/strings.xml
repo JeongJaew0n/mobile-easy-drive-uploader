@@ -249,7 +249,6 @@
     <string name="settings_manage_media_granted">허용됨 — 삭제·휴지통·이동을 바로 실행합니다</string>
     <string name="settings_upload_folder">업로드 폴더</string>
     <string name="settings_upload_queue">업로드 목록</string>
-    <string name="settings_browse_drive">Google Drive 파일 보기</string>
     <string name="settings_auto_backup">자동 백업</string>
     <string name="settings_upload_wifi_only">Wi-Fi에서만 업로드</string>
     <string name="settings_upload_wifi_only_description">모바일 데이터에서는 대기하고 Wi-Fi에 연결되면 이어서 올립니다</string>
@@ -742,4 +741,30 @@
     <string name="trash_manage_media_hint">매번 묻지 않게 하려면 미디어 관리를 허용하세요</string>
     <string name="trash_manage_media_allow">허용</string>
     <string name="album_storage_root">내장 저장공간</string>
+
+    <!-- Drive 사진 (docs/plans/drive-photos/spec.md) -->
+    <string name="drive_photos_title">Drive 사진</string>
+    <string name="drive_photos_card_title">Google Drive 사진</string>
+    <string name="drive_photos_card_subtitle">Drive 에 있는 사진·영상. 기기에서 지운 것도 보입니다</string>
+    <string name="drive_photos_see_all">모두 보기</string>
+    <string name="drive_photos_subtitle">%1$s · %2$s</string>
+    <string name="drive_photos_open_folders">폴더로 보기</string>
+    <string name="drive_photos_filter_all">전체</string>
+    <string name="drive_photos_filter_not_on_device">기기에 없음</string>
+    <string name="drive_photos_filter_videos">영상</string>
+    <string name="drive_photos_scope_app">앱으로 올린 것</string>
+    <string name="drive_photos_scope_view_only">%1$s (보기 전용)</string>
+    <string name="drive_photos_scope_whole">Drive 전체 (보기 전용)</string>
+    <string name="drive_photos_order_uploaded">올린 날짜순</string>
+    <string name="drive_photos_order_taken">찍은 날짜순</string>
+    <string name="drive_photos_empty">Drive 에 올린 사진이 없습니다</string>
+    <string name="drive_photos_empty_not_on_device">여기 있는 사진은 모두 이 기기에도 있습니다</string>
+    <string name="drive_photos_empty_videos">영상이 없습니다</string>
+    <string name="drive_photos_loading_all">찍은 날짜순으로 정렬하려고 모두 읽는 중… %1$d개</string>
+    <string name="drive_photos_not_on_device">이 기기에는 없음</string>
+    <string name="drive_photos_on_device">이 기기에도 있음</string>
+    <string name="drive_photos_open_in_drive">Drive 앱에서 열기</string>
+    <string name="drive_photos_trash">Drive 휴지통으로</string>
+    <string name="drive_photos_not_connected">Google 계정을 연결하면 Drive 사진을 볼 수 있습니다. 설정에서 연결하세요</string>
+    <string name="drive_photos_undated">날짜 없음</string>
 </resources>

@@ -3,6 +3,7 @@ package com.jjw.easygallery.core.data.drive
 import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
+import com.jjw.easygallery.core.domain.model.DriveMediaScope
 import com.jjw.easygallery.core.domain.model.DrivePage
 import java.io.InputStream
 
@@ -28,6 +29,18 @@ interface DriveRepository {
 
     /** 이름 부분 일치(대소문자 무시는 Drive 가 처리). 휴지통 제외, 폴더 먼저 */
     suspend fun search(query: String, pageToken: String? = null): DrivePage
+
+    /**
+     * Drive 사진 화면 — 폴더를 가로지른 사진·영상 한 쪽, 올린 시각 최신순(`docs/plans/drive-photos/spec.md` §4).
+     * [pageSize] 는 찍은 날짜순처럼 끝까지 읽을 때 키운다.
+     */
+    suspend fun listMedia(
+        scope: DriveMediaScope,
+        videosOnly: Boolean,
+        viewScopeGranted: Boolean,
+        pageToken: String? = null,
+        pageSize: Int = DriveMediaQuery.PAGE_SIZE,
+    ): DrivePage
 
     /** 이름 변경. 확장자는 사용자가 쓴 그대로 */
     suspend fun rename(fileId: String, name: String): DriveEntry

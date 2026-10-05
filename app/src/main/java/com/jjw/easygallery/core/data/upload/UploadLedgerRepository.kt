@@ -74,6 +74,16 @@ class UploadLedgerRepository @Inject constructor(
             if (destination == null) flowOf(emptySet()) else dao.observeRemoteIdsAt(destination).map { it.toSet() }
         }
 
+    /** 그곳의 원격 파일 ID → 이 기기의 사진 ID(`docs/plans/drive-photos/spec.md` §4) */
+    fun observeRemoteToMedia(accountId: String?): Flow<Map<String, Long>> =
+        destinationFlow(accountId).flatMapLatest { destination ->
+            if (destination == null) {
+                flowOf(emptyMap())
+            } else {
+                dao.observeRemoteToMediaAt(destination).map { rows -> rows.associate { it.driveFileId to it.mediaId } }
+            }
+        }
+
     suspend fun uploadedAmong(mediaIds: Collection<Long>, accountId: String?): Set<Long> {
         val email = prefs.current().accountEmail
         email?.let { claimLegacy(it) }

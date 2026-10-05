@@ -35,6 +35,10 @@ interface UploadedMediaDao {
     @Query("SELECT driveFileId FROM uploaded_media WHERE destination = :destination")
     fun observeRemoteIdsAt(destination: String): Flow<List<String>>
 
+    /** 그곳의 원격 파일 ID → 기기 사진 ID. Drive 사진 화면이 "이 기기에도 있음" 을 가린다 */
+    @Query("SELECT driveFileId, mediaId FROM uploaded_media WHERE destination = :destination")
+    fun observeRemoteToMediaAt(destination: String): Flow<List<RemoteMediaPair>>
+
     /**
      * 주인 미정인 옛 Drive 기록(스키마 11 이전)을 [destination] 에게 준다.
      *
@@ -50,3 +54,6 @@ interface UploadedMediaDao {
     @Query("DELETE FROM uploaded_media")
     suspend fun clear()
 }
+
+/** [UploadedMediaDao.observeRemoteToMediaAt] 의 한 줄 */
+data class RemoteMediaPair(val driveFileId: String, val mediaId: Long)

@@ -72,11 +72,11 @@ class DriveBrowserViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DriveBrowserUiState())
     val uiState: StateFlow<DriveBrowserUiState> = _uiState.asStateFlow()
 
-    /** 격자(썸네일)로 보나. 설정에 남아 다시 열어도 그대로다 */
+    /** 격자(썸네일)로 보나. 기본은 격자(`docs/plans/drive-photos/spec.md` §3.3). 설정에 남아 다시 열어도 그대로다 */
     val gridView: StateFlow<Boolean> = prefs.preferences.map { it.driveGridView }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), true)
 
-    /** 저장된 값을 읽어 뒤집는다 — [gridView] 는 구독 전 초깃값(false)일 수 있어, 켜진 채 열자마자 누르면 그대로 남는다 */
+    /** 저장된 값을 읽어 뒤집는다 — [gridView] 는 구독 전 초깃값일 수 있어, 열자마자 누르면 그대로 남는다 */
     fun toggleGridView() {
         viewModelScope.launch { prefs.setDriveGridView(!prefs.current().driveGridView) }
     }

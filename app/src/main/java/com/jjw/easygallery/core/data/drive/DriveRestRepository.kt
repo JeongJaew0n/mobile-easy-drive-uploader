@@ -6,6 +6,7 @@ import com.jjw.easygallery.core.data.remote.remoteFailureText
 import com.jjw.easygallery.core.domain.model.DriveAccount
 import com.jjw.easygallery.core.domain.model.DriveEntry
 import com.jjw.easygallery.core.domain.model.DriveFolder
+import com.jjw.easygallery.core.domain.model.DriveMediaScope
 import com.jjw.easygallery.core.domain.model.DrivePage
 import retrofit2.HttpException
 import timber.log.Timber
@@ -66,6 +67,23 @@ class DriveRestRepository @Inject constructor(
         val page = api.listFiles(
             query = "name contains '${escape(query.trim())}' and trashed = false",
             pageToken = pageToken,
+        )
+        return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
+    }
+
+    override suspend fun listMedia(
+        scope: DriveMediaScope,
+        videosOnly: Boolean,
+        viewScopeGranted: Boolean,
+        pageToken: String?,
+        pageSize: Int,
+    ): DrivePage {
+        val page = api.listFiles(
+            query = DriveMediaQuery.of(scope, videosOnly, viewScopeGranted),
+            pageToken = pageToken,
+            pageSize = pageSize,
+            orderBy = DriveMediaQuery.ORDER_BY,
+            fields = DriveMediaQuery.FIELDS,
         )
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
@@ -142,16 +160,10 @@ class DriveRestRepository @Inject constructor(
         ownerEmail = ownerEmail(),
         thumbnailLink = thumbnailLink,
         thumbnailVersion = thumbnailVersion,
+        createdTimeMillis = createdTime?.let { parseRfc3339(it) },
+        takenTimeMillis = imageMediaMetadata?.time?.let { parseExifTime(it) },
+        durationMillis = videoMediaMetadata?.durationMillis?.toLongOrNull(),
     )
-
-    private fun parseRfc3339(value: String): Long? = try {
-        Instant.parse(value).toEpochMilli()
-    } catch (e: DateTimeParseException) {
-        null
-    }
-
-    // Drive 쿼리 문자열 안의 작은따옴표/백슬래시 이스케이프
-    private fun escape(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")
 
     override suspend fun parentOf(fileId: String): String? =
         runCatching { api.getFile(fileId).parents?.firstOrNull() }
@@ -163,3 +175,12 @@ class DriveRestRepository @Inject constructor(
         const val APP_ROOT_PROPERTY = "easyGalleryRoot"
     }
 }
+
+private fun parseRfc3339(value: String): Long? = try {
+    Instant.parse(value).toEpochMilli()
+} catch (e: DateTimeParseException) {
+    null
+}
+
+// Drive 쿼리 문자열 안의 작은따옴표/백슬래시 이스케이프
+private fun escape(value: String) = value.replace("\\", "\\\\").replace("'", "\\'")

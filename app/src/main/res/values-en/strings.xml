@@ -257,7 +257,6 @@
     <string name="settings_manage_media_granted">Allowed — delete, trash, and move run right away</string>
     <string name="settings_upload_folder">Upload folder</string>
     <string name="settings_upload_queue">Upload list</string>
-    <string name="settings_browse_drive">Browse Google Drive</string>
     <string name="settings_auto_backup">Auto backup</string>
     <string name="settings_upload_wifi_only">Upload on Wi-Fi only</string>
     <string name="settings_upload_wifi_only_description">Waits on mobile data and resumes when connected to Wi-Fi</string>
@@ -728,4 +727,30 @@
     <string name="trash_manage_media_hint">To stop being asked every time, allow media management</string>
     <string name="trash_manage_media_allow">Allow</string>
     <string name="album_storage_root">Internal storage</string>
+
+    <!-- Drive 사진 (docs/plans/drive-photos/spec.md) -->
+    <string name="drive_photos_title">Drive photos</string>
+    <string name="drive_photos_card_title">Google Drive photos</string>
+    <string name="drive_photos_card_subtitle">Photos and videos in Drive, including ones removed from this phone</string>
+    <string name="drive_photos_see_all">See all</string>
+    <string name="drive_photos_subtitle">%1$s · %2$s</string>
+    <string name="drive_photos_open_folders">Browse folders</string>
+    <string name="drive_photos_filter_all">All</string>
+    <string name="drive_photos_filter_not_on_device">Not on phone</string>
+    <string name="drive_photos_filter_videos">Videos</string>
+    <string name="drive_photos_scope_app">Uploaded with app</string>
+    <string name="drive_photos_scope_view_only">%1$s (view only)</string>
+    <string name="drive_photos_scope_whole">All of Drive (view only)</string>
+    <string name="drive_photos_order_uploaded">Upload date</string>
+    <string name="drive_photos_order_taken">Date taken</string>
+    <string name="drive_photos_empty">No photos uploaded to Drive yet</string>
+    <string name="drive_photos_empty_not_on_device">Every photo here is also on this phone</string>
+    <string name="drive_photos_empty_videos">No videos</string>
+    <string name="drive_photos_loading_all">Reading everything to sort by date taken… %1$d</string>
+    <string name="drive_photos_not_on_device">Not on this phone</string>
+    <string name="drive_photos_on_device">Also on this phone</string>
+    <string name="drive_photos_open_in_drive">Open in Drive</string>
+    <string name="drive_photos_trash">Move to Drive trash</string>
+    <string name="drive_photos_not_connected">Connect a Google account in Settings to see your Drive photos</string>
+    <string name="drive_photos_undated">No date</string>
 </resources>

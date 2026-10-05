@@ -45,7 +45,7 @@ data class UserPreferences(
      */
     val guestCleanupEmail: String? = null,
     /** Drive 화면을 격자(썸네일)로 본다. 고른 모양은 다시 열어도 그대로다(`docs/DRIVE_PHOTO_GRID.md`) */
-    val driveGridView: Boolean = false,
+    val driveGridView: Boolean = true,
     /** 업로드 대상 저장소 계정. null = Google Drive(`docs/MULTI_CLOUD.md` §3) */
     val uploadAccountId: String? = null,
     /** 사진 백업은 데이터 요금이 크므로 기본은 Wi-Fi 전용 */
@@ -113,7 +113,7 @@ class UserPreferencesRepository @Inject constructor(
             viewFolders = decodeViewFolders(prefs[KEY_VIEW_FOLDERS]),
             driveViewScopeGranted = prefs[KEY_DRIVE_VIEW_SCOPE] ?: false,
             guestCleanupEmail = prefs[KEY_GUEST_CLEANUP],
-            driveGridView = prefs[KEY_DRIVE_GRID] ?: false,
+            driveGridView = prefs[KEY_DRIVE_GRID] ?: true,
             uploadAccountId = prefs[KEY_UPLOAD_ACCOUNT_ID],
             uploadWifiOnly = prefs[KEY_UPLOAD_WIFI_ONLY] ?: true,
             uploadChargingOnly = prefs[KEY_UPLOAD_CHARGING_ONLY] ?: false,

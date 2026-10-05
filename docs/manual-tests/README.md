@@ -34,6 +34,7 @@
 | `13-photo-hiding.md` | 사진 숨기기: PIN 설정·잠금·목록 누수·PIN 분실 복구 |
 | `14-samsung-interop.md` | 삼성 갤러리 연동(즐겨찾기·앨범)과 Drive `drive.file` scope 측정 |
 | `15-app-icon.md` | 런처 아이콘 |
+| `19-drive-photos.md` | Drive 사진: 백업 칸 카드·폴더를 가로지른 격자·거르기·찍은 날짜순·넘겨 보기·폴더 화면 격자 기본 |
 
 ## 실기기 연결
 

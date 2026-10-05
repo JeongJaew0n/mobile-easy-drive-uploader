@@ -109,28 +109,7 @@ private fun DriveGridCell(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
     ) {
-        val link = entry.thumbnailLink
-        // 받다가 실패하면(만료·권한) 빈 칸으로 두지 않고 이름을 보인다
-        var failed by remember(entry.id, link) { mutableStateOf(false) }
-        if (link != null && !failed) {
-            val context = LocalContext.current
-            // 링크는 몇 시간 뒤 바뀐다. 캐시를 링크로 가르면 다시 열 때마다 새로 받는다 — ID 와 썸네일 버전으로 가른다
-            val key = "drive-thumb:${entry.id}:${entry.thumbnailVersion}"
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(thumbnailUrl(link, THUMB_PX))
-                    .memoryCacheKey(key)
-                    .diskCacheKey(key)
-                    .build(),
-                contentDescription = entry.name,
-                imageLoader = imageLoader,
-                contentScale = ContentScale.Crop,
-                onError = { failed = true },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            NoThumbnail(entry)
-        }
+        DriveThumbnail(entry, imageLoader, Modifier.fillMaxSize())
         if (entry.isVideo) {
             Icon(
                 Icons.Filled.PlayArrow,
@@ -153,6 +132,45 @@ private fun DriveGridCell(
                     .padding(4.dp)
                     .size(22.dp),
             )
+        }
+    }
+}
+
+/**
+ * Drive 썸네일 한 칸 — 폴더 격자·Drive 사진 격자·백업 칸의 띠가 함께 쓴다.
+ * 받다가 실패하면(만료·권한) 빈 칸으로 두지 않고 이름을 보인다.
+ */
+@Composable
+internal fun DriveThumbnail(
+    entry: DriveEntry,
+    imageLoader: ImageLoader,
+    modifier: Modifier = Modifier,
+    sizePx: Int = THUMB_PX,
+    showNameWhenMissing: Boolean = true,
+) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        val link = entry.thumbnailLink
+        var failed by remember(entry.id, link) { mutableStateOf(false) }
+        if (link != null && !failed) {
+            val context = LocalContext.current
+            // 링크는 몇 시간 뒤 바뀐다. 캐시를 링크로 가르면 다시 열 때마다 새로 받는다 — ID 와 썸네일 버전으로 가른다
+            val key = "drive-thumb:${entry.id}:${entry.thumbnailVersion}:$sizePx"
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(thumbnailUrl(link, sizePx))
+                    .memoryCacheKey(key)
+                    .diskCacheKey(key)
+                    .build(),
+                contentDescription = entry.name,
+                imageLoader = imageLoader,
+                contentScale = ContentScale.Crop,
+                onError = { failed = true },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (showNameWhenMissing) {
+            NoThumbnail(entry)
+        } else {
+            EntryIcon(entry)
         }
     }
 }
@@ -189,6 +207,6 @@ internal fun thumbnailUrl(link: String, sizePx: Int): String =
 
 private val SIZE_SUFFIX = Regex("=s\\d+$")
 private const val CELL_MIN_DP = 110
-private const val THUMB_PX = 400
+internal const val THUMB_PX = 400
 private const val BADGE_ALPHA = 0.5f
 private const val NAME_MAX_LINES = 2

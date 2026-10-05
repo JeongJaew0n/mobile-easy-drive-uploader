@@ -43,6 +43,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -87,15 +88,10 @@ fun DriveBrowserRoute(
     val storageRootName = stringResource(R.string.storage_root_name)
     val rootName = if (key.accountId == null) driveRootName else storageRootName
 
-    // 사진·영상은 앱 안에서 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
+    // 사진·영상은 앱 안에서, 그 폴더의 사진·영상끼리 넘겨 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
     var preview by remember { mutableStateOf<DriveEntry?>(null) }
     preview?.let { entry ->
-        DrivePreview(
-            entry = entry,
-            imageLoader = viewModel.driveImageLoader,
-            dataSourceFactory = viewModel.driveDataSourceFactory,
-            onDismiss = { preview = null },
-        )
+        key(entry.id) { FolderMediaPager(uiState, viewModel, entry, onDismiss = { preview = null }) }
     }
 
     val authRecoveryLauncher = rememberLauncherForActivityResult(
@@ -192,6 +188,35 @@ fun DriveBrowserRoute(
             onTrashSelected = viewModel::trashSelected,
             onMoveSelected = viewModel::moveSelected,
         ),
+    )
+}
+
+/** 폴더 보기의 넘겨 보기 — 그 폴더의 사진·영상끼리. 저장소가 할 수 있는 것만 단추로 */
+@Composable
+private fun FolderMediaPager(
+    uiState: DriveBrowserUiState,
+    viewModel: DriveBrowserViewModel,
+    entry: DriveEntry,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val canTrash = Capability.TRASH in uiState.capabilities && !uiState.isReadOnlyHere
+    DriveMediaPager(
+        entries = uiState.entries.filter { it.isImage || it.isVideo },
+        initialId = entry.id,
+        imageLoader = viewModel.driveImageLoader,
+        dataSourceFactory = viewModel.driveDataSourceFactory,
+        onDismiss = onDismiss,
+        actions = DriveViewerActions(
+            onDownload = viewModel::download.takeIf { Capability.DOWNLOAD in uiState.capabilities },
+            onTrash = viewModel::trash.takeIf { canTrash },
+            onOpenInDrive = if (Capability.WEB_LINK in uiState.capabilities) {
+                { e -> e.webViewLink?.let { link -> context.openDriveLink(link, uiState.accountEmail) } }
+            } else {
+                null
+            },
+        ),
+        onNearEnd = viewModel::loadMore,
     )
 }
 
@@ -569,7 +594,7 @@ private fun DriveBrowserScreenPreview() {
 }
 
 /** 연결된 계정으로 연다. 여러 계정이 로그인돼 있어도 파일마다 고르라고 묻지 않는다 */
-private fun Context.openDriveLink(link: String, accountEmail: String?) {
+internal fun Context.openDriveLink(link: String, accountEmail: String?) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(driveLinkForAccount(link, accountEmail)))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
