@@ -1,15 +1,11 @@
 package com.jjw.easygallery.feature.gallery
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,8 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -119,61 +113,13 @@ private fun scopeTitle(scope: GalleryScope?, content: GalleryUiState.Content?): 
 internal fun SelectionTopBar(
     selectedCount: Int,
     onClear: () -> Unit,
-    onUpload: () -> Unit,
-    uploadTargets: List<UploadTargetOption> = emptyList(),
-    onUploadTo: (UploadTargetOption) -> Unit = {},
-    /** 주 계정이 연결돼 있으면 "다른 Google 계정으로 업로드" 를 보인다(docs/plans/guest-account-upload) */
-    guestAvailable: Boolean = false,
-    onUploadToGuest: () -> Unit = {},
 ) {
-    var targetMenuExpanded by remember { mutableStateOf(false) }
+    // 업로드·다른 저장소·다른 계정은 선택 하단바(업로드·더보기)로 옮겼다 — docs/plans/ux-round2/spec.md §1
     TopAppBar(
         title = { Text(stringResource(R.string.gallery_selected_count, selectedCount)) },
         navigationIcon = {
             IconButton(onClick = onClear) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear_selection))
-            }
-        },
-        actions = {
-            IconButton(onClick = onUpload) {
-                Icon(
-                    painterResource(R.drawable.ic_cloud_upload),
-                    contentDescription = stringResource(R.string.action_upload_to_drive),
-                )
-            }
-            // 저장소가 둘 이상이거나 다른 계정 업로드가 되면 이번만 다른 곳으로 올릴 수 있다(설정은 그대로)
-            if (uploadTargets.size > 1 || guestAvailable) {
-                Box {
-                    IconButton(onClick = { targetMenuExpanded = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gallery_upload_to))
-                    }
-                    DropdownMenu(expanded = targetMenuExpanded, onDismissRequest = { targetMenuExpanded = false }) {
-                        // 대상이 하나뿐이면 그건 위의 업로드 버튼과 같다 — 목록에 늘어놓지 않는다
-                        if (uploadTargets.size > 1) {
-                            uploadTargets.forEach { target ->
-                                DropdownMenuItem(
-                                    text = {
-                                        val label = stringResource(R.string.gallery_upload_to_item, target.name)
-                                        Text(if (target.isDefault) "$label ✓" else label)
-                                    },
-                                    onClick = {
-                                        targetMenuExpanded = false
-                                        onUploadTo(target)
-                                    },
-                                )
-                            }
-                        }
-                        if (guestAvailable) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.gallery_upload_to_guest)) },
-                                onClick = {
-                                    targetMenuExpanded = false
-                                    onUploadToGuest()
-                                },
-                            )
-                        }
-                    }
-                }
             }
         },
     )

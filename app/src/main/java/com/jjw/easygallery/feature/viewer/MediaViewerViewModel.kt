@@ -46,6 +46,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
+@Suppress("TooManyFunctions") // 화면이 호출하는 API 표면(넘기기·편집 7·카테고리·업로드·휴지통 되돌리기). 로직은 컨트롤러·유스케이스에 있다
 class MediaViewerViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val actionController: MediaActionController,
@@ -55,7 +56,7 @@ class MediaViewerViewModel @Inject constructor(
     private val assignCategories: AssignCategoriesUseCase,
     private val hiddenMedia: HiddenMediaRepository,
     private val chosenMedia: ChosenMediaRepository,
-    prefs: UserPreferencesRepository,
+    private val prefs: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val uploadedIds = prefs.preferences
@@ -125,6 +126,17 @@ class MediaViewerViewModel @Inject constructor(
 
     fun toggleFavorite() = withCurrent { item ->
         actionController.perform(viewModelScope, MediaAction.Favorite(listOf(item), favorite = !item.isFavorite))
+    }
+
+    /** 휴지통 이동의 실행 취소 — 미디어 관리 권한이 있을 때만 화면이 부른다 */
+    fun undoTrash(action: MediaAction.Trash) =
+        actionController.perform(viewModelScope, MediaAction.Trash(action.items, trashed = false))
+
+    val manageMediaHintPending: StateFlow<Boolean> = prefs.preferences.map { !it.manageMediaHintShown }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    fun markManageMediaHintShown() {
+        viewModelScope.launch { prefs.markManageMediaHintShown() }
     }
 
     fun trash() = withCurrent { item ->

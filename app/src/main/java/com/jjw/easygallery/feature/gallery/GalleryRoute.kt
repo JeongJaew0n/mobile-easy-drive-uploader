@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
+import com.jjw.easygallery.core.ui.media.TrashFollowUp
 
 @Composable
 fun GalleryRoute(
@@ -70,6 +71,7 @@ fun GalleryRoute(
     }
     val startUpload = { startUploadTo(null) }
     val uploadTargets by viewModel.uploadTargets.collectAsStateWithLifecycle()
+    val manageMediaHintPending by viewModel.manageMediaHintPending.collectAsStateWithLifecycle()
 
     // 다른 계정 업로드 — 계정 선택 창(docs/plans/guest-account-upload)
     val guestAvailable by viewModel.guestUploadAvailable.collectAsStateWithLifecycle()
@@ -89,6 +91,11 @@ fun GalleryRoute(
         snackbarHostState = snackbarHostState,
         onConsentResult = viewModel::onConsentResult,
         onActionDone = viewModel::onActionDone,
+        trashFollowUp = TrashFollowUp(
+            onUndo = viewModel::undoTrash,
+            offerManageMedia = manageMediaHintPending,
+            onManageMediaOffered = viewModel::markManageMediaHintShown,
+        ),
     )
 
     // 시스템 설정에서 권한을 바꾸고 돌아온 경우를 잡기 위해 RESUME 마다 재확인
@@ -131,6 +138,7 @@ fun GalleryRoute(
         onCancelUpload = viewModel::cancelUploads,
         onUploadQueueClick = onUploadQueueClick,
         onTabChange = viewModel::setTab,
+        onCellSizeStepChange = viewModel::setCellSizeStep,
         onFavoritesOnlyChange = viewModel::setFavoritesOnly,
         onNotBackedUpOnlyChange = viewModel::setNotBackedUpOnly,
         onDateRangeChange = viewModel::setDateRange,

@@ -30,7 +30,8 @@ app/src/main/java/com/jjw/easygallery/
 │       ├── motion/            # MotionSpecs 토큰 + LocalMotion (시스템 애니메이션 끄기 존중)
 │       └── theme/             # Material 3 테마 (LocalMotion 제공)
 └── feature/
-    ├── gallery/               # GalleryRoute(권한·이벤트 배선) / GalleryScreen(Scaffold 조립) / GalleryTopBars / GalleryBanners
+    ├── gallery/               # GalleryRoute(권한·이벤트 배선) / GalleryScreen(Scaffold 조립) / GalleryBody(본문·하단바 전환) / GalleryTopBars / GalleryBanners
+    │                          # SelectionBar(글자 붙은 넷 + 더보기 시트) / GalleryThumbnail(썸네일·백업 배지) / GalleryGridZoom(핀치 칸 크기·날짜 손잡이) / GallerySheets
     │                          # GalleryGrid(+DragSelect), GalleryActions(하단 바·다이얼로그·메뉴), DateRangeSheet(+DateRangeSelection), GalleryViewModel, MediaPermission
     ├── categories/            # CategoriesRoute/Screen/ViewModel(관리), CategoryPickerSheet(+CategoryPickerState tri-state), CategoryFilterSheet, CategoryDot
     ├── viewer/                # MediaViewerRoute / MediaViewerScreen(페이저·회전) / ImagePage(+ZoomState) / VideoPage(재생·탐색·음량·배속) / ViewerChrome(상·하단 바·정보 패널)

@@ -17,6 +17,7 @@ import com.jjw.easygallery.core.data.media.MediaActionController
 import com.jjw.easygallery.core.data.media.MediaActionEvent
 import com.jjw.easygallery.core.data.media.MediaFilter
 import com.jjw.easygallery.core.data.media.MediaRepository
+import com.jjw.easygallery.core.data.prefs.GALLERY_CELL_STEP_DEFAULT
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
 import com.jjw.easygallery.core.data.remote.RemoteAccountRepository
 import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
@@ -169,7 +170,13 @@ class GalleryViewModel @Inject constructor(
         showCategoryBadges,
         prefs.preferences.map { it.showBackedUpBadge }.distinctUntilChanged(),
         queueBadges,
-    ) { category, backedUp, queue -> ThumbnailDecorations(category, backedUp, queue) }
+        prefs.preferences.map { it.galleryCellSizeStep }.distinctUntilChanged(),
+    ) { category, backedUp, queue, cellStep -> ThumbnailDecorations(category, backedUp, queue, cellStep) }
+
+    /** 두 손가락으로 칸 크기를 바꿨다(docs/plans/ux-round2/spec.md §6). 다음에 열어도 그 크기 */
+    fun setCellSizeStep(step: Int) {
+        viewModelScope.launch { prefs.setGalleryCellSizeStep(step) }
+    }
 
     private val events = Channel<GalleryEvent>(Channel.BUFFERED)
     val eventFlow: Flow<GalleryEvent> = events.receiveAsFlow()
@@ -473,6 +480,17 @@ class GalleryViewModel @Inject constructor(
      */
     fun trashSelected() = perform(MediaAction.Trash(selectedItems(), trashed = true))
 
+    /** 휴지통 이동의 실행 취소 — 미디어 관리 권한이 있을 때만 화면이 부른다(확인 창 없이 되돌린다) */
+    fun undoTrash(action: MediaAction.Trash) = perform(MediaAction.Trash(action.items, trashed = false))
+
+    /** 휴지통 이동 뒤 "미디어 관리 허용" 을 아직 제안하지 않았다 */
+    val manageMediaHintPending: StateFlow<Boolean> = prefs.preferences.map { !it.manageMediaHintShown }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    fun markManageMediaHintShown() {
+        viewModelScope.launch { prefs.markManageMediaHintShown() }
+    }
+
     /** 선택이 모두 즐겨찾기면 해제, 아니면 전부 즐겨찾기 */
     fun toggleFavoriteSelected() {
         val items = selectedItems()
@@ -637,6 +655,7 @@ class GalleryViewModel @Inject constructor(
                 showBackedUpBadge = decorations.backedUpBadge,
                 pendingIds = decorations.queue.pending,
                 failedIds = decorations.queue.failed,
+                cellSizeStep = decorations.cellSizeStep,
                 albums = c.albums,
                 supportsTrashAndFavorites = mediaRepository.supportsTrashAndFavorites,
                 selectedAllFavorite = selected.isNotEmpty() && selected.all { c.byId[it]?.isFavorite == true },
@@ -695,6 +714,8 @@ sealed interface GalleryUiState {
         val pendingIds: Set<Long> = emptySet(),
         /** 큐에서 실패(구름 ✕). 원장에 있으면 올라간 것이 앞선다 */
         val failedIds: Set<Long> = emptySet(),
+        /** 칸 크기 단계(`CELL_SIZE_STEPS_DP`) */
+        val cellSizeStep: Int = GALLERY_CELL_STEP_DEFAULT,
         val albums: List<Album> = emptyList(),
         val supportsTrashAndFavorites: Boolean = true,
         val selectedAllFavorite: Boolean = false,
@@ -716,6 +737,7 @@ private data class ThumbnailDecorations(
     val categoryBadges: Boolean,
     val backedUpBadge: Boolean,
     val queue: QueueBadges,
+    val cellSizeStep: Int,
 )
 
 /** 업로드 대상 후보(accountId null = Google Drive) */

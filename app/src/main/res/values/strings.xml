@@ -105,7 +105,7 @@
     <string name="gallery_app_screenshots">스크린샷</string>
     <string name="gallery_tab_chosen">고른 사진</string>
     <string name="gallery_tab_all">전체</string>
-    <string name="gallery_chosen_empty">고른 사진이 없습니다.\n다른 탭에서 사진을 길게 눌러 선택한 뒤, 아래 막대의 \'고른 사진에 넣기\' 를 누르세요.</string>
+    <string name="gallery_chosen_empty">고른 사진이 없습니다.\n다른 탭에서 사진을 길게 눌러 선택한 뒤, 아래 막대의 \'고른 사진\' 을 누르세요.</string>
     <string name="action_choose">고른 사진에 넣기</string>
     <string name="action_unchoose">고른 사진에서 빼기</string>
     <plurals name="gallery_chosen_added">
@@ -731,4 +731,14 @@
     <string name="gallery_failed_badge">백업 실패</string>
     <string name="settings_backed_up_badge">백업된 사진에 표시</string>
     <string name="settings_backed_up_badge_description">올라간 사진 썸네일에 구름 ✓ 를 붙입니다. 대기·실패 표시는 늘 보입니다</string>
+    <!-- 선택 하단바(docs/plans/ux-round2/spec.md) -->
+    <string name="selection_upload">업로드</string>
+    <string name="selection_choose">고른 사진</string>
+    <string name="selection_unchoose">빼기</string>
+    <string name="selection_trash">휴지통</string>
+    <string name="selection_delete">삭제</string>
+    <string name="selection_more">더보기</string>
+    <string name="gallery_chosen_pick_from_all">전체에서 고르기</string>
+    <string name="trash_manage_media_hint">매번 묻지 않게 하려면 미디어 관리를 허용하세요</string>
+    <string name="trash_manage_media_allow">허용</string>
 </resources>

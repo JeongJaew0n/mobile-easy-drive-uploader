@@ -23,6 +23,7 @@ import com.jjw.easygallery.core.domain.model.CategoryFilter
 import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
+import com.jjw.easygallery.core.ui.media.TrashFollowUp
 import com.jjw.easygallery.feature.gallery.GalleryTab
 
 @Composable
@@ -48,10 +49,16 @@ fun MediaViewerRoute(
         )
     }
 
+    val manageMediaHintPending by viewModel.manageMediaHintPending.collectAsStateWithLifecycle()
     MediaActionEffect(
         events = viewModel.actionEvents,
         snackbarHostState = snackbarHostState,
         onConsentResult = viewModel::onConsentResult,
+        trashFollowUp = TrashFollowUp(
+            onUndo = viewModel::undoTrash,
+            offerManageMedia = manageMediaHintPending,
+            onManageMediaOffered = viewModel::markManageMediaHintShown,
+        ),
     )
 
     LaunchedEffect(Unit) {

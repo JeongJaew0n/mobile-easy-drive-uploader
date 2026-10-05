@@ -103,7 +103,7 @@
     <string name="gallery_app_screenshots">スクリーンショット</string>
     <string name="gallery_tab_chosen">ピック</string>
     <string name="gallery_tab_all">すべて</string>
-    <string name="gallery_chosen_empty">ピックした写真はありません。\nほかのタブで写真を長押しして選択し、下のバーの「ピックに追加」をタップしてください。</string>
+    <string name="gallery_chosen_empty">ピックした写真はありません。\nほかのタブで写真を長押しして選択し、下のバーの「ピック」をタップしてください。</string>
     <string name="action_choose">ピックに追加</string>
     <string name="action_unchoose">ピックから外す</string>
     <plurals name="gallery_chosen_added">
@@ -696,4 +696,13 @@
     <string name="gallery_failed_badge">バックアップ失敗</string>
     <string name="settings_backed_up_badge">バックアップ済みの写真に表示</string>
     <string name="settings_backed_up_badge_description">アップロード済みの写真のサムネイルに雲 ✓ を付けます。待機中・失敗の表示は常に出ます</string>
+    <string name="selection_upload">アップロード</string>
+    <string name="selection_choose">ピック</string>
+    <string name="selection_unchoose">外す</string>
+    <string name="selection_trash">ゴミ箱</string>
+    <string name="selection_delete">削除</string>
+    <string name="selection_more">その他</string>
+    <string name="gallery_chosen_pick_from_all">「すべて」から選ぶ</string>
+    <string name="trash_manage_media_hint">毎回確認されないようにするには、メディア管理を許可してください</string>
+    <string name="trash_manage_media_allow">許可</string>
 </resources>

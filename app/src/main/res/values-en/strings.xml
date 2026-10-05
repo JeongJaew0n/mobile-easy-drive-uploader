@@ -109,7 +109,7 @@
     <string name="gallery_app_screenshots">Screenshots</string>
     <string name="gallery_tab_chosen">Picks</string>
     <string name="gallery_tab_all">All</string>
-    <string name="gallery_chosen_empty">No picks yet.\nIn another tab, long-press photos to select them, then tap \'Add to picks\' in the bottom bar.</string>
+    <string name="gallery_chosen_empty">No picks yet.\nIn another tab, long-press photos to select them, then tap \'Pick\' in the bottom bar.</string>
     <string name="action_choose">Add to picks</string>
     <string name="action_unchoose">Remove from picks</string>
     <plurals name="gallery_chosen_added">
@@ -718,4 +718,13 @@
     <string name="gallery_failed_badge">Backup failed</string>
     <string name="settings_backed_up_badge">Mark backed-up photos</string>
     <string name="settings_backed_up_badge_description">Adds a cloud ✓ to thumbnails of uploaded photos. Waiting and failed marks are always shown.</string>
+    <string name="selection_upload">Upload</string>
+    <string name="selection_choose">Pick</string>
+    <string name="selection_unchoose">Unpick</string>
+    <string name="selection_trash">Trash</string>
+    <string name="selection_delete">Delete</string>
+    <string name="selection_more">More</string>
+    <string name="gallery_chosen_pick_from_all">Pick from All</string>
+    <string name="trash_manage_media_hint">To stop being asked every time, allow media management</string>
+    <string name="trash_manage_media_allow">Allow</string>
 </resources>

@@ -2,7 +2,6 @@ package com.jjw.easygallery.feature.gallery
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jjw.easygallery.R
@@ -39,8 +37,6 @@ import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.navigation.HeroOrigin
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
-import com.jjw.easygallery.feature.categories.CategoryFilterSheet
-import com.jjw.easygallery.feature.categories.CategoryPickerSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +54,7 @@ internal fun GalleryScreen(
     modifier: Modifier = Modifier,
     onSelectionChange: (Set<Long>) -> Unit = {},
     onTabChange: (GalleryTab) -> Unit = {},
+    onCellSizeStepChange: (Int) -> Unit = {},
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
     onNotBackedUpOnlyChange: (Boolean) -> Unit = {},
     onDateRangeChange: (DateRange?) -> Unit = {},
@@ -103,15 +100,7 @@ internal fun GalleryScreen(
                 label = "galleryTopBar",
             ) { selecting ->
                 if (selecting && content != null) {
-                    SelectionTopBar(
-                        selectedCount = content.selectedIds.size,
-                        onClear = onClearSelection,
-                        onUpload = onUploadSelected,
-                        uploadTargets = uploadTargets,
-                        onUploadTo = onUploadSelectedTo,
-                        guestAvailable = guest.available,
-                        onUploadToGuest = guest.onStart,
-                    )
+                    SelectionTopBar(selectedCount = content.selectedIds.size, onClear = onClearSelection)
                 } else {
                     // 탭은 상단바와 한 덩어리다 — 선택 모드로 바뀌면 함께 사라진다.
                     // 탭을 누르면 선택이 풀리므로 선택 상단바 옆에 두면 실수로 누르기 쉽다.
@@ -134,13 +123,22 @@ internal fun GalleryScreen(
         bottomBar = {
             GalleryBottomBar(
                 content = content.takeIf { selectionMode },
-                actions = actions,
                 navigationBar = navigationBar,
-                onRename = { showRename = true },
-                onMove = { showMove = true },
-                onCategories = { showCategoryPicker = true },
-                onHide = onHideSelected,
-                onToggleChosen = onToggleChosenSelected,
+                uploadTargets = uploadTargets,
+                guestAvailable = guest.available,
+                actions = SelectionBarActions(
+                    onUpload = onUploadSelected,
+                    onUploadTo = onUploadSelectedTo,
+                    onUploadToGuest = guest.onStart,
+                    onToggleChosen = onToggleChosenSelected,
+                    onTrash = actions.onTrash,
+                    onDelete = actions.onDelete,
+                    onToggleFavorite = actions.onToggleFavorite,
+                    onHide = onHideSelected,
+                    onCategories = { showCategoryPicker = true },
+                    onRename = { showRename = true },
+                    onMove = { showMove = true },
+                ),
             )
         },
     ) { innerPadding ->
@@ -168,6 +166,8 @@ internal fun GalleryScreen(
 
                 is GalleryUiState.Content -> GalleryContent(
                     uiState = uiState,
+                    onPickFromAll = { onTabChange(GalleryTab.ALL) },
+                    onCellSizeStepChange = onCellSizeStepChange,
                     onToggleSelection = onToggleSelection,
                     onSelectionChange = onSelectionChange,
                     onOpenItem = { item, bounds ->
@@ -213,182 +213,6 @@ internal fun GalleryScreen(
             onDismissMove = { showMove = false },
             actions = actions,
         )
-    }
-}
-
-/** 기간 선택·카테고리 필터·카테고리 지정 바텀시트. 적용하면 닫힌다 */
-@Composable
-@Suppress("LongParameterList") // 시트 3개의 표시 상태·콜백 묶음
-private fun GallerySheets(
-    content: GalleryUiState.Content,
-    showDateRange: Boolean,
-    showFilter: Boolean,
-    showPicker: Boolean,
-    onDismissDateRange: () -> Unit,
-    onDismissFilter: () -> Unit,
-    onDismissPicker: () -> Unit,
-    onDateRangeChange: (DateRange?) -> Unit,
-    onCategoryFilterChange: (CategoryFilter?) -> Unit,
-    onManageCategories: () -> Unit,
-    onCreateCategory: suspend (String, Int) -> Result<Category>,
-    onAssignCategories: (add: Set<Long>, remove: Set<Long>) -> Unit,
-) {
-    if (showDateRange) {
-        DateRangeSheet(
-            current = content.dateRange,
-            dayCounts = content.dayCounts,
-            onDismiss = onDismissDateRange,
-            onConfirm = { range ->
-                onDismissDateRange()
-                onDateRangeChange(range)
-            },
-        )
-    }
-    if (showFilter) {
-        CategoryFilterSheet(
-            categories = content.categories,
-            current = content.categoryFilter,
-            onApply = { filter ->
-                onDismissFilter()
-                onCategoryFilterChange(filter)
-            },
-            onManage = {
-                onDismissFilter()
-                onManageCategories()
-            },
-            onDismiss = onDismissFilter,
-        )
-    }
-    if (showPicker) {
-        CategoryPickerSheet(
-            mediaIds = content.selectedIds,
-            categories = content.categories,
-            assignments = content.assignments,
-            onCreateCategory = onCreateCategory,
-            onApply = { add, remove ->
-                onDismissPicker()
-                onAssignCategories(add, remove)
-            },
-            onDismiss = onDismissPicker,
-        )
-    }
-}
-
-@Composable
-private fun GalleryDialogs(
-    content: GalleryUiState.Content,
-    showRename: Boolean,
-    showMove: Boolean,
-    onDismissRename: () -> Unit,
-    onDismissMove: () -> Unit,
-    actions: GalleryActionCallbacks,
-) {
-    if (showRename) {
-        val selected = content.sections.asSequence().flatMap { it.items }.firstOrNull { it.id in content.selectedIds }
-        if (selected != null) {
-            RenameDialog(
-                currentName = selected.displayName,
-                onDismiss = onDismissRename,
-                onConfirm = { name ->
-                    onDismissRename()
-                    actions.onRename(name)
-                },
-            )
-        }
-    }
-    if (showMove) {
-        MoveDialog(
-            albums = content.albums,
-            onDismiss = onDismissMove,
-            onConfirm = { path ->
-                onDismissMove()
-                actions.onMove(path)
-            },
-        )
-    }
-}
-
-@Composable
-private fun GalleryContent(
-    uiState: GalleryUiState.Content,
-    onToggleSelection: (Long) -> Unit,
-    onSelectionChange: (Set<Long>) -> Unit,
-    onOpenItem: (MediaItem, Rect?) -> Unit,
-    onClearDateRange: () -> Unit,
-    onSelectAllVisible: () -> Unit,
-    onClearCategoryFilter: () -> Unit,
-    onCancelUpload: () -> Unit,
-    onUploadQueueClick: () -> Unit,
-    onRequestPermission: () -> Unit,
-    guest: GuestUploadUi = GuestUploadUi(),
-) {
-    val motion = LocalMotion.current
-    // 배너는 펴지며 등장해 그리드를 밀어내고, 접히며 사라진다 (그리드 점프 방지). 짧게(150ms) 유지
-    Column(Modifier.fillMaxSize()) {
-        // 다른 계정 업로드가 끝났다 — 기기에서 그 계정을 지우라고(앱은 직접 못 지운다)
-        AnimatedVisibility(
-            visible = guest.cleanupEmail != null,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            GuestCleanupBanner(
-                email = guest.cleanupEmail.orEmpty(),
-                onOpenSettings = guest.onOpenAccountSettings,
-                onDismiss = guest.onDismissCleanup,
-            )
-        }
-        AnimatedVisibility(
-            visible = uiState.upload.hasActive,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            UploadProgressBanner(summary = uiState.upload, onCancel = onCancelUpload, onClick = onUploadQueueClick)
-        }
-        AnimatedVisibility(
-            visible = !uiState.upload.hasActive && uiState.upload.failed > 0,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            UploadFailedBanner(
-                failed = uiState.upload.failed,
-                onClick = onUploadQueueClick,
-                reason = uiState.upload.failureReason,
-            )
-        }
-        AnimatedVisibility(
-            visible = uiState.isPartialAccess,
-            enter = motion.enterExpand(),
-            exit = motion.exitShrink(),
-        ) {
-            PartialAccessBanner(onManageSelection = onRequestPermission)
-        }
-        GalleryFilterBars(
-            uiState = uiState,
-            onClearDateRange = onClearDateRange,
-            onSelectAllVisible = onSelectAllVisible,
-            onClearCategoryFilter = onClearCategoryFilter,
-        )
-        if (uiState.sections.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(uiState.emptyMessageRes()),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                )
-            }
-        } else {
-            GalleryGrid(
-                sections = uiState.sections,
-                selectedIds = uiState.selectedIds,
-                onToggleSelection = onToggleSelection,
-                onSelectionChange = onSelectionChange,
-                onOpenItem = onOpenItem,
-                animateChanges = uiState.animateItemChanges,
-                backupBadgeOf = uiState::backupBadgeOf,
-                categoryColorsOf = categoryBadgeColors(uiState),
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
     }
 }
 
@@ -464,68 +288,5 @@ internal fun categoryTitle(filter: CategoryFilter?, categories: List<Category>):
     is CategoryFilter.Any -> {
         val selected = categories.filter { it.id in filter.ids }
         selected.singleOrNull()?.name ?: stringResource(R.string.gallery_title_category_count, selected.size)
-    }
-}
-
-/** 항목별 카테고리 배지 색(최대 3개). 설정이 꺼져 있으면 항상 빈 목록 */
-@Composable
-private fun categoryBadgeColors(content: GalleryUiState.Content): (Long) -> List<Int> {
-    if (!content.showCategoryBadges || content.assignments.isEmpty()) return { emptyList() }
-    val colorById = remember(content.categories) { content.categories.associate { it.id to it.colorIndex } }
-    val ordered = remember(content.categories) { content.categories.map { it.id } }
-    val assignments = content.assignments
-    return { mediaId ->
-        val assigned = assignments[mediaId]
-        if (assigned.isNullOrEmpty()) {
-            emptyList()
-        } else {
-            ordered.asSequence().filter { it in assigned }.mapNotNull { colorById[it] }.take(MAX_BADGE_DOTS).toList()
-        }
-    }
-}
-
-private const val MAX_BADGE_DOTS = 3
-
-/**
- * 선택 하단바와 하단 칸 막대가 같은 자리를 나눠 쓴다 — 아래에서 올라오고 내려가며 바뀐다.
- * [content] 가 있으면(고르는 중) 선택 하단바, 없으면 칸 막대.
- */
-@Composable
-private fun GalleryBottomBar(
-    content: GalleryUiState.Content?,
-    actions: GalleryActionCallbacks,
-    navigationBar: @Composable () -> Unit,
-    onRename: () -> Unit,
-    onMove: () -> Unit,
-    onCategories: () -> Unit,
-    onHide: () -> Unit,
-    onToggleChosen: () -> Unit,
-) {
-    val motion = LocalMotion.current
-    AnimatedContent(
-        targetState = content,
-        contentKey = { it != null },
-        transitionSpec = { motion.enterFromBottom() togetherWith motion.exitToBottom() },
-        label = "galleryBottomBar",
-    ) { selecting ->
-        if (selecting == null) {
-            navigationBar()
-        } else {
-            SelectionBottomBar(
-                selectedCount = selecting.selectedIds.size,
-                allFavorite = selecting.selectedAllFavorite,
-                allChosen = selecting.selectedAllChosen,
-                supportsTrashAndFavorites = selecting.supportsTrashAndFavorites,
-                enabled = !selecting.isMutating,
-                onTrash = actions.onTrash,
-                onDelete = actions.onDelete,
-                onToggleFavorite = actions.onToggleFavorite,
-                onRename = onRename,
-                onMove = onMove,
-                onCategories = onCategories,
-                onHide = onHide,
-                onToggleChosen = onToggleChosen,
-            )
-        }
     }
 }

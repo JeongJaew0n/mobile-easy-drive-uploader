@@ -64,6 +64,10 @@ data class UserPreferences(
     val showCategoryBadges: Boolean = true,
     /** 올라간 사진에 구름 ✓ — 기본 켬(2026-10-05 사용자 결정). 대기·실패 배지는 이 값과 무관하게 늘 보인다 */
     val showBackedUpBadge: Boolean = true,
+    /** 휴지통 이동 뒤 "미디어 관리 허용" 을 한 번 제안했다(docs/plans/ux-round2/spec.md §4) */
+    val manageMediaHintShown: Boolean = false,
+    /** 갤러리 칸 크기 단계(0 = 가장 작게). [GALLERY_CELL_STEP_DEFAULT] 가 예전 고정 크기(100dp) */
+    val galleryCellSizeStep: Int = GALLERY_CELL_STEP_DEFAULT,
     /** 새 사진을 매일 한 번 자동으로 분석한다(`docs/AUTO_TAGGING.md` §5.4) */
     val autoTagEnabled: Boolean = false,
     /** 자동 분석 시각(하루 중 분, 0~1439). 기본 04:00 */
@@ -126,6 +130,8 @@ class UserPreferencesRepository @Inject constructor(
                 ?: VideoCompression.ORIGINAL,
             showCategoryBadges = prefs[KEY_SHOW_CATEGORY_BADGES] ?: true,
             showBackedUpBadge = prefs[KEY_SHOW_BACKED_UP_BADGE] ?: true,
+            manageMediaHintShown = prefs[KEY_MANAGE_MEDIA_HINT_SHOWN] ?: false,
+            galleryCellSizeStep = prefs[KEY_GALLERY_CELL_STEP] ?: GALLERY_CELL_STEP_DEFAULT,
         )
     }
 
@@ -330,6 +336,14 @@ class UserPreferencesRepository @Inject constructor(
         store.edit { it[KEY_SHOW_BACKED_UP_BADGE] = enabled }
     }
 
+    suspend fun markManageMediaHintShown() {
+        store.edit { it[KEY_MANAGE_MEDIA_HINT_SHOWN] = true }
+    }
+
+    suspend fun setGalleryCellSizeStep(step: Int) {
+        store.edit { it[KEY_GALLERY_CELL_STEP] = step }
+    }
+
     private companion object {
         val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_TAG_ENABLED = booleanPreferencesKey("auto_tag_enabled")
@@ -344,6 +358,8 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_UPLOAD_ACCOUNT_ID = stringPreferencesKey("upload_account_id")
         val KEY_SHOW_CATEGORY_BADGES = booleanPreferencesKey("show_category_badges")
         val KEY_SHOW_BACKED_UP_BADGE = booleanPreferencesKey("show_backed_up_badge")
+        val KEY_MANAGE_MEDIA_HINT_SHOWN = booleanPreferencesKey("manage_media_hint_shown")
+        val KEY_GALLERY_CELL_STEP = intPreferencesKey("gallery_cell_size_step")
         val KEY_UPLOAD_WIFI_ONLY = booleanPreferencesKey("upload_wifi_only")
         val KEY_UPLOAD_CHARGING_ONLY = booleanPreferencesKey("upload_charging_only")
         val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")
@@ -357,3 +373,6 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_DRIVE_GRID = booleanPreferencesKey("drive_grid_view")
     }
 }
+
+/** 갤러리 칸 크기 단계의 기본값 — 예전 고정 크기(최소 100dp)와 같다 */
+const val GALLERY_CELL_STEP_DEFAULT = 2

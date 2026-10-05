@@ -11,12 +11,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,78 +41,6 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.data.media.MediaAction
 import com.jjw.easygallery.core.domain.model.Album
 
-/** 선택 모드 하단 액션 바 */
-@Composable
-internal fun SelectionBottomBar(
-    selectedCount: Int,
-    allFavorite: Boolean,
-    allChosen: Boolean,
-    supportsTrashAndFavorites: Boolean,
-    enabled: Boolean,
-    onTrash: () -> Unit,
-    onDelete: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onRename: () -> Unit,
-    onMove: () -> Unit,
-    onCategories: () -> Unit,
-    onHide: () -> Unit,
-    onToggleChosen: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BottomAppBar(modifier = modifier) {
-        // 맨 앞 — 이 앱의 첫 탭을 채우는 동작이다
-        IconButton(onClick = onToggleChosen, enabled = enabled) {
-            Icon(
-                painterResource(if (allChosen) R.drawable.ic_bookmark_remove else R.drawable.ic_bookmark_add),
-                contentDescription = stringResource(
-                    if (allChosen) R.string.action_unchoose else R.string.action_choose,
-                ),
-            )
-        }
-        if (supportsTrashAndFavorites) {
-            IconButton(onClick = onTrash, enabled = enabled) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_trash))
-            }
-            IconButton(onClick = onToggleFavorite, enabled = enabled) {
-                Icon(
-                    imageVector = if (allFavorite) Icons.Filled.Star else Icons.Outlined.Star,
-                    contentDescription = stringResource(
-                        if (allFavorite) R.string.action_unfavorite else R.string.action_favorite,
-                    ),
-                )
-            }
-        }
-        IconButton(onClick = onDelete, enabled = enabled) {
-            Icon(
-                painterResource(R.drawable.ic_delete_forever),
-                contentDescription = stringResource(R.string.action_delete_forever),
-            )
-        }
-        IconButton(onClick = onHide, enabled = enabled) {
-            Icon(
-                painterResource(R.drawable.ic_visibility_off),
-                contentDescription = stringResource(R.string.action_hide),
-            )
-        }
-        IconButton(onClick = onRename, enabled = enabled && selectedCount == 1) {
-            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_rename))
-        }
-        IconButton(onClick = onMove, enabled = enabled) {
-            Icon(
-                painterResource(R.drawable.ic_drive_file_move),
-                contentDescription = stringResource(R.string.action_move),
-            )
-        }
-        IconButton(onClick = onCategories, enabled = enabled) {
-            Icon(
-                painterResource(R.drawable.ic_label),
-                contentDescription = stringResource(R.string.category_assign_title),
-            )
-        }
-    }
-}
-
-/** 상단바 overflow: 즐겨찾기 필터, 휴지통 */
 /**
  * 사진 칸의 ⋮ — **지금 보는 목록을 거르는 것만** 남았다(`docs/plans/bottom-navigation/spec.md`).
  * 다른 화면으로 가는 것(앨범·숨긴 사진·중복·Drive·휴지통 등)은 하단 칸으로 옮겼다.
