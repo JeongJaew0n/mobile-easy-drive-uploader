@@ -99,7 +99,8 @@ fun MediaActionEffect(
                         TrashFollowUpKind.OFFER_MANAGE_MEDIA -> {
                             current?.onManageMediaOffered?.invoke()
                             val result = snackbarHostState.showSnackbar(
-                                message = resources.getString(R.string.trash_manage_media_hint),
+                                // 완료 문장을 지우지 않는다 — 옮겼다는 확인 없이 권한 얘기만 하면 무슨 일이 있었는지 모른다
+                                message = message + "\n" + resources.getString(R.string.trash_manage_media_hint),
                                 actionLabel = resources.getString(R.string.trash_manage_media_allow),
                                 duration = SnackbarDuration.Long,
                             )

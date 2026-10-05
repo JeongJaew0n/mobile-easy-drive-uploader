@@ -741,4 +741,5 @@
     <string name="gallery_chosen_pick_from_all">전체에서 고르기</string>
     <string name="trash_manage_media_hint">매번 묻지 않게 하려면 미디어 관리를 허용하세요</string>
     <string name="trash_manage_media_allow">허용</string>
+    <string name="album_storage_root">내장 저장공간</string>
 </resources>

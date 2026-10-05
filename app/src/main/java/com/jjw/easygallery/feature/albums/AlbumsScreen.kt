@@ -50,7 +50,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.Album
 import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
-import com.jjw.easygallery.feature.gallery.AppFolders
+import com.jjw.easygallery.feature.gallery.albumLabel
 import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
 
 @Composable
@@ -223,8 +223,7 @@ private fun AlbumCell(album: Album, onClick: () -> Unit) {
 
 /** 카카오톡·다운로드 같은 잘 알려진 폴더는 지금 언어의 이름으로, 나머지는 폴더 이름 그대로 */
 @Composable
-internal fun albumDisplayName(album: Album): String =
-    AppFolders.displayNameRes(album.name)?.let { stringResource(it) } ?: album.name
+internal fun albumDisplayName(album: Album): String = albumLabel(album.name)
 
 private const val ALBUM_CELL_MIN_DP = 104
 

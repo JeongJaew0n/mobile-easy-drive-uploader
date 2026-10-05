@@ -103,8 +103,7 @@ private fun scopeTitle(scope: GalleryScope?, content: GalleryUiState.Content?): 
     null -> null
     GalleryScope.Favorites -> stringResource(R.string.gallery_title_favorites)
     is GalleryScope.Album -> {
-        val name = content?.albumFilter?.name ?: scope.relativePath.trimEnd('/').substringAfterLast('/')
-        AppFolders.displayNameRes(name)?.let { stringResource(it) } ?: name
+        albumLabel(content?.albumFilter?.name ?: scope.relativePath.trimEnd('/').substringAfterLast('/'))
     }
 }
 

@@ -1,5 +1,7 @@
 package com.jjw.easygallery.feature.gallery
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import com.jjw.easygallery.R
 
 /**
@@ -35,4 +37,14 @@ internal object AppFolders {
         "documents" to R.string.gallery_app_documents,
         "screenshots" to R.string.gallery_app_screenshots,
     )
+}
+
+/**
+ * 앨범(폴더) 이름을 화면에 보일 말로. 저장공간 맨 위(`/`)에 바로 놓인 파일은 폴더 이름이 없다 — 빈 칸 대신
+ * 삼성 갤러리처럼 "내장 저장공간". 카카오톡 같은 잘 알려진 폴더는 지금 언어의 이름으로, 나머지는 그대로.
+ */
+@Composable
+internal fun albumLabel(name: String): String = when {
+    name.isBlank() -> stringResource(R.string.album_storage_root)
+    else -> AppFolders.displayNameRes(name)?.let { stringResource(it) } ?: name
 }

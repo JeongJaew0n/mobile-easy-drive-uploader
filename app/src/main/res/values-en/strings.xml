@@ -727,4 +727,5 @@
     <string name="gallery_chosen_pick_from_all">Pick from All</string>
     <string name="trash_manage_media_hint">To stop being asked every time, allow media management</string>
     <string name="trash_manage_media_allow">Allow</string>
+    <string name="album_storage_root">Internal storage</string>
 </resources>
