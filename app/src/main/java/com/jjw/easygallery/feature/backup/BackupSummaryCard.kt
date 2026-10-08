@@ -18,10 +18,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +35,7 @@ import com.jjw.easygallery.R
 import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
 import com.jjw.easygallery.feature.gallery.destinationLabel
 import com.jjw.easygallery.feature.viewer.thumbnailCacheKey
+import java.text.NumberFormat
 
 /**
  * 백업 칸 맨 위 — 이 기기의 사진이 얼마나·어디에 올라갔나(`docs/plans/backed-up-photos/spec.md` §2.1).
@@ -54,13 +57,17 @@ internal fun BackupSummaryCard(overview: BackupOverview, failed: Int, onOpen: ()
                     text = pluralStringResource(
                         R.plurals.backed_up_summary_of,
                         overview.deviceCount,
-                        overview.deviceCount,
+                        grouped(overview.deviceCount),
                     ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = stringResource(R.string.backed_up_summary_count, overview.backedUpCount, overview.percent),
+                    text = stringResource(
+                        R.string.backed_up_summary_count,
+                        grouped(overview.backedUpCount),
+                        overview.percent,
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -88,7 +95,7 @@ private fun DestinationBars(overview: BackupOverview, failed: Int) {
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = stringResource(R.string.backed_up_destination_count, count),
+                        text = stringResource(R.string.backed_up_destination_count, grouped(count)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -102,7 +109,7 @@ private fun DestinationBars(overview: BackupOverview, failed: Int) {
         }
         if (failed > 0) {
             Text(
-                text = stringResource(R.string.backed_up_failed_count, failed),
+                text = stringResource(R.string.backed_up_failed_count, grouped(failed)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -156,6 +163,13 @@ private fun RecentStrip(overview: BackupOverview, onOpen: () -> Unit) {
             }
         }
     }
+}
+
+/** 6,190 — 네 자리부터 읽기 어렵다(2026-10-08 기기에서 "6190장"). 지금 언어의 구분자로 */
+@Composable
+private fun grouped(value: Int): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(value, locale) { NumberFormat.getIntegerInstance(locale).format(value) }
 }
 
 private const val THUMB_DP = 72

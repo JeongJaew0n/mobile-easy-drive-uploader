@@ -226,7 +226,8 @@ private fun ViewerTopBar(
                 text = viewerSubtitle(entry, onDevice),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = SUBTITLE_ALPHA),
-                maxLines = 1,
+                // 단추 셋에 밀려 한 줄이면 "이 기기에는 없음" 이 잘린다(2026-10-08 기기) — 그게 가장 중요한 말이다
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

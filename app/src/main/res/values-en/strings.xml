@@ -768,15 +768,15 @@
     <string name="backed_up_empty_queue">No waiting or failed uploads</string>
     <string name="gallery_group_select_all">Select this group</string>
     <string name="gallery_group_deselect_all">Deselect this group</string>
-    <string name="backed_up_summary_count">%1$d backed up · %2$d%%</string>
-    <string name="backed_up_destination_count">%1$d</string>
-    <string name="backed_up_failed_count">%1$d failed</string>
+    <string name="backed_up_summary_count">%1$s backed up · %2$d%%</string>
+    <string name="backed_up_destination_count">%1$s</string>
+    <string name="backed_up_failed_count">%1$s failed</string>
     <string name="backed_up_target_note">The ✓ on thumbnails and \"Delete uploaded photos from device\" count only the current upload destination</string>
     <string name="backed_up_recent">Recent backups</string>
     <string name="viewer_info_backup">Backup</string>
     <string name="viewer_open_in_drive">Open in Drive</string>
     <plurals name="backed_up_summary_of">
-        <item quantity="one">Of %1$d photo on this phone</item>
-        <item quantity="other">Of %1$d photos on this phone</item>
+        <item quantity="one">Of %1$s photo on this phone</item>
+        <item quantity="other">Of %1$s photos on this phone</item>
     </plurals>
 </resources>

@@ -27,15 +27,35 @@ class DrivePhotosModelTest {
     }
 
     @Test
-    fun `찍은 날짜순 - 찍은 시각 없으면 올린 시각, 둘 다 없으면 맨 뒤`() {
+    fun `찍은 날짜순 - EXIF, 없으면 파일 이름의 시각, 둘 다 없으면 맨 뒤`() {
         val entries = listOf(
             entry("old-upload-new-shot", created = at(2026, 1, 1), taken = at(2026, 9, 1)),
-            entry("video", created = at(2026, 5, 1)),
-            entry("unknown"),
+            // EXIF 없는 영상 — 이름이 찍은 시각이다
+            entry("20260501_120000", created = at(2026, 9, 30)),
+            // 올린 시각만 있다 — 올린 달로 묶지 않는다(2026-10-08 기기)
+            entry("unknown", created = at(2026, 10, 1)),
             entry("shot", created = at(2026, 9, 30), taken = at(2025, 12, 25)),
         )
         val sorted = entries.sortedFor(DriveMediaOrder.TAKEN).map { it.id }
-        assertEquals(listOf("old-upload-new-shot", "video", "shot", "unknown"), sorted)
+        assertEquals(listOf("old-upload-new-shot", "20260501_120000", "shot", "unknown"), sorted)
+    }
+
+    @Test
+    fun `파일 이름의 시각 - 카메라 형식과 13자리 밀리초`() {
+        val kst = ZoneOffset.ofHours(9)
+        assertEquals(
+            LocalDateTime.of(2023, 8, 8, 12, 25, 40).toInstant(kst).toEpochMilli(),
+            timeFromFileName("20230808_122540.mp4", kst),
+        )
+        assertEquals(
+            LocalDateTime.of(2024, 1, 2, 3, 4, 5).toInstant(kst).toEpochMilli(),
+            timeFromFileName("Screenshot_20240102-030405_KakaoTalk.jpg", kst),
+        )
+        assertEquals(1_435_487_647_130L, timeFromFileName("1435487647130.jpeg", kst))
+        // 날짜처럼 생겼지만 아닌 것
+        assertEquals(null, timeFromFileName("20231340_999999.jpg", kst))
+        assertEquals(null, timeFromFileName("2일차", kst))
+        assertEquals(null, timeFromFileName("0000000000001.jpg", kst))
     }
 
     @Test
