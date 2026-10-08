@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
@@ -122,14 +123,45 @@ class UploadNotifications @Inject constructor(
     private fun downloadId(key: String): Int =
         DOWNLOAD_ID_BASE + (key.hashCode().mod(DOWNLOAD_ID_SLOTS))
 
-    fun showDownloadResult(key: String, name: String, success: Boolean) {
-        val textRes = if (success) R.string.notification_download_done else R.string.notification_download_failed
-        notify(
-            DOWNLOAD_RESULT_ID_BASE + key.hashCode().mod(DOWNLOAD_ID_SLOTS),
-            context.getString(textRes, name),
-            context.getString(R.string.notification_download_title),
+    /**
+     * 다 받았다는 알림(`docs/plans/drive-feedback/spec.md` §3). 업로드 진행과 달리 **끝을 알리는** 것이라 따로 채널을 쓴다 —
+     * 기본 중요도라 상태바에 아이콘이 남고, 소리는 없다. 누르면 받은 사진이 열린다.
+     */
+    fun showDownloadResult(key: String, name: String, success: Boolean, saved: Uri? = null) {
+        if (!manager.areNotificationsEnabled()) return
+        manager.createNotificationChannel(
+            NotificationChannel(
+                DOWNLOAD_DONE_CHANNEL_ID,
+                context.getString(R.string.notification_channel_download_done),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = context.getString(R.string.notification_channel_download_done_description)
+                setSound(null, null)
+            },
         )
+        val textRes = if (success) R.string.notification_download_done else R.string.notification_download_failed
+        val notification = NotificationCompat.Builder(context, DOWNLOAD_DONE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_file_download)
+            .setContentTitle(
+                context.getString(
+                    if (success) R.string.notification_download_done_title else R.string.notification_download_title,
+                ),
+            )
+            .setContentText(context.getString(textRes, name))
+            .setAutoCancel(true)
+            .setContentIntent(saved?.let(::viewIntent) ?: openAppIntent())
+            .build()
+        manager.notify(DOWNLOAD_RESULT_ID_BASE + key.hashCode().mod(DOWNLOAD_ID_SLOTS), notification)
     }
+
+    /** 받은 파일을 기기의 기본 보기 앱으로 연다 */
+    private fun viewIntent(uri: Uri): PendingIntent = PendingIntent.getActivity(
+        context,
+        uri.hashCode(),
+        Intent(Intent.ACTION_VIEW, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     fun showSummary(succeeded: Int, failed: Int) {
         val text = if (failed == 0) {
@@ -204,6 +236,7 @@ class UploadNotifications @Inject constructor(
 
     companion object {
         const val CHANNEL_ID = "upload"
+        const val DOWNLOAD_DONE_CHANNEL_ID = "download_done"
         const val PROGRESS_ID = 1001
         const val SUMMARY_ID = 1002
         const val SCAN_ID = 1003

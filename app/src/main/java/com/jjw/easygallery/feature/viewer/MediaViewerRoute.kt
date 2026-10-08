@@ -14,7 +14,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,8 +24,7 @@ import com.jjw.easygallery.core.domain.model.DateRange
 import com.jjw.easygallery.core.navigation.MediaViewerKey
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.media.TrashFollowUp
-import com.jjw.easygallery.feature.drive.driveFileLink
-import com.jjw.easygallery.feature.drive.openDriveLink
+import com.jjw.easygallery.feature.drive.DriveFileViewer
 import com.jjw.easygallery.feature.gallery.BackupStatusFilter
 import com.jjw.easygallery.feature.gallery.BackupView
 import com.jjw.easygallery.feature.gallery.GalleryTab
@@ -40,7 +38,10 @@ fun MediaViewerRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val backups by viewModel.currentBackups.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    var openDriveFile by remember { mutableStateOf<BackupLine?>(null) }
+    openDriveFile?.let { line ->
+        DriveFileViewer(fileId = line.remoteId, openAs = line.openAs, onDismiss = { openDriveFile = null })
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
 
@@ -115,7 +116,8 @@ fun MediaViewerRoute(
             onCreateCategory = viewModel::createCategory,
             onAssignCategories = viewModel::assignCategoriesToCurrent,
             backups = backups,
-            onOpenInDrive = { line -> context.openDriveLink(driveFileLink(line.remoteId), line.openAs) },
+            // 앱 안에서 연다(결정 A) — Drive 앱은 계정을 다시 묻고 엉뚱한 계정을 골라 둔다
+            onOpenInDrive = { line -> openDriveFile = line },
         )
         val hero = key.hero
         if (!heroDone && hero != null) {

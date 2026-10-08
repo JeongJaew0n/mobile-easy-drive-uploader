@@ -1,6 +1,8 @@
 package com.jjw.easygallery.core.data.download
 
+import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -9,6 +11,7 @@ import androidx.work.workDataOf
 import com.jjw.easygallery.core.data.remote.RemoteStorageException
 import com.jjw.easygallery.core.data.remote.StorageRegistry
 import com.jjw.easygallery.core.data.remote.UnsupportedOperationException
+import com.jjw.easygallery.core.data.upload.UploadLedgerRepository
 import com.jjw.easygallery.core.data.upload.work.UploadNotifications
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -32,6 +35,7 @@ class DownloadWorker @AssistedInject constructor(
     private val storages: StorageRegistry,
     private val saver: MediaStoreSaver,
     private val notifications: UploadNotifications,
+    private val ledger: UploadLedgerRepository,
 ) : CoroutineWorker(appContext, params) {
 
     /**
@@ -55,14 +59,14 @@ class DownloadWorker @AssistedInject constructor(
         return try {
             val storage = storages.storage(accountId)
             val copiedBytes = MutableStateFlow(0L)
-            coroutineScope {
+            val saved = coroutineScope {
                 // 저장기는 블로킹 콜백만 주므로, 진행 알림은 별도 코루틴이 상태를 보고 갱신한다
                 val progressJob = launch {
                     copiedBytes.collect { copied ->
                         if (size > 0) updateForeground(entryId, name, (copied.toFloat() / size).coerceIn(0f, 1f))
                     }
                 }
-                withContext(Dispatchers.IO) {
+                val uri = withContext(Dispatchers.IO) {
                     storage.openDownload(entryId).use { input ->
                         var lastShown = 0L
                         saver.save(name, mimeType, input) { copied ->
@@ -74,9 +78,11 @@ class DownloadWorker @AssistedInject constructor(
                     }
                 }
                 progressJob.cancel()
+                uri
             }
-            notifications.showDownloadResult(entryId, name, success = true)
-            Result.success()
+            val mediaId = linkToLedger(saved, entryId, accountId)
+            notifications.showDownloadResult(entryId, name, success = true, saved = saved)
+            Result.success(workDataOf(KEY_SAVED_URI to saved.toString(), KEY_MEDIA_ID to (mediaId ?: -1L)))
         } catch (e: CancellationException) {
             throw e
         } catch (e: UnsupportedOperationException) {
@@ -89,6 +95,19 @@ class DownloadWorker @AssistedInject constructor(
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             fail(entryId, name, e, retry = false)
         }
+    }
+
+    /**
+     * 받은 사진·영상을 원장에 잇는다 — 그 Drive 파일이 이제 이 기기에도 있다(`docs/plans/drive-feedback/spec.md` §3).
+     * Drive 사진의 ☁ 가 사라지고 "이 기기에도 있음", 갤러리에서는 백업됨 ✓ 가 된다. 사진·영상이 아니면(Download 폴더) 잇지 않는다.
+     */
+    private suspend fun linkToLedger(saved: Uri, entryId: String, accountId: String?): Long? {
+        val mediaId = runCatching { ContentUris.parseId(saved) }.getOrNull()?.takeIf { it >= 0 } ?: return null
+        val isMedia = saved.toString().let { it.contains("/images/") || it.contains("/video/") }
+        if (!isMedia) return null
+        runCatching { ledger.record(mediaId, entryId, folderId = null, accountId = accountId) }
+            .onFailure { Timber.w(it, "ledger link failed for download %s", entryId) }
+        return mediaId
     }
 
     private fun fail(key: String, name: String, e: Exception, retry: Boolean): Result {
@@ -112,6 +131,10 @@ class DownloadWorker @AssistedInject constructor(
         const val KEY_NAME = "name"
         const val KEY_MIME_TYPE = "mimeType"
         const val KEY_SIZE = "size"
+
+        /** 결과: 저장된 MediaStore 주소와 사진 ID(사진·영상이 아니면 -1) */
+        const val KEY_SAVED_URI = "savedUri"
+        const val KEY_MEDIA_ID = "mediaId"
         const val MAX_ATTEMPTS = 3
         private const val HTTP_SERVER_ERROR = 500
         private const val PROGRESS_STEP_BYTES = 512 * 1024L

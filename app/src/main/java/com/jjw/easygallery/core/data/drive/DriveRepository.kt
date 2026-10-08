@@ -42,6 +42,9 @@ interface DriveRepository {
         pageSize: Int = DriveMediaQuery.PAGE_SIZE,
     ): DrivePage
 
+    /** 파일 하나의 사진 정보(썸네일·찍은 시각 포함). 지금 계정이 읽을 수 없으면 404 로 던진다 */
+    suspend fun getMediaFile(fileId: String): DriveEntry
+
     /** 이름 변경. 확장자는 사용자가 쓴 그대로 */
     suspend fun rename(fileId: String, name: String): DriveEntry
 

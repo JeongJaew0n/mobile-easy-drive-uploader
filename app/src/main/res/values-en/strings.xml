@@ -341,8 +341,8 @@
     <string name="drive_move_here">Move here</string>
     <string name="drive_move_no_folders">No subfolders</string>
     <string name="drive_moved">Moved %1$s to %2$s</string>
-    <string name="drive_trashed">Moved %1$s to trash</string>
-    <string name="drive_batch_trashed">Moved %1$d items to trash</string>
+    <string name="drive_trashed">Moved %1$s to Drive trash</string>
+    <string name="drive_batch_trashed">Moved %1$d items to Drive trash</string>
     <string name="drive_batch_deleted">Deleted %1$d items</string>
     <string name="drive_batch_moved">Moved %1$d items to %2$s</string>
     <string name="drive_batch_failed">Couldn\'t process %1$d items</string>
@@ -353,9 +353,9 @@
     <string name="drive_filter_hint">Find by name in this folder</string>
     <string name="drive_uploaded_from_device">Uploaded from this device</string>
     <string name="drive_menu_download">Save to device</string>
-    <string name="drive_download_started">Started downloading %1$d items. See the notification for progress.</string>
+    <string name="drive_download_started">Downloading %1$d to this phone… we\'ll let you know when done</string>
     <string name="notification_download_title">Saving to device</string>
-    <string name="notification_download_done">Saved %1$s (Easy Gallery folder)</string>
+    <string name="notification_download_done">%1$s — saved to gallery (Easy Gallery folder). Tap to view</string>
     <string name="notification_download_failed">Couldn\'t save %1$s</string>
     <string name="drive_restored">Restored</string>
     <string name="action_undo">Undo</string>
@@ -774,9 +774,18 @@
     <string name="backed_up_target_note">The ✓ on thumbnails and \"Delete uploaded photos from device\" count only the current upload destination</string>
     <string name="backed_up_recent">Recent backups</string>
     <string name="viewer_info_backup">Backup</string>
-    <string name="viewer_open_in_drive">Open in Drive</string>
+    <string name="viewer_open_in_drive">View in Drive</string>
     <plurals name="backed_up_summary_of">
         <item quantity="one">Of %1$s photo on this phone</item>
         <item quantity="other">Of %1$s photos on this phone</item>
     </plurals>
+
+    <!-- Drive 되먹임 (docs/plans/drive-feedback/spec.md) -->
+    <string name="notification_channel_download_done">Downloads finished</string>
+    <string name="notification_channel_download_done_description">Tells you when photos from Drive are saved to this phone</string>
+    <string name="notification_download_done_title">Saved to this phone</string>
+    <string name="drive_download_done">Saved %1$d to gallery</string>
+    <string name="drive_download_done_partial">%1$d saved, %2$d failed</string>
+    <string name="drive_file_unreadable">The connected account cannot open this file. If it was uploaded with another account, open it in the Drive app with that account.</string>
+    <string name="drive_file_open_in_app">Open in Drive app</string>
 </resources>

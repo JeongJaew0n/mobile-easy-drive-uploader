@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,6 +26,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +74,11 @@ internal fun DriveMediaPager(
     actions: DriveViewerActions = DriveViewerActions(),
     onDeviceIds: Set<String>? = null,
     onNearEnd: () -> Unit = {},
+    /**
+     * 받기·휴지통의 결과를 **이 창 안에** 띄운다. 화면(Scaffold)의 스낵바는 이 전체 화면 창에 가려 보이지 않는다
+     * (2026-10-08 기기: 받았는지도, 실행 취소가 있는지도 몰랐다 — `docs/plans/drive-feedback/spec.md` §1)
+     */
+    snackbarHostState: SnackbarHostState? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -119,6 +127,16 @@ internal fun DriveMediaPager(
                     onDevice = onDeviceIds?.let { entries[currentIndex].id in it },
                     actions = actions,
                     onDismiss = onDismiss,
+                )
+            }
+            // 영상 조작 막대 위로 올린다
+            snackbarHostState?.let { state ->
+                SnackbarHost(
+                    hostState = state,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = SNACKBAR_BOTTOM_DP.dp),
                 )
             }
         }
@@ -283,5 +301,6 @@ private fun viewerSubtitle(entry: DriveEntry, onDevice: Boolean?): String {
 /** 넘겨 보기에서 까는 썸네일 크기 — 화면을 덮을 만큼(수백 KB) */
 private const val PREVIEW_PX = 1_600
 private const val NEAR_END = 5
+private const val SNACKBAR_BOTTOM_DP = 96
 private const val SCRIM_ALPHA = 0.55f
 private const val SUBTITLE_ALPHA = 0.8f

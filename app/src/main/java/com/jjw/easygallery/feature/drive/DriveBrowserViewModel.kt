@@ -12,6 +12,7 @@ import com.jjw.easygallery.core.common.text.UiText
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
 import com.jjw.easygallery.core.data.auth.SignInStep
+import com.jjw.easygallery.core.data.download.DownloadBatchResult
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.drive.DriveImages
 import com.jjw.easygallery.core.data.drive.DriveMedia
@@ -340,7 +341,10 @@ class DriveBrowserViewModel @Inject constructor(
         val files = entries.filterNot { it.isFolder }
         if (files.isEmpty()) return
         files.forEach { downloads.enqueue(accountId, it) }
-        viewModelScope.launch { events.send(DriveBrowserEvent.DownloadStarted(files.size)) }
+        viewModelScope.launch {
+            events.send(DriveBrowserEvent.DownloadStarted(files.size))
+            events.send(DriveBrowserEvent.DownloadFinished(downloads.awaitBatch(files.map { it.id })))
+        }
     }
 
     // ---- 다중 선택(`docs/DRIVE_FILE_CRUD.md` §7) ----
@@ -732,6 +736,7 @@ sealed interface DriveBrowserEvent {
     data class BatchMoved(val count: Int, val target: DriveFolder) : DriveBrowserEvent
     data class BatchFailed(val count: Int) : DriveBrowserEvent
     data class DownloadStarted(val count: Int) : DriveBrowserEvent
+    data class DownloadFinished(val result: DownloadBatchResult) : DriveBrowserEvent
     data class UploadFolderSelected(val folder: DriveFolder) : DriveBrowserEvent
 
     /** 읽기 권한 동의 화면을 띄워야 한다 */

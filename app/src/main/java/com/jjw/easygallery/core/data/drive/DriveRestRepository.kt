@@ -88,6 +88,9 @@ class DriveRestRepository @Inject constructor(
         return DrivePage(entries = page.files.map { it.toEntry() }, nextPageToken = page.nextPageToken)
     }
 
+    override suspend fun getMediaFile(fileId: String): DriveEntry =
+        api.getFile(fileId, fields = DriveMediaQuery.FILE_FIELDS).toEntry()
+
     override suspend fun rename(fileId: String, name: String): DriveEntry =
         api.updateFile(fileId, DriveFilePatch(name = name)).toEntry()
 

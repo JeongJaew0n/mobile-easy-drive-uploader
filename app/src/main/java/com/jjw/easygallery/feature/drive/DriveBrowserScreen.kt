@@ -91,7 +91,9 @@ fun DriveBrowserRoute(
     // 사진·영상은 앱 안에서, 그 폴더의 사진·영상끼리 넘겨 본다. 외부 Drive 앱으로 넘기면 파일마다 계정을 고르라고 묻는다
     var preview by remember { mutableStateOf<DriveEntry?>(null) }
     preview?.let { entry ->
-        key(entry.id) { FolderMediaPager(uiState, viewModel, entry, onDismiss = { preview = null }) }
+        key(entry.id) {
+            FolderMediaPager(uiState, viewModel, entry, snackbarHostState, onDismiss = { preview = null })
+        }
     }
 
     val authRecoveryLauncher = rememberLauncherForActivityResult(
@@ -197,6 +199,7 @@ private fun FolderMediaPager(
     uiState: DriveBrowserUiState,
     viewModel: DriveBrowserViewModel,
     entry: DriveEntry,
+    snackbarHostState: SnackbarHostState,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -217,6 +220,7 @@ private fun FolderMediaPager(
             },
         ),
         onNearEnd = viewModel::loadMore,
+        snackbarHostState = snackbarHostState,
     )
 }
 

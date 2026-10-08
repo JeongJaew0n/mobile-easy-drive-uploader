@@ -40,6 +40,10 @@ object DriveMediaQuery {
         "owners(emailAddress),thumbnailLink,thumbnailVersion,imageMediaMetadata(time)," +
         "videoMediaMetadata(durationMillis))"
 
+    /** 파일 하나(`files.get`) — [FIELDS] 의 `files(...)` 안쪽과 같다 */
+    const val FILE_FIELDS = "id,name,mimeType,createdTime,modifiedTime,size,webViewLink,owners(emailAddress)," +
+        "thumbnailLink,thumbnailVersion,imageMediaMetadata(time),videoMediaMetadata(durationMillis)"
+
     const val ORDER_BY = "createdTime desc"
     const val PAGE_SIZE = 300
 

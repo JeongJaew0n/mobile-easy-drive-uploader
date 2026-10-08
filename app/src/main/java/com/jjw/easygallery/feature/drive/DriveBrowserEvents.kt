@@ -6,6 +6,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.common.text.displayMessage
+import com.jjw.easygallery.core.data.download.DownloadBatchResult
 import com.jjw.easygallery.core.domain.model.DriveFolder
 
 /** ViewModel 이벤트 → 스낵바(실행 취소 포함). Route 에서 분리해 복잡도를 낮춘다 */
@@ -41,8 +42,8 @@ internal suspend fun showBrowserEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_deleted, event.entry.name))
         DriveBrowserEvent.Restored ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_restored))
-        is DriveBrowserEvent.DownloadStarted ->
-            snackbarHostState.showSnackbar(resources.getString(R.string.drive_download_started, event.count))
+        is DriveBrowserEvent.DownloadStarted, is DriveBrowserEvent.DownloadFinished ->
+            snackbarHostState.showSnackbar(downloadEventText(event, resources))
         is DriveBrowserEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
         // 위에서 이미 처리했다. else 로 뭉뚱그리지 않는 것은, 새 이벤트를 더했을 때
         // 컴파일러가 "여기도 보라" 고 말해주게 하기 위해서다
@@ -110,4 +111,19 @@ private suspend fun showBatchEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_batch_failed, event.count))
         else -> Unit
     }
+}
+
+/** "3개를 갤러리에 저장했습니다" / "2개 저장, 1개 실패" — Drive 사진·폴더 화면이 함께 쓴다 */
+internal fun downloadFinishedText(result: DownloadBatchResult, resources: Resources): String =
+    if (result.failed == 0) {
+        resources.getString(R.string.drive_download_done, result.succeeded)
+    } else {
+        resources.getString(R.string.drive_download_done_partial, result.succeeded, result.failed)
+    }
+
+/** 받기 시작·끝 — 분기를 덜어 [showBrowserEvent] 를 detekt 한계 아래로 */
+private fun downloadEventText(event: DriveBrowserEvent, resources: Resources): String = when (event) {
+    is DriveBrowserEvent.DownloadFinished -> downloadFinishedText(event.result, resources)
+    is DriveBrowserEvent.DownloadStarted -> resources.getString(R.string.drive_download_started, event.count)
+    else -> ""
 }

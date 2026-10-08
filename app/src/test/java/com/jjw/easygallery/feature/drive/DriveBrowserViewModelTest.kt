@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import app.cash.turbine.test
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
+import com.jjw.easygallery.core.data.download.DownloadBatchResult
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.prefs.UserPreferences
 import com.jjw.easygallery.core.data.prefs.UserPreferencesRepository
@@ -316,6 +317,8 @@ class DriveBrowserViewModelTest {
 
     @Test
     fun `download selected enqueues files only and clears the selection`() = runTest(testDispatcher) {
+        val done = DownloadBatchResult(succeeded = 2, failed = 0, lastMediaId = 7L)
+        coEvery { downloads.awaitBatch(listOf("f1", "f2")) } returns done
         val viewModel = loadedViewModel()
         viewModel.selectAll()
 
@@ -326,7 +329,11 @@ class DriveBrowserViewModelTest {
         verify(exactly = 1) { downloads.enqueue(null, fileB) }
         verify(exactly = 0) { downloads.enqueue(null, folderA) }
         assertTrue(!viewModel.uiState.value.isSelecting)
-        viewModel.eventFlow.test { assertEquals(DriveBrowserEvent.DownloadStarted(2), awaitItem()) }
+        viewModel.eventFlow.test {
+            assertEquals(DriveBrowserEvent.DownloadStarted(2), awaitItem())
+            // 다 받으면 결과를 한 번 더 알린다(`docs/plans/drive-feedback/spec.md` §3)
+            assertEquals(DriveBrowserEvent.DownloadFinished(done), awaitItem())
+        }
     }
 
     @Test

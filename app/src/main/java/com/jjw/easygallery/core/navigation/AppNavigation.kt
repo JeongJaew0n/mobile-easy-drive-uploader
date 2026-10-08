@@ -202,6 +202,7 @@ fun AppNavigation() {
                     key = key,
                     onBackClick = { backStack.removeLastOrNull() },
                     onOpenFolders = { backStack.add(DriveBrowserKey()) },
+                    onOpenDeviceMedia = { mediaId -> backStack.add(MediaViewerKey(mediaId = mediaId)) },
                 )
             }
             entry<DriveBrowserKey> { key ->

@@ -324,8 +324,8 @@
     <string name="drive_move_here">ここに移動</string>
     <string name="drive_move_no_folders">サブフォルダはありません</string>
     <string name="drive_moved">%1$s を %2$s に移動しました</string>
-    <string name="drive_trashed">%1$s をゴミ箱に移動しました</string>
-    <string name="drive_batch_trashed">%1$d件をゴミ箱に移動しました</string>
+    <string name="drive_trashed">%1$s をドライブのゴミ箱に移動しました</string>
+    <string name="drive_batch_trashed">%1$d件をドライブのゴミ箱に移動しました</string>
     <string name="drive_batch_deleted">%1$d件を削除しました</string>
     <string name="drive_batch_moved">%1$d件を %2$s に移動しました</string>
     <string name="drive_batch_failed">%1$d件は処理できませんでした</string>
@@ -336,9 +336,9 @@
     <string name="drive_filter_hint">このフォルダで名前から探す</string>
     <string name="drive_uploaded_from_device">この端末からアップロード</string>
     <string name="drive_menu_download">端末に保存</string>
-    <string name="drive_download_started">%1$d件のダウンロードを開始しました。進行状況は通知で確認してください。</string>
+    <string name="drive_download_started">%1$d件を端末に保存中… 終わったらお知らせします</string>
     <string name="notification_download_title">端末に保存中</string>
-    <string name="notification_download_done">%1$s を保存しました（Easy Galleryフォルダ）</string>
+    <string name="notification_download_done">%1$s — ギャラリーに保存しました（Easy Galleryフォルダ）。タップして表示</string>
     <string name="notification_download_failed">%1$s を保存できませんでした</string>
     <string name="drive_restored">復元しました</string>
     <string name="action_undo">元に戻す</string>
@@ -752,8 +752,17 @@
     <string name="backed_up_target_note">サムネイルの ✓ と「アップロード済みの写真を端末から削除」は、いまのアップロード先 1 か所だけを数えます</string>
     <string name="backed_up_recent">最近のバックアップ</string>
     <string name="viewer_info_backup">バックアップ</string>
-    <string name="viewer_open_in_drive">ドライブで開く</string>
+    <string name="viewer_open_in_drive">ドライブで見る</string>
     <plurals name="backed_up_summary_of">
         <item quantity="other">この端末の写真 %1$s枚のうち</item>
     </plurals>
+
+    <!-- Drive 되먹임 (docs/plans/drive-feedback/spec.md) -->
+    <string name="notification_channel_download_done">ダウンロード完了</string>
+    <string name="notification_channel_download_done_description">ドライブから端末に保存した写真が保存されたらお知らせします</string>
+    <string name="notification_download_done_title">端末に保存しました</string>
+    <string name="drive_download_done">%1$d件をギャラリーに保存しました</string>
+    <string name="drive_download_done_partial">%1$d件保存、%2$d件失敗</string>
+    <string name="drive_file_unreadable">いま接続中のアカウントではこのファイルを表示できません。別のアカウントでアップした場合は、ドライブアプリでそのアカウントで開いてください。</string>
+    <string name="drive_file_open_in_app">ドライブアプリで開く</string>
 </resources>

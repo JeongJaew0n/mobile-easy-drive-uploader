@@ -337,8 +337,8 @@
     <string name="drive_move_here">여기로 이동</string>
     <string name="drive_move_no_folders">하위 폴더가 없습니다</string>
     <string name="drive_moved">%1$s을(를) %2$s(으)로 옮겼습니다</string>
-    <string name="drive_trashed">%1$s을(를) 휴지통으로 옮겼습니다</string>
-    <string name="drive_batch_trashed">%1$d개를 휴지통으로 옮겼습니다</string>
+    <string name="drive_trashed">%1$s을(를) Drive 휴지통으로 옮겼습니다</string>
+    <string name="drive_batch_trashed">%1$d개를 Drive 휴지통으로 옮겼습니다</string>
     <string name="drive_batch_deleted">%1$d개를 삭제했습니다</string>
     <string name="drive_batch_moved">%1$d개를 %2$s(으)로 옮겼습니다</string>
     <string name="drive_batch_failed">%1$d개는 처리하지 못했습니다</string>
@@ -349,9 +349,9 @@
     <string name="drive_filter_hint">이 폴더에서 이름으로 찾기</string>
     <string name="drive_uploaded_from_device">이 기기에서 올림</string>
     <string name="drive_menu_download">기기에 저장</string>
-    <string name="drive_download_started">%1$d개 다운로드를 시작했습니다. 진행은 알림에서 확인하세요.</string>
+    <string name="drive_download_started">%1$d개를 기기로 받는 중… 끝나면 알려 드릴게요</string>
     <string name="notification_download_title">기기에 저장 중</string>
-    <string name="notification_download_done">%1$s 저장 완료 (Easy Gallery 폴더)</string>
+    <string name="notification_download_done">%1$s — 갤러리에 저장했습니다(Easy Gallery 폴더). 눌러서 보기</string>
     <string name="notification_download_failed">%1$s 저장 실패</string>
     <string name="drive_restored">복원했습니다</string>
     <string name="action_undo">실행 취소</string>
@@ -788,8 +788,17 @@
     <string name="backed_up_target_note">썸네일의 ✓ 와 \"올린 사진 기기에서 삭제\" 는 지금 업로드 대상 한 곳만 셉니다</string>
     <string name="backed_up_recent">최근 백업</string>
     <string name="viewer_info_backup">백업</string>
-    <string name="viewer_open_in_drive">Drive 에서 열기</string>
+    <string name="viewer_open_in_drive">Drive 에서 보기</string>
     <plurals name="backed_up_summary_of">
         <item quantity="other">이 기기의 사진 %1$s장 중</item>
     </plurals>
+
+    <!-- Drive 되먹임 (docs/plans/drive-feedback/spec.md) -->
+    <string name="notification_channel_download_done">다운로드 완료</string>
+    <string name="notification_channel_download_done_description">Drive 에서 기기로 받은 사진이 저장되면 알립니다</string>
+    <string name="notification_download_done_title">기기에 저장했습니다</string>
+    <string name="drive_download_done">%1$d개를 갤러리에 저장했습니다</string>
+    <string name="drive_download_done_partial">%1$d개 저장, %2$d개 실패</string>
+    <string name="drive_file_unreadable">이 파일은 지금 연결된 계정으로 볼 수 없습니다. 다른 계정으로 올렸다면 Drive 앱에서 그 계정으로 여세요.</string>
+    <string name="drive_file_open_in_app">Drive 앱에서 열기</string>
 </resources>

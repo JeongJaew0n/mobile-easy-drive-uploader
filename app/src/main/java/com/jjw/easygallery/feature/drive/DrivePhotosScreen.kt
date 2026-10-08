@@ -17,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -60,6 +61,8 @@ fun DrivePhotosRoute(
     key: DrivePhotosKey,
     onBackClick: () -> Unit,
     onOpenFolders: () -> Unit,
+    /** 받은 사진을 기기 상세보기로 연다(스낵바 "보기") */
+    onOpenDeviceMedia: (mediaId: Long) -> Unit = {},
     viewModel: DrivePhotosViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -70,7 +73,9 @@ fun DrivePhotosRoute(
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(Unit) {
-        viewModel.eventFlow.collect { event -> showPhotosEvent(event, snackbarHostState, resources, viewModel) }
+        viewModel.eventFlow.collect { event ->
+            showPhotosEvent(event, snackbarHostState, resources, viewModel, onOpenDeviceMedia)
+        }
     }
     val authRecoveryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -126,6 +131,7 @@ fun DrivePhotosRoute(
                 ),
                 onDeviceIds = content.onDeviceIds,
                 onNearEnd = viewModel::loadMore,
+                snackbarHostState = snackbarHostState,
             )
         }
     }
@@ -153,6 +159,7 @@ private suspend fun showPhotosEvent(
     snackbarHostState: SnackbarHostState,
     resources: Resources,
     viewModel: DrivePhotosViewModel,
+    onOpenDeviceMedia: (Long) -> Unit,
 ) {
     when (event) {
         is DrivePhotosEvent.Trashed -> {
@@ -167,6 +174,15 @@ private suspend fun showPhotosEvent(
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_batch_failed, event.count))
         is DrivePhotosEvent.DownloadStarted ->
             snackbarHostState.showSnackbar(resources.getString(R.string.drive_download_started, event.count))
+        is DrivePhotosEvent.DownloadFinished -> {
+            val mediaId = event.result.lastMediaId
+            val result = snackbarHostState.showSnackbar(
+                message = downloadFinishedText(event.result, resources),
+                actionLabel = mediaId?.let { resources.getString(R.string.action_view) },
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed && mediaId != null) onOpenDeviceMedia(mediaId)
+        }
         is DrivePhotosEvent.Error -> snackbarHostState.showSnackbar(event.error.displayMessage(resources))
     }
 }

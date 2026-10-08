@@ -8,6 +8,7 @@ import androidx.media3.datasource.DataSource
 import coil3.ImageLoader
 import com.jjw.easygallery.core.data.auth.AuthRepository
 import com.jjw.easygallery.core.data.auth.AuthorizationRequiredException
+import com.jjw.easygallery.core.data.download.DownloadBatchResult
 import com.jjw.easygallery.core.data.download.DownloadScheduler
 import com.jjw.easygallery.core.data.drive.DriveImages
 import com.jjw.easygallery.core.data.drive.DriveMedia
@@ -280,11 +281,15 @@ class DrivePhotosViewModel @Inject constructor(
 
     fun clearSelection() = updateContent { it.copy(selectedIds = emptySet()) }
 
+    /** 받기 → "받는 중" → 다 끝나면 "N장을 갤러리에 저장했습니다 [보기]"(`docs/plans/drive-feedback/spec.md` §3) */
     fun download(entries: List<DriveEntry>) {
         if (entries.isEmpty()) return
         entries.forEach { downloads.enqueue(null, it) }
         clearSelection()
-        viewModelScope.launch { events.send(DrivePhotosEvent.DownloadStarted(entries.size)) }
+        viewModelScope.launch {
+            events.send(DrivePhotosEvent.DownloadStarted(entries.size))
+            events.send(DrivePhotosEvent.DownloadFinished(downloads.awaitBatch(entries.map { it.id })))
+        }
     }
 
     fun downloadSelected() = download(selectedEntries())
@@ -406,5 +411,6 @@ sealed interface DrivePhotosEvent {
     data object Restored : DrivePhotosEvent
     data class Failed(val count: Int) : DrivePhotosEvent
     data class DownloadStarted(val count: Int) : DrivePhotosEvent
+    data class DownloadFinished(val result: DownloadBatchResult) : DrivePhotosEvent
     data class Error(val error: Throwable) : DrivePhotosEvent
 }
