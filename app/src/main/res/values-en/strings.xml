@@ -653,6 +653,7 @@
     <string name="drive_view_folder_removed">Removed %1$s from the list</string>
     <string name="drive_view_folder_exists">%1$s is already in the list</string>
     <string name="drive_view_scope_denied">Drive read permission is needed to view folders</string>
+    <string name="error_offline">Cannot reach the internet. Check your connection and try again</string>
     <string name="error_not_signed_in">You\'re not signed in to a Google account</string>
     <string name="error_authorization_required">Allow Google Drive access again</string>
     <string name="error_sign_in_cancelled">Sign-in was cancelled</string>

@@ -46,12 +46,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.UploadSummary
 import com.jjw.easygallery.core.ui.media.MediaActionEffect
 import com.jjw.easygallery.core.ui.theme.EasyGalleryTheme
+import com.jjw.easygallery.feature.gallery.MediaPermission
+import com.jjw.easygallery.feature.gallery.MediaPermissionStatus
 import com.jjw.easygallery.feature.gallery.UploadFailedBanner
 import com.jjw.easygallery.feature.gallery.UploadProgressBanner
 
@@ -67,6 +70,14 @@ fun BackupRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // 사진 권한이 없어도 앱이 직접 저장한 파일(Drive 에서 받은 것)은 보여서 "2장 중 1장" 처럼 엉뚱하게 센다(2026-10-08 기기).
+    // 셀 수 없으면 요약 카드를 두지 않는다. 설정에서 바꾸고 돌아오는 경우가 있어 RESUME 마다 다시 본다
+    val context = LocalContext.current
+    var mediaAccess by remember { mutableStateOf(MediaPermission.status(context)) }
+    LifecycleResumeEffect(Unit) {
+        mediaAccess = MediaPermission.status(context)
+        onPauseOrDispose { }
+    }
     MediaActionEffect(
         events = viewModel.actionEvents,
         snackbarHostState = snackbarHostState,
@@ -76,6 +87,7 @@ fun BackupRoute(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
         imageLoader = viewModel.driveImageLoader,
+        showOverview = mediaAccess != MediaPermissionStatus.Denied,
         actions = BackupActions(
             onUploadQueueClick = onUploadQueueClick,
             onAutoBackupClick = onAutoBackupClick,
@@ -115,6 +127,8 @@ internal fun BackupScreen(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     navigationBar: @Composable () -> Unit = {},
     imageLoader: ImageLoader? = null,
+    /** 사진 권한이 없으면 false — 셀 수 없다 */
+    showOverview: Boolean = true,
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_backup)) }) },
@@ -136,7 +150,7 @@ internal fun BackupScreen(
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (uiState.isMutating) LinearProgressIndicator(Modifier.fillMaxWidth())
-                uiState.overview?.let { overview ->
+                uiState.overview?.takeIf { showOverview }?.let { overview ->
                     BackupSummaryCard(overview, failed = uiState.summary.failed, onOpen = actions.onBackedUpClick)
                 }
                 TargetCard(uiState.target, onSettingsClick = actions.onSettingsClick)
