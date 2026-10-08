@@ -660,7 +660,7 @@
     <string name="drive_view_scope_denied">폴더를 보려면 Drive 읽기 권한이 필요합니다</string>
 
     <!-- 오류 문장(docs/plans/i18n/spec.md). 데이터 계층은 문장 대신 이 ID 를 싣고, 화면이 지금 언어로 만든다 -->
-    <string name="error_offline">인터넷에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요</string>
+    <string name="error_offline">연결할 수 없습니다. 인터넷이나 서버(NAS) 연결을 확인하고 다시 시도하세요</string>
     <string name="error_not_signed_in">Google 계정에 로그인되어 있지 않습니다</string>
     <string name="error_authorization_required">Google Drive 접근 권한을 다시 허용해야 합니다</string>
     <string name="error_sign_in_cancelled">로그인이 취소되었습니다</string>

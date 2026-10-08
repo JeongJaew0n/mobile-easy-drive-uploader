@@ -632,7 +632,7 @@
     <string name="drive_view_folder_removed">%1$s を一覧から外しました</string>
     <string name="drive_view_folder_exists">%1$s はすでに一覧にあります</string>
     <string name="drive_view_scope_denied">フォルダを見るにはDriveの読み取り権限が必要です</string>
-    <string name="error_offline">インターネットに接続できません。接続を確認してもう一度お試しください</string>
+    <string name="error_offline">接続できません。インターネットまたはサーバー（NAS）への接続を確認して、もう一度お試しください</string>
     <string name="error_not_signed_in">Googleアカウントにログインしていません</string>
     <string name="error_authorization_required">Google Driveへのアクセスをもう一度許可してください</string>
     <string name="error_sign_in_cancelled">ログインがキャンセルされました</string>

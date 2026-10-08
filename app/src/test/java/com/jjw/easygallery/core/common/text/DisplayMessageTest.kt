@@ -20,15 +20,15 @@ class DisplayMessageTest {
             "${args[0]} 실패 (${args[1]})"
         }
         every { getString(R.string.error_folder_exists) } returns "이미 같은 이름의 폴더가 있습니다"
-        every { getString(R.string.error_offline) } returns "인터넷에 연결할 수 없습니다"
+        every { getString(R.string.error_offline) } returns "연결할 수 없습니다"
     }
 
     @Test
     fun `인터넷이 끊겼으면 원문 대신 우리 문장 - 감싸여 있어도`() {
         val offline = UnknownHostException("Unable to resolve host \"www.googleapis.com\"")
-        assertEquals("인터넷에 연결할 수 없습니다", offline.displayMessage(resources))
+        assertEquals("연결할 수 없습니다", offline.displayMessage(resources))
         val wrapped = RemoteStorageException("io", uiText = UiText(R.string.error_folder_exists), cause = offline)
-        assertEquals("인터넷에 연결할 수 없습니다", IOException("wrapped", wrapped).displayMessage(resources))
+        assertEquals("연결할 수 없습니다", IOException("wrapped", wrapped).displayMessage(resources))
     }
 
     @Test

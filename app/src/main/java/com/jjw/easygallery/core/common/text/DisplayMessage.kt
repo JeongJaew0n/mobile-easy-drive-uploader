@@ -23,7 +23,8 @@ fun UiText.resolve(resources: Resources): String {
  * 원인 사슬도 본다: 코루틴·Retrofit 이 우리 예외를 감싸 다시 던지는 일이 있다.
  */
 fun Throwable.displayMessage(resources: Resources): String {
-    // 인터넷이 끊겼으면 우리 문장이 무엇이든 그게 까닭이다 — 예전엔 "Unable to resolve host …" 가 그대로 보였다(2026-10-08 기기)
+    // 연결이 안 되면 우리 문장이 무엇이든 그게 까닭이다 — 예전엔 "Unable to resolve host …" 가 그대로 보였다(2026-10-08 기기).
+    // 인터넷만이 아니다 — 같은 망에 없는 NAS 도 여기로 온다. 그래서 문장이 둘 다 말한다
     if (causeChain().any { it.isOffline() }) return resources.getString(R.string.error_offline)
     var current: Throwable? = this
     var depth = 0
