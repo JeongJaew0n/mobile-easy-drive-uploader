@@ -107,6 +107,16 @@ class GalleryViewModelTest {
         Dispatchers.resetMain()
     }
 
+    /** 두 손가락으로 바꾼 칸 크기는 설정에 남는다 — 다음에 열어도 그 크기(UX2-10) */
+    @Test
+    fun `칸 크기 단계를 바꾸면 설정에 저장한다`() = runTest(testDispatcher) {
+        io.mockk.coEvery { prefs.setGalleryCellSizeStep(any()) } returns Unit
+        val viewModel = createViewModel()
+        viewModel.setCellSizeStep(3)
+        advanceUntilIdle()
+        io.mockk.coVerify { prefs.setGalleryCellSizeStep(3) }
+    }
+
     /**
      * 앱은 고른 사진 탭에서 시작한다. 기존 테스트는 "전체" 를 전제로 쓰였으므로 기본으로 [GalleryTab.ALL] 로 옮겨 둔다.
      * 시작 탭 자체를 볼 때만 [startOnAll] 을 끈다.

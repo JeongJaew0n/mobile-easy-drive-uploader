@@ -161,7 +161,7 @@ private fun cellSizePinch(step: Int?, onChange: (Int) -> Unit): Modifier =
     if (step == null) {
         Modifier
     } else {
-        Modifier.pinchToZoom { zoom ->
+        Modifier.pinchToZoom(key = step) { zoom ->
             val next = nextCellStep(step, zoom)
             if (next != step) onChange(next)
         }

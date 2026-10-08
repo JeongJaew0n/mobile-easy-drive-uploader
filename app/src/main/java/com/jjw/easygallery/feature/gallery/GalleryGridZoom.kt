@@ -65,8 +65,11 @@ internal fun nextCellStep(current: Int, zoom: Float): Int {
 /**
  * 두 번째 손가락이 닿았을 때만 듣는다 — 한 손가락(스크롤·길게 눌러 끌어 고르기)은 그대로 격자로 흘려 보낸다.
  * 두 손가락일 때는 먼저(Initial) 가로채 격자가 스크롤하지 않게 한다.
+ *
+ * [key] 가 바뀌면 감지기를 새로 만든다. `pointerInput(Unit)` 이던 때는 [onPinchEnd] 가 처음 단계를 붙잡고 있어서,
+ * 한 번 키운 뒤에는 더 키워도 그대로이고 줄이면 두 단계를 건너뛰었다(2026-10-08 실기기 핀치 테스트에서 발견).
  */
-internal fun Modifier.pinchToZoom(onPinchEnd: (zoom: Float) -> Unit): Modifier = pointerInput(Unit) {
+internal fun Modifier.pinchToZoom(key: Any?, onPinchEnd: (zoom: Float) -> Unit): Modifier = pointerInput(key) {
     awaitEachGesture {
         var zoom = 1f
         var pinched = false
