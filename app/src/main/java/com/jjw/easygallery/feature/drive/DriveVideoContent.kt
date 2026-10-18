@@ -4,7 +4,6 @@ import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -17,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +45,7 @@ import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.DriveEntry
+import com.jjw.easygallery.core.ui.media.VideoSeekBar
 import com.jjw.easygallery.feature.gallery.formatDuration
 import kotlinx.coroutines.delay
 import timber.log.Timber
@@ -161,36 +161,39 @@ internal fun DriveVideoContent(entry: DriveEntry, dataSourceFactory: DataSource.
             }
         }
 
+        // 기기 영상과 같은 재생바·그림자(`docs/plans/video-controls/spec.md`)
+        val scrub = scrubFraction
+        val shown = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
-                .navigationBarsPadding(),
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = SCRIM_ALPHA))))
+                .navigationBarsPadding()
+                .padding(top = SCRIM_TOP_DP.dp, bottom = 8.dp),
         ) {
-            val scrub = scrubFraction
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val shown = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis
-                Text(formatDuration(shown), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                Slider(
-                    value = scrub ?: fractionOf(positionMillis, durationMillis),
-                    onValueChange = { scrubFraction = it },
-                    onValueChangeFinished = {
-                        scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
-                        scrubFraction = null
-                    },
-                    enabled = durationMillis > 0,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                )
-                Text(formatDuration(durationMillis), style = MaterialTheme.typography.labelSmall, color = Color.White)
-            }
+            VideoSeekBar(
+                fraction = scrub ?: fractionOf(positionMillis, durationMillis),
+                onScrub = { scrubFraction = it },
+                onScrubFinished = {
+                    scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
+                    scrubFraction = null
+                },
+                enabled = durationMillis > 0,
+                scrubLabel = formatDuration(shown),
+                label = stringResource(R.string.viewer_seek_label),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Text(
+                text = stringResource(
+                    R.string.viewer_time_progress,
+                    formatDuration(shown),
+                    formatDuration(durationMillis),
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
     }
 }
@@ -201,3 +204,5 @@ private fun fractionOf(positionMillis: Long, durationMillis: Long): Float =
 private const val PROGRESS_POLL_MILLIS = 250L
 private const val PLAY_BUTTON_SIZE_DP = 64
 private const val OVERLAY_ALPHA = 0.4f
+private const val SCRIM_ALPHA = 0.6f
+private const val SCRIM_TOP_DP = 24

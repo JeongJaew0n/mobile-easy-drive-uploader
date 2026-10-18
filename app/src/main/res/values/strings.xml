@@ -802,4 +802,10 @@
     <string name="drive_download_done_partial">%1$d개 저장, %2$d개 실패</string>
     <string name="drive_file_unreadable">이 파일은 지금 연결된 계정으로 볼 수 없습니다. 다른 계정으로 올렸다면 Drive 앱에서 그 계정으로 여세요.</string>
     <string name="drive_file_open_in_app">Drive 앱에서 열기</string>
+
+    <!-- 영상 컨트롤 (docs/plans/video-controls/spec.md) -->
+    <string name="viewer_seek_label">재생 위치</string>
+    <string name="viewer_time_progress">%1$s / %2$s</string>
+    <string name="viewer_seek_back_hint">−10초</string>
+    <string name="viewer_seek_forward_hint">+10초</string>
 </resources>

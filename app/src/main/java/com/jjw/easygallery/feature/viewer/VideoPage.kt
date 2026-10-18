@@ -2,11 +2,12 @@ package com.jjw.easygallery.feature.viewer
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,7 +26,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,10 +35,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -57,6 +60,7 @@ import coil3.request.ImageRequest
 import com.jjw.easygallery.R
 import com.jjw.easygallery.core.domain.model.MediaItem
 import com.jjw.easygallery.core.ui.image.mediaStoreThumbnail
+import com.jjw.easygallery.core.ui.media.VideoSeekBar
 import com.jjw.easygallery.core.ui.motion.LocalMotion
 import com.jjw.easygallery.feature.gallery.formatDuration
 import kotlinx.coroutines.delay
@@ -117,14 +121,29 @@ internal fun VideoPage(
     LaunchedEffect(player, settings.speed) { player.setPlaybackSpeed(settings.speed) }
     LaunchedEffect(player, settings.volume) { player.volume = settings.volume }
 
+    // 두 번 톡: 왼쪽 반은 10초 뒤로, 오른쪽 반은 10초 앞으로(`docs/plans/video-controls/spec.md`). 한 번 톡은 컨트롤 보이기/숨기기
+    val latestToggle by rememberUpdatedState(onToggleControls)
+    var seekHint by remember { mutableStateOf<SeekHint?>(null) }
+    LaunchedEffect(seekHint) {
+        if (seekHint != null) {
+            delay(SEEK_HINT_MILLIS)
+            seekHint = null
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onToggleControls,
-            ),
+            .pointerInput(player) {
+                detectTapGestures(
+                    onTap = { latestToggle() },
+                    onDoubleTap = { offset ->
+                        val forward = offset.x > size.width / 2
+                        player.seekTo(seekTarget(player.currentPosition, player.duration, forward))
+                        positionMillis = player.currentPosition.coerceAtLeast(0L)
+                        seekHint = SeekHint(forward, System.nanoTime())
+                    },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         // ContentFrame 이 영상 크기(PresentationState.videoSizeDp)에 맞춰 표면을 Fit 으로 배치한다 — PlayerSurface 를
@@ -146,14 +165,7 @@ internal fun VideoPage(
             modifier = Modifier.align(Alignment.Center),
         ) {
             IconButton(
-                onClick = {
-                    if (player.isPlaying) {
-                        player.pause()
-                    } else {
-                        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
-                        player.play()
-                    }
-                },
+                onClick = { togglePlay(player) },
                 modifier = Modifier
                     .size(PLAY_BUTTON_SIZE_DP.dp)
                     .background(Color.Black.copy(alpha = OVERLAY_ALPHA), CircleShape),
@@ -183,27 +195,93 @@ internal fun VideoPage(
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             val scrub = scrubFraction
+            val shownMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis
+            // 회색 상자 대신 아래로 갈수록 어두워지는 그림자 — 영상을 덜 가린다
             Column(
                 Modifier
                     .padding(bottom = controlsBottomPadding)
-                    .background(Color.Black.copy(alpha = OVERLAY_ALPHA))
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = SCRIM_ALPHA))),
+                    )
                     // 가로 모드에서 측면 시스템 바·컷아웃을 피한다(하단은 Scaffold 의 하단 바가 이미 소비)
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    .padding(top = SCRIM_TOP_DP.dp),
             ) {
-                VideoSettingsRow(settings = settings)
                 VideoSeekBar(
-                    positionMillis = if (scrub != null) (scrub * durationMillis).toLong() else positionMillis,
-                    durationMillis = durationMillis,
                     fraction = scrub ?: fractionOf(positionMillis, durationMillis),
                     onScrub = { scrubFraction = it },
                     onScrubFinished = {
                         scrubFraction?.let { player.seekTo((it * durationMillis).toLong()) }
                         scrubFraction = null
                     },
+                    enabled = durationMillis > 0,
+                    scrubLabel = formatDuration(shownMillis),
+                    label = stringResource(R.string.viewer_seek_label),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                VideoControlRow(
+                    isPlaying = isPlaying,
+                    onPlayPause = { togglePlay(player) },
+                    time = stringResource(
+                        R.string.viewer_time_progress,
+                        formatDuration(shownMillis),
+                        formatDuration(durationMillis),
+                    ),
+                    settings = settings,
                 )
             }
         }
+
+        SeekHintBubble(seekHint)
     }
+}
+
+/** 두 번 톡 직후 그 쪽에 잠깐 뜨는 "−10초"/"+10초". [at] 은 같은 쪽을 연달아 쳐도 다시 뜨게 하는 값 */
+private data class SeekHint(val forward: Boolean, val at: Long)
+
+@Composable
+private fun BoxScope.SeekHintBubble(hint: SeekHint?) {
+    val motion = LocalMotion.current
+    // 사라지는 동안에도 마지막 쪽을 보인다
+    var last by remember { mutableStateOf(hint) }
+    if (hint != null) last = hint
+    AnimatedVisibility(
+        visible = hint != null,
+        enter = motion.enterFade(),
+        exit = motion.exitFade(),
+        modifier = Modifier
+            .align(if (last?.forward == true) Alignment.CenterEnd else Alignment.CenterStart)
+            .padding(horizontal = SEEK_HINT_INSET_DP.dp),
+    ) {
+        Text(
+            text = stringResource(
+                if (last?.forward == true) R.string.viewer_seek_forward_hint else R.string.viewer_seek_back_hint,
+            ),
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = OVERLAY_ALPHA), CircleShape)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+        )
+    }
+}
+
+private fun togglePlay(player: Player) {
+    if (player.isPlaying) {
+        player.pause()
+    } else {
+        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+        player.play()
+    }
+}
+
+/**
+ * 두 번 톡의 목표 위치 — [SEEK_STEP_MILLIS] 만큼, 처음과 끝을 넘지 않게. 길이를 아직 모르면(음수·0) 앞쪽 끝만 자른다
+ */
+internal fun seekTarget(current: Long, duration: Long, forward: Boolean): Long {
+    val target = current + if (forward) SEEK_STEP_MILLIS else -SEEK_STEP_MILLIS
+    val upper = if (duration > 0) duration else Long.MAX_VALUE
+    return target.coerceIn(0L, upper)
 }
 
 /** 첫 프레임이 나오기 전까지 보여주는 썸네일. 그리드와 같은 캐시 키라 디코딩 없이 바로 뜬다 */
@@ -222,42 +300,6 @@ private fun VideoShutter(item: MediaItem) {
     )
 }
 
-@Composable
-private fun VideoSeekBar(
-    positionMillis: Long,
-    durationMillis: Long,
-    fraction: Float,
-    onScrub: (Float) -> Unit,
-    onScrubFinished: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = formatDuration(positionMillis),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-        )
-        Slider(
-            value = fraction,
-            onValueChange = onScrub,
-            onValueChangeFinished = onScrubFinished,
-            enabled = durationMillis > 0,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp),
-        )
-        Text(
-            text = formatDuration(durationMillis),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-        )
-    }
-}
-
 /** 영상 컨트롤 중 화면을 넘겨도 유지되는 설정 묶음 */
 internal data class VideoSettings(
     val speed: Float,
@@ -268,15 +310,41 @@ internal data class VideoSettings(
     val onToggleRotation: () -> Unit,
 )
 
+/**
+ * 재생바 아래 한 줄: ❚❚/▶ · "0:03 / 0:08" ……… 🔊 · 1x · ⟲. 음량 막대는 없다 — 🔊 는 음소거만, 음량은 폰 버튼으로
+ * (`docs/plans/video-controls/spec.md`).
+ */
 @Composable
-private fun VideoSettingsRow(settings: VideoSettings) {
+private fun VideoControlRow(
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
+    time: String,
+    settings: VideoSettings,
+) {
     val muted = settings.volume <= 0f
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        IconButton(onClick = onPlayPause) {
+            if (isPlaying) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_pause),
+                    contentDescription = stringResource(R.string.viewer_pause),
+                    tint = Color.White,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(R.string.viewer_play),
+                    tint = Color.White,
+                )
+            }
+        }
+        Text(text = time, style = MaterialTheme.typography.labelLarge, color = Color.White)
+        Spacer(Modifier.weight(1f))
         IconButton(onClick = { settings.onVolumeChange(if (muted) 1f else 0f) }) {
             Icon(
                 painter = painterResource(if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_up),
@@ -284,13 +352,6 @@ private fun VideoSettingsRow(settings: VideoSettings) {
                 tint = Color.White,
             )
         }
-        Slider(
-            value = settings.volume,
-            onValueChange = settings.onVolumeChange,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 4.dp),
-        )
         SpeedMenuButton(speed = settings.speed, onSpeedChange = settings.onSpeedChange)
         IconButton(onClick = settings.onToggleRotation) {
             Icon(
@@ -343,6 +404,12 @@ private fun fractionOf(positionMillis: Long, durationMillis: Long): Float =
     if (durationMillis > 0) (positionMillis.toFloat() / durationMillis).coerceIn(0f, 1f) else 0f
 
 private const val PROGRESS_POLL_MILLIS = 250L
+
+private const val SEEK_STEP_MILLIS = 10_000L
+private const val SEEK_HINT_MILLIS = 600L
+private const val SEEK_HINT_INSET_DP = 48
+private const val SCRIM_ALPHA = 0.6f
+private const val SCRIM_TOP_DP = 24
 
 private const val PLAY_BUTTON_SIZE_DP = 64
 

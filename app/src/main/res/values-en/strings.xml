@@ -789,4 +789,10 @@
     <string name="drive_download_done_partial">%1$d saved, %2$d failed</string>
     <string name="drive_file_unreadable">The connected account cannot open this file. If it was uploaded with another account, open it in the Drive app with that account.</string>
     <string name="drive_file_open_in_app">Open in Drive app</string>
+
+    <!-- 영상 컨트롤 (docs/plans/video-controls/spec.md) -->
+    <string name="viewer_seek_label">Playback position</string>
+    <string name="viewer_time_progress">%1$s / %2$s</string>
+    <string name="viewer_seek_back_hint">−10s</string>
+    <string name="viewer_seek_forward_hint">+10s</string>
 </resources>

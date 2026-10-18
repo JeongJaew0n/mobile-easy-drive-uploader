@@ -766,4 +766,10 @@
     <string name="drive_download_done_partial">%1$d件保存、%2$d件失敗</string>
     <string name="drive_file_unreadable">いま接続中のアカウントではこのファイルを表示できません。別のアカウントでアップした場合は、ドライブアプリでそのアカウントで開いてください。</string>
     <string name="drive_file_open_in_app">ドライブアプリで開く</string>
+
+    <!-- 영상 컨트롤 (docs/plans/video-controls/spec.md) -->
+    <string name="viewer_seek_label">再生位置</string>
+    <string name="viewer_time_progress">%1$s / %2$s</string>
+    <string name="viewer_seek_back_hint">−10秒</string>
+    <string name="viewer_seek_forward_hint">+10秒</string>
 </resources>
