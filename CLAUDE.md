@@ -54,7 +54,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools   # local.prope
 - author: `JeongJaew0n <45487307+JeongJaew0n@users.noreply.github.com>` — `git config --local` 로 설정돼 있다. 커밋 전 `git config user.email` 로 확인한다.
 - 커밋·푸시: **전자동**. 작업 단위가 끝나고 검증(detekt·testDebugUnitTest)이 통과하면 커밋하고 `origin/main` 에 푸시한다. 사용자가 2026-09-13 에 준 지속적 승인이며, 근거 없이 자동 푸시하는 것과 구분된다.
 - 브랜치: **main 고정**. 브랜치를 만들지 않고 main 에 바로 쌓는다.
-- **예외 — 리뷰는 자동 커밋·푸시하지 않는다.** 코드리뷰·리뷰 문서, 그리고 리뷰에서 나온 수정은 위 정책이 '전자동'이어도 사람이 읽고 판단한 뒤에 커밋한다. 리뷰는 사실이 아니라 의견이고, 틀린 의견이 먼저 기록에 박히면 되돌리기 어렵다.
+- 리뷰 문서와 리뷰에서 나온 수정도 위 정책대로 커밋한다. 2026-11-18 에 사용자가 리뷰 예외를 없앴다("전부 자동 commit 으로 전환").
 
 ### docs
 - 여러 단계짜리 작업은 코드를 건드리기 전에 `docs/plans/<slug>/` 에 계획을 먼저 쓴다. 기능 단위 설계 문서(`docs/<FEATURE>.md`)는 지금처럼 계속 쓴다 — plans 는 "이번 작업을 어떻게 진행할지", 설계 문서는 "이 기능이 어떻게 동작하는지"다.
